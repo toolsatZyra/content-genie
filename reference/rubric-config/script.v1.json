@@ -1,0 +1,943 @@
+{
+  "rubricId": "script",
+  "version": "1.0.0",
+  "displayName": "Script rubric v1 (12 parameters)",
+  "provenance": "Synthesized from 'Implementation-Ready Microdrama Scriptwriting and Evaluation Framework' (input-research/, pages 25-30) under the 8 founder rulings of 2 Jul 2026. Every deviation is documented in SYNTHESIS_NOTES.md. Anchor levels 1/3/5/7/10 carry the source's verbatim keyword; levels 2/4/6/8/9 are interpolated and flagged _derived.",
+  "scales": {
+    "parameter": { "min": 1, "max": 10, "integerPerCall": true },
+    "composite": { "min": 0, "max": 100 }
+  },
+  "parameters": [
+    {
+      "id": "opening_hook",
+      "name": "Opening hook strength",
+      "definition": "Whether the opener creates immediate compulsion: the first beat changes status, knowledge, or threat.",
+      "weight": 10,
+      "evidence": "either",
+      "anchors": {
+        "1": {
+          "text": "Flat - the opener creates no compulsion; nothing changes status, knowledge, or threat.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Nearly flat - a faint stir of tension, but the first beat is still setup and demands nothing.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Readable but weak - the opening's intent is legible, yet the first beat lands softly and generates little pull.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Approaching functional - a real hook exists but arrives late or undersold.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Functional - a clear hook exists and lands on time, but it is ordinary; it holds rather than grabs.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Above functional - the hook is clear and has one distinct element (image, line, or accusation) that raises curiosity.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Strong - the first beat immediately changes status, knowledge, or threat in a way that demands the next beat.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very strong - immediate, specific, and fresh; the hook creates a question a viewer will not abandon.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-irresistible - a first beat that would stop a scroll cold; only marginal polish separates it from best-in-class.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Irresistible and clean - an instantly legible, compulsive opening (accusation, danger, public exposure) with zero wasted setup.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "protagonist_clarity",
+      "name": "Protagonist clarity and emotional alignment",
+      "definition": "Whether the viewer knows whose pain and want matter: clear goal, wound, and identification.",
+      "weight": 9,
+      "evidence": "either",
+      "anchors": {
+        "1": {
+          "text": "No anchor - the viewer cannot tell whose story this is or why to care.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Barely anchored - a lead is identifiable but their want and wound are absent.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Anchor vague - the lead is visible but goal or injury is fuzzy; competing focal points blur alignment.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Emerging - goal or wound is stated but not yet felt; alignment flickers.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Decent - the lead's goal and injury are readable; the viewer aligns, without strong pull.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Solid - goal, wound, and desire are all present and consistent across the episode.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Strong - a specific, personal want and injury make the viewer feel the lead's stakes as their own.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very strong - the lead's pain and want drive every beat; alignment never breaks.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-vivid - deeply personal and specific; a single beat short of unforgettable.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Vivid and personal - the lead's desire and injury are so specific and personal the audience cannot help but take their side.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "conflict_stakes",
+      "name": "Conflict and stakes density",
+      "definition": "How much active pressure exists: obstacles, countdowns, shame, loss, danger.",
+      "weight": 11,
+      "evidence": "either",
+      "anchors": {
+        "1": {
+          "text": "Inert - no active opposition or cost anywhere; people talk, nothing presses.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Nearly inert - one mild obstacle exists but carries no consequence.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Thin - pressure appears in patches; long stretches carry no risk of loss.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Sparse - real stakes exist but the pressure releases between beats.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Adequate - consistent conflict with visible cost, though the pressure is familiar and evenly paced.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Firm - conflict compounds; at least one countdown, shame, or danger tightens mid-episode.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Pressurized - overlapping obstacles and social cost keep every scene under load.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Heavily pressurized - escalating, layered stakes; each beat raises what can be lost.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-relentless - pressure never releases and keeps sharpening; marginal slack remains in one beat at most.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Relentless - every beat applies new, meaningful pressure; obstacles, countdowns, and social cost interlock without repetition.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "structure_pacing",
+      "name": "Episode structure and pacing",
+      "definition": "Beat efficiency and escalation: late entry, no drift, rising pressure across the micro-slot.",
+      "weight": 10,
+      "evidence": "either",
+      "anchors": {
+        "1": {
+          "text": "Shapeless - no discernible beat structure; scenes wander without escalation.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Barely shaped - a structure is intended but buried under setup and drift.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Saggy - the spine exists but the middle drifts; entries are early and exits late.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Loose - beats land in order but at TV pace, too slow for the micro-slot.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Competent - clean beat order and functional pacing; escalation present but even.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Tight-ish - late entries and early exits in most scenes; only one beat overstays.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Crisp - every beat enters late, exits early, and escalates; no drift anywhere.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very crisp - compression creates momentum; structure itself generates tension.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-perfect economy - every second earns its place; one merge away from optimal.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Perfectly economical - not a wasted beat; setup is folded into pressure and the escalation curve never flattens.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "twist_reveal",
+      "name": "Twist and reveal effectiveness",
+      "definition": "Quality of reversals and knowledge shifts: seeded turns that change power.",
+      "weight": 8,
+      "evidence": "either",
+      "anchors": {
+        "1": {
+          "text": "Absent or cheap - no reversal, or a shock with no seeding and no consequence.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Token - a turn exists but is arbitrary; nothing changes because of it.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Predictable - the reveal is visible long before it lands; power barely shifts.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Serviceable-minus - the turn lands but its seeding is thin or its consequence delayed.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Works - a legible, seeded reveal that shifts knowledge, executed conventionally.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Good - seeded and consequential; the power shift is felt immediately.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Strong - a well-seeded reversal that meaningfully rearranges power and raises the next question.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very strong - surprising yet inevitable in hindsight; consequences ripple through the episode.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-exceptional - shocking and fully earned; a hair short of best-in-class execution.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Shocking yet earned - a reveal the audience never saw coming that was fairly seeded all along, with immediate, heavy consequence.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "cliffhanger_pull",
+      "name": "Cliffhanger and next-episode pull",
+      "definition": "Force of the continuation cue: a precise unanswered debt at the episode's end.",
+      "weight": 10,
+      "evidence": "either",
+      "anchors": {
+        "1": {
+          "text": "None - the episode simply stops or resolves; no unanswered question remains.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Trace - a loose thread exists but no one would notice it as a cue to continue.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Soft - a vague mood ending; unease without a precise question.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Mild - a question exists but is small or answerable by assumption.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Serviceable - a clear unanswered question that would carry a patient viewer forward.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Firm - a specific debt (threat, secret, decision) left open at the cut.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Strong - a precise, actionable uncertainty that makes skipping the next episode feel costly.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very strong - the cut lands mid-consequence; the question is urgent and personal.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-compulsive - an ending engineered for the immediate next tap; a frame's polish from perfect.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Immediate tap desire - an ending that converts directly into the next episode: one precise, unbearable question at maximum pressure.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "dialogue_economy",
+      "name": "Dialogue economy and performability",
+      "definition": "Whether lines do clean story work: short, specific, actable, subtitle-friendly.",
+      "weight": 8,
+      "evidence": "either",
+      "anchors": {
+        "1": {
+          "text": "Bloated - long, explanatory speeches; lines restate emotion instead of acting.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Heavy - exposition dominates; a few functional lines survive.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Generic - lines are short enough but interchangeable; no voice, no status play.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Passable - mostly functional lines with recurring generic patches.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Fine - economical and performable; does the work without distinction.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Good - compressed, specific lines; status play visible in exchanges.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Sharp - every line attacks, defends, reveals, or decides; subtitle-friendly and actable.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very sharp - compression creates subtext; lines are quotable in places.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-exceptional - emotionally specific, highly compressed; a line or two from best-in-class.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Quotable and lean - maximum story work per word; lines survive dubbing and subtitling with their edge intact.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "relationship_legibility",
+      "name": "Character and relationship legibility",
+      "definition": "Clarity of the social topology: kinship, status, and bonds readable at speed.",
+      "weight": 7,
+      "evidence": "either",
+      "anchors": {
+        "1": {
+          "text": "Confusing - the viewer cannot map who is who or how anyone relates.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Muddled - core pair is clear but everyone else blurs; name overload.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Patchy - key relationships legible only after effort or rewatching.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Mostly readable - one relationship or status link remains unclear.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Clear enough - the social map is readable, if plain; roles arrive a beat late in places.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Clear - kinship, status, and bonds land on first viewing.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Strong - relationships are established instantly through role labels and behavior, not exposition.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very strong - the topology is legible and does dramatic work; status shifts read in real time.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-effortless - instant, memorable social map with a single soft edge.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Effortless - every relationship and status line is instantly legible and productive; no viewer ever asks who someone is.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "series_continuity",
+      "name": "Series continuity and escalation",
+      "definition": "How well the episode serves the season arc: callbacks, planted debt, payoff chaining.",
+      "weight": 8,
+      "evidence": "either",
+      "contextRequirements": ["series_context"],
+      "anchors": {
+        "1": {
+          "text": "Disconnected - the episode ignores the arc; filler with forgotten secrets.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Loose - a nominal link to the arc that changes nothing.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Shaky - continuity exists but wobbles; planted debts go unacknowledged.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Serviceable-minus - the episode advances the arc but pays off little it planted.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Adequate - respects continuity and plants or pays at least one debt.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Connected - callbacks land; the episode both pays and plants.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Integrated - the episode's function in the season is explicit; reveals chain cleanly across episodes.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Tightly integrated - escalation is cumulative; earlier plants pay at maximum value.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-elegant - the chaining is invisible until it strikes; one link short of perfect.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Elegantly cumulative - every callback, debt, and payoff compounds; the episode is both complete and inseparable from the arc.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "genre_freshness",
+      "name": "Genre/trope fit and freshness",
+      "definition": "Formula competence plus novelty: expected pleasure delivered with a distinct spin.",
+      "weight": 7,
+      "evidence": "either",
+      "anchors": {
+        "1": {
+          "text": "Wrong-fit - the episode misunderstands its genre contract; expected pleasures never arrive.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Off-genre - the contract is half-honored; tone or beats fight the format.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Derivative - competent tropes with zero angle; indistinguishable from the pile.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Standard-minus - the formula works but any spin is cosmetic.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Acceptable - delivers the genre's pleasures cleanly; freshness is modest.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Engaging - formula plus one genuine twist on setting, competence, or moral line.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Satisfying - the expected pleasure lands with a distinct, ownable spin.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very satisfying - the spin reshapes familiar beats; the episode feels new without breaking contract.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-exceptional - familiar made newly energized; a notch from defining its subgenre.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Familiar but newly energized - honors the formula perfectly while making it feel invented yesterday.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "localization_fit",
+      "name": "Localization and cultural fit",
+      "definition": "Credibility in the target market: idiom, ritual, institutions, and shame logic feel lived, not translated.",
+      "weight": 6,
+      "evidence": "either",
+      "contextRequirements": ["market_language"],
+      "anchors": {
+        "1": {
+          "text": "False - the world reads imported; idiom, ritual, and institutions ring untrue for the market.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Mostly false - isolated authentic touches inside a translated frame.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Spotty - authenticity comes and goes; key beats (custom, kinship, procedure) feel off.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Uneven - the world mostly holds but dialogue or ritual slips into translationese.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Passable - a native viewer would not object, though little feels specifically local.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Grounded - local idiom and social rules do real work in at least one beat.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Credible - conflict runs through local social rules; shame and honor logic are native.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very credible - the market's texture shapes plot decisions, not just dressing.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-native - lived-in specificity throughout; one soft note from market-native.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Market-native - indistinguishable from a story conceived inside the culture; nothing reads translated.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "monetization_compliance",
+      "name": "Monetization, production, and platform compliance fit",
+      "definition": "Ability to work on the actual platform and locations safely and affordably: paywall placement, cast/location and safety discipline.",
+      "weight": 6,
+      "evidence": "either",
+      "contextRequirements": ["platform_model"],
+      "anchors": {
+        "1": {
+          "text": "Unusable - the script cannot be produced or published as written: unsafe content, impossible logistics, or no workable paywall structure.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Severely constrained - major compliance or production blockers with no obvious fixes.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Risky - expensive sprawl or content near compliance lines; the paywall beat is weak or misplaced.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Marginal - producible with compromises; monetization structure underexploited.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Workable - fits budget, safety, and platform norms; paywall placement functional.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Sound - disciplined logistics and a deliberate paywall beat.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Strong - production is lean by design and the monetization beat is engineered into the structure.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very strong - cost discipline and compliance headroom with a high-conversion gate beat.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-optimized - production and monetization logic reinforce the drama; trivial slack remains.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Optimized - maximum drama per rupee, airtight compliance, and a paywall beat the structure was built around.",
+          "_derived": false
+        }
+      }
+    }
+  ],
+  "composites": [
+    {
+      "id": "cq",
+      "name": "Craft Quality",
+      "kind": "weighted-params",
+      "scale": "0-100",
+      "higherIsWorse": false,
+      "formulaText": "CQ = (SUM(w_i x s_i) / SUM(w_i)) x 10, using parameters 1-11 with effective (context-adjusted) weights. Excludes monetization_compliance.",
+      "paramIds": [
+        "opening_hook",
+        "protagonist_clarity",
+        "conflict_stakes",
+        "structure_pacing",
+        "twist_reveal",
+        "cliffhanger_pull",
+        "dialogue_economy",
+        "relationship_legibility",
+        "series_continuity",
+        "genre_freshness",
+        "localization_fit"
+      ],
+      "weighting": "effective-weights",
+      "scaleFactor": 10,
+      "clamp": [0, 100]
+    },
+    {
+      "id": "cp",
+      "name": "Commercial Pull",
+      "kind": "linear",
+      "scale": "0-100",
+      "higherIsWorse": false,
+      "formulaText": "CP = 10 x (0.25 x opening_hook + 0.20 x conflict_stakes + 0.20 x cliffhanger_pull + 0.15 x genre_freshness + 0.10 x localization_fit + 0.10 x monetization_compliance). 'Scaled to 100' resolved as x10 per founder ruling 3.",
+      "intercept": 0,
+      "scaleFactor": 10,
+      "terms": [
+        {
+          "ref": { "type": "param", "id": "opening_hook" },
+          "coefficient": 0.25
+        },
+        {
+          "ref": { "type": "param", "id": "conflict_stakes" },
+          "coefficient": 0.2
+        },
+        {
+          "ref": { "type": "param", "id": "cliffhanger_pull" },
+          "coefficient": 0.2
+        },
+        {
+          "ref": { "type": "param", "id": "genre_freshness" },
+          "coefficient": 0.15
+        },
+        {
+          "ref": { "type": "param", "id": "localization_fit" },
+          "coefficient": 0.1
+        },
+        {
+          "ref": { "type": "param", "id": "monetization_compliance" },
+          "coefficient": 0.1
+        }
+      ],
+      "clamp": [0, 100]
+    },
+    {
+      "id": "risk",
+      "name": "Risk",
+      "kind": "linear",
+      "scale": "0-100",
+      "higherIsWorse": true,
+      "formulaText": "R = 100 - 10 x (0.4 x localization_fit + 0.6 x monetization_compliance); +15 if a severe safety/compliance red flag is raised (source: 'adjusted upward for any known red-flag issue', quantified as +15 in Rubric v1 - see SYNTHESIS_NOTES). Higher is worse; R is SUBTRACTED in Overall.",
+      "intercept": 100,
+      "scaleFactor": -10,
+      "terms": [
+        {
+          "ref": { "type": "param", "id": "localization_fit" },
+          "coefficient": 0.4
+        },
+        {
+          "ref": { "type": "param", "id": "monetization_compliance" },
+          "coefficient": 0.6
+        }
+      ],
+      "flagAdjustments": [
+        { "whenFlag": "severe_safety_compliance", "add": 15 }
+      ],
+      "clamp": [0, 100]
+    },
+    {
+      "id": "overall",
+      "name": "Overall",
+      "isOverall": true,
+      "kind": "linear",
+      "scale": "0-100",
+      "higherIsWorse": false,
+      "formulaText": "Overall = 0.60 x CQ + 0.30 x CP - 0.10 x R, clamped to 0-100. The formula governs; the source's worked example (71 vs computed 66.0) is rejected per founder ruling 4.",
+      "intercept": 0,
+      "scaleFactor": 1,
+      "terms": [
+        { "ref": { "type": "composite", "id": "cq" }, "coefficient": 0.6 },
+        { "ref": { "type": "composite", "id": "cp" }, "coefficient": 0.3 },
+        { "ref": { "type": "composite", "id": "risk" }, "coefficient": -0.1 }
+      ],
+      "clamp": [0, 100]
+    }
+  ],
+  "priority": {
+    "formulaText": "Priority_i = effectiveWeight_i x (10 - score_i) x contextMultiplier_i; top items are the fix-first list.",
+    "contextMultipliers": [
+      {
+        "paramId": "opening_hook",
+        "when": { "field": "episodePosition", "equals": "first" },
+        "multiplier": 1.5
+      },
+      {
+        "paramId": "cliffhanger_pull",
+        "when": { "field": "episodePosition", "equals": "pre-paywall" },
+        "multiplier": 1.5
+      },
+      {
+        "paramId": "series_continuity",
+        "when": { "field": "episodePosition", "equals": "finale" },
+        "multiplier": 1.5
+      }
+    ],
+    "defaultMultiplier": 1.0
+  },
+  "confidence": {
+    "kind": "subtractive",
+    "base": 100,
+    "clamp": [0, 100],
+    "deductions": [
+      {
+        "id": "no_series_context",
+        "when": { "field": "seriesContext", "absent": true },
+        "subtract": 20
+      },
+      {
+        "id": "no_episode_position",
+        "when": { "field": "episodePosition", "absent": true },
+        "subtract": 15
+      },
+      {
+        "id": "no_market_language",
+        "when": { "field": "market", "absent": true },
+        "subtract": 15
+      },
+      {
+        "id": "no_platform_model",
+        "when": { "field": "platformModel", "absent": true },
+        "subtract": 10
+      },
+      {
+        "id": "outline_only",
+        "when": { "field": "mode", "equals": "outline_only" },
+        "subtract": 10
+      },
+      {
+        "id": "prior_episodes_unavailable",
+        "when": { "field": "priorEpisodesAvailable", "absent": true },
+        "subtract": 10
+      }
+    ],
+    "engineDeductions": [
+      { "id": "rejected_parameter_calls", "perItem": 5, "max": 20 },
+      { "id": "run_disagreement_spread_3plus", "perItem": 2, "max": 10 }
+    ]
+  },
+  "gates": [
+    {
+      "id": "first_episode_hook",
+      "description": "First-episode hook below 4: the opener cannot carry a series launch.",
+      "condition": { "paramId": "opening_hook", "op": "<", "value": 4 },
+      "appliesWhen": { "field": "episodePosition", "equals": "first" },
+      "severity": "major",
+      "effect": "cap-verdict"
+    },
+    {
+      "id": "non_finale_cliffhanger",
+      "description": "Non-finale cliffhanger below 4: an episode that does not pull forward breaks the binge chain.",
+      "condition": { "paramId": "cliffhanger_pull", "op": "<", "value": 4 },
+      "appliesWhen": {
+        "field": "episodePosition",
+        "in": ["first", "pre-paywall", "midpoint", "other"]
+      },
+      "severity": "major",
+      "effect": "cap-verdict"
+    },
+    {
+      "id": "market_localization",
+      "description": "Localization below 4 on a market-specific commissioning: the script will not land in its target market.",
+      "condition": { "paramId": "localization_fit", "op": "<", "value": 4 },
+      "appliesWhen": { "field": "market", "present": true },
+      "severity": "major",
+      "effect": "cap-verdict"
+    },
+    {
+      "id": "monetization_compliance_floor",
+      "description": "Monetization/production/compliance below 4: the script cannot be produced or published viably. Applies only when platform context was provided (missing context must lower confidence, never fail - see SYNTHESIS_NOTES).",
+      "condition": {
+        "paramId": "monetization_compliance",
+        "op": "<",
+        "value": 4
+      },
+      "appliesWhen": { "field": "platformModel", "present": true },
+      "severity": "major",
+      "effect": "cap-verdict"
+    },
+    {
+      "id": "arc_continuity",
+      "description": "Continuity below 4 at midpoint or finale: the arc-carrying episodes cannot ignore the arc.",
+      "condition": { "paramId": "series_continuity", "op": "<", "value": 4 },
+      "appliesWhen": {
+        "field": "episodePosition",
+        "in": ["midpoint", "finale"]
+      },
+      "severity": "major",
+      "effect": "cap-verdict"
+    },
+    {
+      "id": "severe_red_flag",
+      "description": "Any safety/compliance red flag marked severe (obscenity/IRWA exposure, POCSO risk, drug glorification, harmful misrepresentation).",
+      "condition": { "flag": "severe_safety_compliance" },
+      "appliesWhen": {},
+      "severity": "safety",
+      "effect": "force-bottom"
+    }
+  ],
+  "modes": [
+    {
+      "id": "finished_episode",
+      "reachable": true,
+      "inputType": "video",
+      "note": "Video path: transcript + joint AV read scored against this rubric. Base weights."
+    },
+    {
+      "id": "script_only",
+      "reachable": true,
+      "inputType": "text",
+      "note": "Paste-script path. Base weights; context-starved parameters carry low-confidence markers."
+    },
+    {
+      "id": "outline_only",
+      "reachable": false,
+      "inputType": "text",
+      "note": "In config for completeness (source mode); no UI path in v1. Confidence deduction applies."
+    },
+    {
+      "id": "batch",
+      "reachable": false,
+      "inputType": "text",
+      "note": "Full scripted batch (source mode); no UI path in v1."
+    }
+  ],
+  "contextAdjustments": [
+    {
+      "id": "position_first",
+      "when": { "field": "episodePosition", "equals": "first" },
+      "up": ["opening_hook", "protagonist_clarity", "genre_freshness"],
+      "down": ["series_continuity"]
+    },
+    {
+      "id": "position_pre_paywall",
+      "when": { "field": "episodePosition", "equals": "pre-paywall" },
+      "up": ["cliffhanger_pull", "conflict_stakes", "monetization_compliance"],
+      "down": []
+    },
+    {
+      "id": "position_midpoint",
+      "when": { "field": "episodePosition", "equals": "midpoint" },
+      "up": ["twist_reveal", "series_continuity"],
+      "down": ["opening_hook"]
+    },
+    {
+      "id": "position_finale",
+      "when": { "field": "episodePosition", "equals": "finale" },
+      "up": ["series_continuity", "protagonist_clarity"],
+      "down": ["monetization_compliance"]
+    },
+    {
+      "id": "platform_ad_supported",
+      "when": { "field": "platformModel", "equals": "ad-supported" },
+      "up": ["opening_hook", "structure_pacing", "dialogue_economy"],
+      "down": ["series_continuity"]
+    },
+    {
+      "id": "platform_premium_unlock",
+      "when": { "field": "platformModel", "equals": "premium-unlock" },
+      "up": ["cliffhanger_pull", "twist_reveal", "monetization_compliance"],
+      "down": []
+    }
+  ],
+  "weightShift": {
+    "relativeFactorUp": 1.2,
+    "relativeFactorDown": 0.8,
+    "stacking": "multiplicative",
+    "renormalizeTo": 100,
+    "note": "Founder ruling 5: shifts are +/-20% relative, renormalized to 100, and every shifted weight is flagged derived in the result."
+  },
+  "verdict": {
+    "ladder": [
+      {
+        "internalLabel": "greenlight",
+        "displayLabel": "Ready to shoot",
+        "rule": {
+          "overallGte": 82,
+          "compositeGte": { "cq": 78, "cp": 78 },
+          "requiresNoGates": true
+        }
+      },
+      {
+        "internalLabel": "greenlight_minor_fixes",
+        "displayLabel": "Ready with minor fixes",
+        "rule": { "overallGte": 74, "requiresNoGates": true }
+      },
+      {
+        "internalLabel": "rewrite_lightly",
+        "displayLabel": "Fix first",
+        "rule": { "overallGte": 65 }
+      },
+      {
+        "internalLabel": "rewrite_heavily",
+        "displayLabel": "Rework",
+        "rule": { "overallGte": 50 }
+      },
+      {
+        "internalLabel": "rebreak",
+        "displayLabel": "Rebreak",
+        "rule": { "overallGte": 35 }
+      },
+      {
+        "internalLabel": "reject",
+        "displayLabel": "Not in this form",
+        "rule": { "overallGte": 0 }
+      }
+    ],
+    "gateCap": {
+      "capLabel": "rewrite_heavily",
+      "safetyLabel": "reject",
+      "note": "Founder ruling 1: every triggered gate is major severity and caps the verdict at rewrite_heavily (displayed 'Rework'); only a severe safety/compliance flag forces reject ('Not in this form'). Founder ruling 6: a triggered gate always blocks both Ready labels. Ladder is read top-down, first match (ruling 2)."
+    }
+  }
+}

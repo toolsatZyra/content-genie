@@ -1,0 +1,1296 @@
+{
+  "rubricId": "visual",
+  "version": "1.0.0",
+  "displayName": "Visual rubric v1 (15 parameters)",
+  "provenance": "Synthesized from 'Mobile-First Vertical Microdrama Visual Direction and Evaluation Framework' (input-research/, pages 19-24) under the 8 founder rulings of 2 Jul 2026. Garbled anchor rows were re-verified against the PDF via word-coordinate extraction (ruling 7); every deviation is documented in SYNTHESIS_NOTES.md. Anchor levels 1/3/5/7/10 carry the source's verbatim keyword; levels 2/4/6/8/9 are interpolated and flagged _derived.",
+  "scales": {
+    "parameter": { "min": 1, "max": 10, "integerPerCall": true },
+    "composite": { "min": 0, "max": 100 }
+  },
+  "parameters": [
+    {
+      "id": "first_frame_hook",
+      "name": "First-frame hook",
+      "definition": "The opening image's ability to stop a scroll or hold entry: instant conflict, a face, danger, or urgent proof.",
+      "weight": 10,
+      "evidence": "timestamp",
+      "anchors": {
+        "1": {
+          "text": "Neutral opening - the first frame carries no signal at all; nothing invites a stop.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Faint signal - a subject exists but no tension, question, or urgency reads.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Slow or generic - the opening image resembles a thousand others or takes seconds to mean anything.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Mildly engaging - one element (face, prop, framing) earns a beat of attention.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Readable but not urgent - the situation is instantly legible, yet nothing presses the viewer to stay.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Engaging - legible plus one urgent element; most viewers pause.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Urgent and clear - conflict or danger reads within the first second and demands the next.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very strong - an arresting, specific image that opens a question on sight.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-unforgettable - a scroll-stopping frame a hair short of iconic.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Unforgettable opening image - instantly legible, emotionally loaded, and unlike anything adjacent in the feed.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "visual_story_clarity",
+      "name": "Visual story clarity",
+      "definition": "Ability to understand who, what, and why from the images: cause and effect legible without leaning on dialogue.",
+      "weight": 9,
+      "evidence": "timestamp",
+      "anchors": {
+        "1": {
+          "text": "Viewers lost - who, what, or why cannot be followed from the images at all.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Heavily obscured - the spine is guessable only with effort and rewinding.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Frequent ambiguity - key beats are repeatedly unclear; proof shots missing.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Patchy - most beats read but at least one pivotal moment is visually mute.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Mostly clear - the story reads, with occasional soft spots a caption has to rescue.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Clear - cause and effect read on first viewing; minor polish possible.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Clear with minor gaps - visually self-sufficient storytelling with only trivial ambiguities.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very clear - every beat lands visually; inserts and reactions carry the causality.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-crystal - the muted episode would still be fully understood; one soft frame remains.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Crystal clear - the images alone tell the complete story; no viewer, in any language, is ever lost.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "vertical_composition",
+      "name": "Vertical composition",
+      "definition": "How well the frame uses 9:16: subject centered, depth, clean tiering.",
+      "weight": 8,
+      "evidence": "timestamp",
+      "anchors": {
+        "1": {
+          "text": "Frame fights format - horizontal staging crammed into 9:16; subjects cut off or lost.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Poor fit - the portrait frame is tolerated, not used; constant awkward headroom or dead zones.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Frequent empty edges - large unused frame areas; the vertical field wasted more often than not.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Serviceable-minus - subjects sit correctly but depth and tiering are rare.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Competent - clean, centered vertical framing throughout; conventional but correct.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Good - deliberate use of vertical depth in several shots.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Strong portrait use - foreground/background tiering and vertical lines actively composed.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very strong - the vertical frame shapes meaning: dominance, isolation, proximity.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-native - composition thinks phone-first in nearly every shot.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Frame feels native to phone - 9:16 is the film language, not a crop; every composition exploits the format.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "emotional_readability",
+      "name": "Emotional readability",
+      "definition": "Facial and bodily feeling transmission: reactions decode instantly on a small screen.",
+      "weight": 8,
+      "evidence": "timestamp",
+      "anchors": {
+        "1": {
+          "text": "Emotions unreadable - faces too far, too dark, or too flat to decode.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Barely readable - emotion is present but the camera keeps missing it.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Effortful - the viewer works to infer feeling; key reactions under-shot.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Inconsistent - some beats land emotionally, others go blank.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Mostly legible - primary emotions read, nuance does not.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Legible - feelings read reliably in close-ups and holds.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Easy to read - every key emotion lands instantly at phone size.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very strong - emotion is staged, lit, and held so it cannot be missed.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-exceptional - immediate and starting to layer (mixed feelings readable).",
+          "_derived": true
+        },
+        "10": {
+          "text": "Immediate and layered - feelings decode in a glance yet carry depth; reaction shots do dramatic work of their own.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "reveal_execution",
+      "name": "Reveal execution",
+      "definition": "The reveal is visible, timed, and emotionally landed: proof + reaction + consequence.",
+      "weight": 8,
+      "evidence": "timestamp",
+      "anchors": {
+        "1": {
+          "text": "Reveal unreadable - the audience cannot see or grasp the evidence that turns the story.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Nearly lost - the reveal exists on screen but most viewers would miss it.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Late or confusing - the proof arrives at the wrong beat or reads only on second viewing.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Under-executed - visible but flat; reaction or consequence shot missing.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Functional - proof shown and understood; the moment lands without force.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Solid - proof plus reaction present and timed; consequence implied.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Strong - proof, reaction, and consequence all land in sequence at the right beat.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very strong - the reveal is staged for maximum legibility and emotional impact.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-devastating - a fully weaponized reveal one cut from perfect.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Devastatingly clear - an unmissable, perfectly timed reveal whose proof, reaction, and consequence hit like a verdict.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "blocking_power_geometry",
+      "name": "Blocking and power geometry",
+      "definition": "Social rank made visible in space: foreground ownership, height, doors, distance.",
+      "weight": 7,
+      "evidence": "timestamp",
+      "anchors": {
+        "1": {
+          "text": "Random staging - actor placement carries no meaning; power invisible.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Accidental - occasional meaningful placement, clearly unplanned.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Weak hierarchy - rank is sometimes suggested but equal framing flattens unequal stakes.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Intermittent - deliberate geometry in a few scenes only.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Some rank visible - status reads in key confrontations, generic elsewhere.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Consistent - placement, height, and distance track the power map scene to scene.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Strong status shifts - power reversals are staged spatially and read without a word.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very strong - geometry anticipates and amplifies every beat change.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-self-sufficient - blocking alone nearly narrates the drama.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Geometry tells story by itself - the spatial arrangement alone communicates who holds power and when it moves.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "visual_escalation",
+      "name": "Visual escalation",
+      "definition": "The episode intensifies visually: scale, movement, density, stakes rise together.",
+      "weight": 7,
+      "evidence": "timestamp",
+      "anchors": {
+        "1": {
+          "text": "Flat line - the last minute looks like the first; zero visual build.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Trace build - one intensifying element, quickly abandoned.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Weak build - intent to escalate is visible but the rise keeps stalling.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Uneven - escalation in patches with visual plateaus between.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Some build - a readable rise exists, gentle and partly accidental.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Structured - a deliberate ladder with most rungs in place.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Clear ladder - scale, pace, and density step up beat by beat toward the climax.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very strong - the escalation is felt physically; each beat visibly outbids the last.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-relentless - continuous coherent rise with a single soft step.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Relentless but coherent rise - unbroken visual escalation that never tips into noise.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "cliffhanger_image",
+      "name": "Cliffhanger image strength",
+      "definition": "The terminal image's continuation pull: an unanswered image question that creates purchase or next-click pressure.",
+      "weight": 7,
+      "evidence": "timestamp",
+      "anchors": {
+        "1": {
+          "text": "No pull - the episode ends on a resolved or empty frame; nothing asks to be continued.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Faint pull - a residual mood, no visual question.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Soft stop - the ending frame gestures at more but releases the tension before the cut.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Mild - a question exists in dialogue but the final image undersells it.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Serviceable - the final frame holds a readable open question.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Firm - a specific visual question at the cut; the next tap is likely.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Compelling - the terminal image freezes an unresolved action or threat at its peak.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very strong - image and timing engineered so stopping feels like a loss.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-irresistible - a purchase-pressure ending one frame from perfect.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Irresistible - the final image is an unbearable open question; continuation (or payment) feels inevitable.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "edit_rhythm",
+      "name": "Edit rhythm",
+      "definition": "The cut pattern suits beat density and readability: pace aligns to duration.",
+      "weight": 7,
+      "evidence": "timestamp",
+      "anchors": {
+        "1": {
+          "text": "Incomprehensible or dull - cutting so fast it scrambles, or so slow it dies.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Erratic - pace lurches without relation to the drama.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Unstable - stretches of overcut or drag; rhythm fights the beats.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Rough - workable pace with recurring mistimed cuts.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Acceptable - conventional rhythm that neither helps nor hurts.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Assured - cuts land on beats; holds appear where emotion needs them.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Controlled - rhythm consciously shaped to duration and beat density.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very strong - the cut pattern itself builds tension and release.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-addictive - propulsive and legible; one sequence from perfect.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Addictive and clear - a rhythm that pulls the viewer through while every frame stays readable.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "shot_economy",
+      "name": "Shot economy",
+      "definition": "Each shot advances value: no wasted coverage.",
+      "weight": 6,
+      "evidence": "timestamp",
+      "anchors": {
+        "1": {
+          "text": "Bloated and redundant - coverage padding everywhere; shots repeat without adding.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Heavy - noticeable filler in most scenes.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Repeated same value - multiple shots doing one shot's job.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Loose - occasional redundancy; trims available in every scene.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Acceptable - functional coverage with modest excess.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Lean-ish - most shots earn their place.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Efficient - every shot advances information, emotion, or pressure.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very efficient - compression adds energy; nothing removable without loss.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-razor - essentially minimal; one shot in question.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Razor-sharp - the minimum set of shots, each indispensable, each multiplying value.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "performance_capture",
+      "name": "Performance capture",
+      "definition": "Camera and editorial use of acting: take choice, hold length, framing.",
+      "weight": 6,
+      "evidence": "timestamp",
+      "anchors": {
+        "1": {
+          "text": "Best emotion missed - the camera or cut consistently abandons the performance at its peak.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Poor - strong moments exist in the footage logic but rarely survive to screen.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Partial capture - key beats caught, others cut away too early or framed too wide.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Uneven - good instincts, inconsistent execution across scenes.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Enough - performances read; holds and take choices are safe.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Good - deliberate holds on the right faces at the right beats.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Strong - take selection, hold length, and framing consistently serve the acting.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very strong - editorial choices actively elevate the performances.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-maximized - the screen extracts nearly everything the actors gave.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Performance maximized - camera and cut squeeze full value from every take; nothing an actor did well is wasted.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "sound_music",
+      "name": "Sound and music effectiveness",
+      "definition": "Dialogue clear, music helps: clean speech, smart stings, use of silence.",
+      "weight": 5,
+      "evidence": "timestamp",
+      "anchors": {
+        "1": {
+          "text": "Speech unintelligible - dialogue materially cannot be understood.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Badly compromised - constant strain to hear; music fights speech.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Masking frequent - score or effects repeatedly bury lines.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Uneven - clean in places, muddy in others; stings generic.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Usable - dialogue clear; music present but decorative.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Supportive - the mix is clean and cues land with the beats.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Effective - sound design shapes tension; silence used deliberately.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very strong - audio actively drives emotion without ever costing a word.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-exceptional - impactful and pristine; one cue from perfect.",
+          "_derived": true
+        },
+        "10": {
+          "text": "High-impact and clean - a mix that hits hard, stays clear, and makes silence count.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "subtitle_ui_safety",
+      "name": "Subtitle and UI safety",
+      "definition": "Key information never blocked by text or app chrome: caption and UI safe zones honored.",
+      "weight": 4,
+      "evidence": "timestamp",
+      "anchors": {
+        "1": {
+          "text": "Captions hide story - crucial evidence or action sits under captions or app UI.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Repeated blocking - story-relevant material obscured more than once.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Frequent collisions - text and UI regularly overlap faces, props, or on-screen text.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Occasional collisions - a few avoidable overlaps, none fatal.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Mostly safe - safe zones generally respected; near-misses remain.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Safe - no meaningful collisions; placement is competent.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Safe and planned - framing anticipated captions and chrome from the shoot onward.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very strong - proof shots and text elements composed around the caption band by design.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-elegant - safety invisible because it was designed in everywhere.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Integrated elegantly - captions, UI, and imagery composed as one; nothing ever collides, nothing feels constrained.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "production_feasibility",
+      "name": "Production feasibility",
+      "definition": "Visual ambition fits resources: shootability and coverage practicality.",
+      "weight": 4,
+      "evidence": "timestamp",
+      "anchors": {
+        "1": {
+          "text": "Impossible - the plan cannot be executed on a microdrama schedule or budget.",
+          "_derived": false
+        },
+        "2": {
+          "text": "Improbable - executable only with luck or overrun baked in.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Likely overrun - too many moves, locations, or setups for the slot.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Tight - feasible with visible strain and no slack for problems.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Achievable with strain - the package fits, but only just.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Manageable - modest slack; the plan absorbs a bad day.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Realistic - ambition and resources are honestly matched.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very efficient - the design gets more screen value than its budget suggests.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-elegant - almost maximal value per setup.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Elegantly efficient - a lean package engineered to look richer than it costs.",
+          "_derived": false
+        }
+      }
+    },
+    {
+      "id": "localization_compliance",
+      "name": "Localization and compliance fit",
+      "definition": "Visuals fit the region and avoid avoidable risk: culturally coherent props, gestures, rituals.",
+      "weight": 4,
+      "evidence": "timestamp",
+      "contextRequirements": ["market_language"],
+      "anchors": {
+        "1": {
+          "text": "Severe mismatch or risk - imagery that offends, misrepresents, or breaches platform/regulatory lines for the market.",
+          "_derived": false
+        },
+        "2": {
+          "text": "High friction - multiple cultural misfires or compliance exposures.",
+          "_derived": true
+        },
+        "3": {
+          "text": "Notable friction - stereotype or taboo collisions a local viewer would flag.",
+          "_derived": false
+        },
+        "4": {
+          "text": "Minor friction - small mismatches in props, gestures, or rituals.",
+          "_derived": true
+        },
+        "5": {
+          "text": "Adequate - nothing offends; nothing feels specifically local either.",
+          "_derived": false
+        },
+        "6": {
+          "text": "Fitting - visual culture mostly reads native; compliance clean.",
+          "_derived": true
+        },
+        "7": {
+          "text": "Good fit - props, gestures, and rituals are coherent for the region; no avoidable risk.",
+          "_derived": false
+        },
+        "8": {
+          "text": "Very good - local visual texture does storytelling work.",
+          "_derived": true
+        },
+        "9": {
+          "text": "Near-native - a local viewer would assume a local crew; negligible risk.",
+          "_derived": true
+        },
+        "10": {
+          "text": "Deeply native feel - the imagery belongs to the market completely, with zero compliance exposure.",
+          "_derived": false
+        }
+      }
+    }
+  ],
+  "composites": [
+    {
+      "id": "ovs",
+      "name": "Overall Visual Score",
+      "isOverall": true,
+      "kind": "weighted-params",
+      "scale": "0-100",
+      "higherIsWorse": false,
+      "formulaText": "OVS = SUM(score_i x effectiveWeight_i) / 10 over all 15 parameters (weights sum to 100; equivalent to the weighted mean x 10).",
+      "paramIds": [
+        "first_frame_hook",
+        "visual_story_clarity",
+        "vertical_composition",
+        "emotional_readability",
+        "reveal_execution",
+        "blocking_power_geometry",
+        "visual_escalation",
+        "cliffhanger_image",
+        "edit_rhythm",
+        "shot_economy",
+        "performance_capture",
+        "sound_music",
+        "subtitle_ui_safety",
+        "production_feasibility",
+        "localization_compliance"
+      ],
+      "weighting": "effective-weights",
+      "scaleFactor": 10,
+      "clamp": [0, 100]
+    },
+    {
+      "id": "cvp",
+      "name": "Commercial Visual Pull",
+      "kind": "linear",
+      "scale": "0-100",
+      "higherIsWorse": false,
+      "formulaText": "CVP = 10 x (0.22 x first_frame_hook + 0.14 x emotional_readability + 0.14 x visual_escalation + 0.18 x reveal_execution + 0.20 x cliffhanger_image + 0.12 x edit_rhythm).",
+      "intercept": 0,
+      "scaleFactor": 10,
+      "terms": [
+        {
+          "ref": { "type": "param", "id": "first_frame_hook" },
+          "coefficient": 0.22
+        },
+        {
+          "ref": { "type": "param", "id": "emotional_readability" },
+          "coefficient": 0.14
+        },
+        {
+          "ref": { "type": "param", "id": "visual_escalation" },
+          "coefficient": 0.14
+        },
+        {
+          "ref": { "type": "param", "id": "reveal_execution" },
+          "coefficient": 0.18
+        },
+        {
+          "ref": { "type": "param", "id": "cliffhanger_image" },
+          "coefficient": 0.2
+        },
+        { "ref": { "type": "param", "id": "edit_rhythm" }, "coefficient": 0.12 }
+      ],
+      "clamp": [0, 100]
+    },
+    {
+      "id": "vcs",
+      "name": "Visual Craft Score",
+      "kind": "linear",
+      "scale": "0-100",
+      "higherIsWorse": false,
+      "formulaText": "VCS = 10 x (0.18 x vertical_composition + 0.20 x visual_story_clarity + 0.16 x blocking_power_geometry + 0.12 x shot_economy + 0.14 x performance_capture + 0.10 x sound_music + 0.10 x subtitle_ui_safety).",
+      "intercept": 0,
+      "scaleFactor": 10,
+      "terms": [
+        {
+          "ref": { "type": "param", "id": "vertical_composition" },
+          "coefficient": 0.18
+        },
+        {
+          "ref": { "type": "param", "id": "visual_story_clarity" },
+          "coefficient": 0.2
+        },
+        {
+          "ref": { "type": "param", "id": "blocking_power_geometry" },
+          "coefficient": 0.16
+        },
+        {
+          "ref": { "type": "param", "id": "shot_economy" },
+          "coefficient": 0.12
+        },
+        {
+          "ref": { "type": "param", "id": "performance_capture" },
+          "coefficient": 0.14
+        },
+        { "ref": { "type": "param", "id": "sound_music" }, "coefficient": 0.1 },
+        {
+          "ref": { "type": "param", "id": "subtitle_ui_safety" },
+          "coefficient": 0.1
+        }
+      ],
+      "clamp": [0, 100]
+    },
+    {
+      "id": "pfs",
+      "name": "Production Feasibility Score",
+      "kind": "linear",
+      "scale": "0-100",
+      "higherIsWorse": false,
+      "formulaText": "PFS = 10 x (0.35 x production_feasibility + 0.20 x shot_economy + 0.20 x blocking_power_geometry + 0.15 x edit_rhythm + 0.10 x subtitle_ui_safety).",
+      "intercept": 0,
+      "scaleFactor": 10,
+      "terms": [
+        {
+          "ref": { "type": "param", "id": "production_feasibility" },
+          "coefficient": 0.35
+        },
+        {
+          "ref": { "type": "param", "id": "shot_economy" },
+          "coefficient": 0.2
+        },
+        {
+          "ref": { "type": "param", "id": "blocking_power_geometry" },
+          "coefficient": 0.2
+        },
+        {
+          "ref": { "type": "param", "id": "edit_rhythm" },
+          "coefficient": 0.15
+        },
+        {
+          "ref": { "type": "param", "id": "subtitle_ui_safety" },
+          "coefficient": 0.1
+        }
+      ],
+      "clamp": [0, 100]
+    },
+    {
+      "id": "lcr",
+      "name": "Localization and Compliance Risk",
+      "kind": "linear",
+      "scale": "0-100",
+      "higherIsWorse": true,
+      "formulaText": "LCR = 100 - 10 x (0.45 x localization_compliance + 0.25 x subtitle_ui_safety + 0.15 x visual_story_clarity + 0.15 x sound_music). INVERTED: higher is worse; <= 30 is good. If local counsel or platform policy flags a serious issue, LCR is floored at 70 (source override rule).",
+      "intercept": 100,
+      "scaleFactor": -10,
+      "terms": [
+        {
+          "ref": { "type": "param", "id": "localization_compliance" },
+          "coefficient": 0.45
+        },
+        {
+          "ref": { "type": "param", "id": "subtitle_ui_safety" },
+          "coefficient": 0.25
+        },
+        {
+          "ref": { "type": "param", "id": "visual_story_clarity" },
+          "coefficient": 0.15
+        },
+        { "ref": { "type": "param", "id": "sound_music" }, "coefficient": 0.15 }
+      ],
+      "flagAdjustments": [{ "whenFlag": "policy_counsel_flag", "floor": 70 }],
+      "clamp": [0, 100]
+    }
+  ],
+  "priority": {
+    "formulaText": "Priority_i = effectiveWeight_i x (10 - score_i) x contextMultiplier_i; top items are the fix-first list. Multipliers mirror the script rubric's 1.5 emphasis (S1 p.30) onto the visual hook/cliffhanger - a Rubric v1 derivation, S2 has no priority formula (see SYNTHESIS_NOTES).",
+    "contextMultipliers": [
+      {
+        "paramId": "first_frame_hook",
+        "when": { "field": "episodePosition", "equals": "first" },
+        "multiplier": 1.5
+      },
+      {
+        "paramId": "first_frame_hook",
+        "when": { "field": "paywallPosition", "equals": "free" },
+        "multiplier": 1.5
+      },
+      {
+        "paramId": "cliffhanger_image",
+        "when": { "field": "paywallPosition", "equals": "pre" },
+        "multiplier": 1.5
+      },
+      {
+        "paramId": "cliffhanger_image",
+        "when": { "field": "episodePosition", "equals": "pre-paywall" },
+        "multiplier": 1.5
+      }
+    ],
+    "defaultMultiplier": 1.0
+  },
+  "confidence": {
+    "kind": "weighted-components",
+    "formulaText": "Confidence = 0.45 x InputCompleteness + 0.25 x EvidenceDensity + 0.20 x ModeAppropriateness + 0.10 x EvaluatorCertainty (each component 0-100). Components operationalized in Rubric v1 - the source names but never defines them (see SYNTHESIS_NOTES).",
+    "clamp": [0, 100],
+    "components": [
+      {
+        "id": "input_completeness",
+        "coefficient": 0.45,
+        "kind": "metadata-completeness",
+        "base": 100,
+        "perMissingItem": 25,
+        "items": ["genre", "episodePosition", "paywallPosition", "market"]
+      },
+      {
+        "id": "evidence_density",
+        "coefficient": 0.25,
+        "kind": "valid-call-ratio",
+        "note": "100 x (valid calls / expected calls); rejected or evidence-less calls reduce it."
+      },
+      {
+        "id": "mode_appropriateness",
+        "coefficient": 0.2,
+        "kind": "mode-map",
+        "map": {
+          "finished_episode": 100,
+          "rough_cut": 85,
+          "visual_plan": 70,
+          "script_only": 55
+        }
+      },
+      {
+        "id": "evaluator_certainty",
+        "coefficient": 0.1,
+        "kind": "run-agreement",
+        "base": 100,
+        "perDisagreeingParam": 12,
+        "spreadThreshold": 3
+      }
+    ]
+  },
+  "gates": [
+    {
+      "id": "first_frame_hook_gate",
+      "description": "First-frame hook <= 3 on an Episode 1 or free-block chapter.",
+      "condition": { "paramId": "first_frame_hook", "op": "<=", "value": 3 },
+      "appliesWhen": {
+        "anyOf": [
+          { "field": "episodePosition", "equals": "first" },
+          { "field": "paywallPosition", "equals": "free" }
+        ]
+      },
+      "severity": "major",
+      "effect": "cap-verdict",
+      "repairLabel": "recut"
+    },
+    {
+      "id": "reveal_gate",
+      "description": "Reveal execution <= 3 when the reveal is the episode's function.",
+      "condition": { "paramId": "reveal_execution", "op": "<=", "value": 3 },
+      "appliesWhen": { "flag": "reveal_is_episode_function" },
+      "severity": "major",
+      "effect": "cap-verdict",
+      "repairLabel": "reshoot_inserts"
+    },
+    {
+      "id": "subtitle_gate",
+      "description": "Subtitle/UI safety <= 3: captions or app chrome cover crucial story information.",
+      "condition": { "paramId": "subtitle_ui_safety", "op": "<=", "value": 3 },
+      "appliesWhen": {},
+      "severity": "major",
+      "effect": "cap-verdict",
+      "repairLabel": "recut"
+    },
+    {
+      "id": "sound_gate",
+      "description": "Sound/music <= 3: dialogue is materially unintelligible.",
+      "condition": { "paramId": "sound_music", "op": "<=", "value": 3 },
+      "appliesWhen": {},
+      "severity": "major",
+      "effect": "cap-verdict",
+      "repairLabel": "reshoot_scene"
+    },
+    {
+      "id": "clarity_gate",
+      "description": "Visual story clarity <= 3 in rough-cut or finished-episode mode.",
+      "condition": {
+        "paramId": "visual_story_clarity",
+        "op": "<=",
+        "value": 3
+      },
+      "appliesWhen": {
+        "field": "mode",
+        "in": ["rough_cut", "finished_episode"]
+      },
+      "severity": "major",
+      "effect": "cap-verdict",
+      "repairLabel": "recut"
+    },
+    {
+      "id": "feasibility_gate",
+      "description": "Production feasibility <= 3 in plan mode (unreachable in v1; shipped for completeness).",
+      "condition": {
+        "paramId": "production_feasibility",
+        "op": "<=",
+        "value": 3
+      },
+      "appliesWhen": { "field": "mode", "equals": "visual_plan" },
+      "severity": "major",
+      "effect": "cap-verdict",
+      "repairLabel": "rewrite_before_shoot"
+    },
+    {
+      "id": "localization_gate",
+      "description": "Localization/compliance fit <= 2 in a region-specific release (note the source's deliberate lower threshold).",
+      "condition": {
+        "paramId": "localization_compliance",
+        "op": "<=",
+        "value": 2
+      },
+      "appliesWhen": { "field": "market", "present": true },
+      "severity": "major",
+      "effect": "cap-verdict",
+      "repairLabel": "reject_visual_plan"
+    },
+    {
+      "id": "cliffhanger_gate",
+      "description": "Cliffhanger image <= 3 on a pre-paywall or continuation-dependent (non-finale) episode.",
+      "condition": { "paramId": "cliffhanger_image", "op": "<=", "value": 3 },
+      "appliesWhen": {
+        "anyOf": [
+          { "field": "paywallPosition", "equals": "pre" },
+          {
+            "field": "episodePosition",
+            "in": ["first", "pre-paywall", "midpoint", "other"]
+          }
+        ]
+      },
+      "severity": "major",
+      "effect": "cap-verdict",
+      "repairLabel": "recut"
+    },
+    {
+      "id": "policy_flag_gate",
+      "description": "Local counsel or platform policy flags a serious issue (also floors LCR at 70).",
+      "condition": { "flag": "policy_counsel_flag" },
+      "appliesWhen": {},
+      "severity": "safety",
+      "effect": "force-bottom"
+    }
+  ],
+  "modes": [
+    {
+      "id": "finished_episode",
+      "reachable": true,
+      "inputType": "video",
+      "note": "The only reachable visual mode in v1 (video upload). All base weights; no mode deltas (source: 'all base weights; no major reduction')."
+    },
+    {
+      "id": "rough_cut",
+      "reachable": false,
+      "inputType": "video",
+      "note": "Source mode; no UI path in v1."
+    },
+    {
+      "id": "visual_plan",
+      "reachable": false,
+      "inputType": "text",
+      "note": "Source mode (shot list); no UI path in v1."
+    },
+    {
+      "id": "script_only",
+      "reachable": false,
+      "inputType": "text",
+      "note": "Source mode; in v1 the script rubric owns the text path."
+    }
+  ],
+  "modeAdjustments": [
+    {
+      "id": "mode_script_only",
+      "when": { "field": "mode", "equals": "script_only" },
+      "up": [
+        "first_frame_hook",
+        "visual_story_clarity",
+        "visual_escalation",
+        "reveal_execution",
+        "production_feasibility"
+      ],
+      "down": ["sound_music", "subtitle_ui_safety", "performance_capture"]
+    },
+    {
+      "id": "mode_visual_plan",
+      "when": { "field": "mode", "equals": "visual_plan" },
+      "up": [
+        "vertical_composition",
+        "blocking_power_geometry",
+        "shot_economy",
+        "reveal_execution",
+        "production_feasibility"
+      ],
+      "down": ["sound_music"]
+    },
+    {
+      "id": "mode_rough_cut",
+      "when": { "field": "mode", "equals": "rough_cut" },
+      "up": [
+        "visual_story_clarity",
+        "edit_rhythm",
+        "performance_capture",
+        "reveal_execution",
+        "subtitle_ui_safety",
+        "sound_music"
+      ],
+      "down": ["production_feasibility"]
+    }
+  ],
+  "contextAdjustments": [
+    {
+      "id": "genre_romance",
+      "when": { "field": "genre", "equals": "romance" },
+      "up": ["emotional_readability", "performance_capture"],
+      "down": []
+    },
+    {
+      "id": "genre_family_social",
+      "when": { "field": "genre", "equals": "family_social" },
+      "up": ["blocking_power_geometry", "localization_compliance"],
+      "down": []
+    },
+    {
+      "id": "genre_thriller_crime",
+      "when": { "field": "genre", "equals": "thriller_crime" },
+      "up": [
+        "reveal_execution",
+        "visual_story_clarity",
+        "sound_music",
+        "edit_rhythm"
+      ],
+      "down": []
+    },
+    {
+      "id": "genre_supernatural",
+      "when": { "field": "genre", "equals": "supernatural" },
+      "up": ["reveal_execution", "cliffhanger_image"],
+      "down": []
+    },
+    {
+      "id": "genre_comedy",
+      "when": { "field": "genre", "equals": "comedy" },
+      "up": ["performance_capture", "edit_rhythm"],
+      "down": []
+    },
+    {
+      "id": "genre_mythological_devotional",
+      "when": { "field": "genre", "equals": "mythological_devotional" },
+      "up": ["sound_music", "localization_compliance"],
+      "down": []
+    },
+    {
+      "id": "position_first",
+      "when": { "field": "episodePosition", "equals": "first" },
+      "up": ["first_frame_hook", "visual_story_clarity"],
+      "down": []
+    },
+    {
+      "id": "paywall_free_block",
+      "when": { "field": "paywallPosition", "equals": "free" },
+      "up": ["first_frame_hook", "visual_escalation", "cliffhanger_image"],
+      "down": []
+    },
+    {
+      "id": "paywall_pre",
+      "when": { "field": "paywallPosition", "equals": "pre" },
+      "up": ["cliffhanger_image", "reveal_execution"],
+      "down": []
+    },
+    {
+      "id": "paywall_post",
+      "when": { "field": "paywallPosition", "equals": "post" },
+      "up": ["reveal_execution", "visual_story_clarity"],
+      "down": []
+    },
+    {
+      "id": "position_midpoint",
+      "when": { "field": "episodePosition", "equals": "midpoint" },
+      "up": ["reveal_execution", "performance_capture"],
+      "down": []
+    },
+    {
+      "id": "position_finale",
+      "when": { "field": "episodePosition", "equals": "finale" },
+      "up": [
+        "visual_story_clarity",
+        "emotional_readability",
+        "cliffhanger_image"
+      ],
+      "down": []
+    }
+  ],
+  "weightShift": {
+    "relativeFactorUp": 1.2,
+    "relativeFactorDown": 0.8,
+    "stacking": "multiplicative",
+    "renormalizeTo": 100,
+    "note": "Founder ruling 5 applied to the source's magnitude-less 'additive deltas' instruction: +/-20% relative, multiplicative stacking, renormalized to 100, shifted weights flagged derived."
+  },
+  "verdict": {
+    "ladder": [
+      {
+        "internalLabel": "approve",
+        "displayLabel": "Ready to publish",
+        "rule": {
+          "overallGte": 82,
+          "compositeGte": { "cvp": 78, "pfs": 70 },
+          "compositeLte": { "lcr": 30 },
+          "requiresNoGates": true
+        }
+      },
+      {
+        "internalLabel": "approve_minor_fixes",
+        "displayLabel": "Ready with minor fixes",
+        "rule": {
+          "overallGte": 74,
+          "compositeLte": { "lcr": 50 },
+          "requiresNoGates": true
+        }
+      },
+      {
+        "internalLabel": "recut",
+        "displayLabel": "Recut",
+        "rule": { "overallGte": 55 }
+      },
+      {
+        "internalLabel": "reject_visual_plan",
+        "displayLabel": "Not releasable in this form",
+        "rule": { "overallGte": 0 }
+      }
+    ],
+    "displayMap": {
+      "approve": "Ready to publish",
+      "approve_minor_fixes": "Ready with minor fixes",
+      "revise_shot_list": "Revise shot list",
+      "recut": "Recut",
+      "reshoot_inserts": "Reshoot inserts",
+      "reshoot_scene": "Reshoot scene",
+      "rewrite_before_shoot": "Rewrite before shoot",
+      "reject_visual_plan": "Not releasable in this form"
+    },
+    "gateCap": {
+      "repairSeverityOrder": [
+        "recut",
+        "reshoot_inserts",
+        "reshoot_scene",
+        "rewrite_before_shoot",
+        "reject_visual_plan"
+      ],
+      "safetyLabel": "reject_visual_plan",
+      "note": "Founder rulings 1 and 6: a triggered gate blocks both Ready labels and resolves to the most specific repair action - the final label is the WORSE of the numeric ladder band (recut / reject tier) and the most severe repairLabel among triggered gates. A safety-severity flag forces reject_visual_plan. Ladder read top-down, first match (ruling 2)."
+    }
+  }
+}

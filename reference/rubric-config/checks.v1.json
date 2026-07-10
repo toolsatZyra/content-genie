@@ -1,0 +1,109 @@
+{
+  "checksId": "checks",
+  "version": "1.0.0",
+  "displayName": "Non-scored checks v1 (pass/warn) + promotable moments",
+  "provenance": "Visual-direction items synthesized from 'Standalone Visual Direction Framework for Scripted Series' (founder ruling 8: checklist source, never a third scorecard). AI-artifact checks are wholly Claude-owned additions - no source document covers AI-generated-video failure modes (see SYNTHESIS_NOTES). All checks are informational pass/warn: they never score, never gate, and never enter any composite. The engine passes their results through untouched.",
+  "note": "The engine is provenance-blind: AI-artifact checks run on EVERY video, and the app never asks whether content is AI-made.",
+  "aiArtifacts": [
+    {
+      "id": "morphing_faces",
+      "name": "Face stability",
+      "whatToCheck": "Faces keep a stable identity across frames and shots: no warping, melting, or character-swap between cuts of the same person.",
+      "evidence": "timestamp"
+    },
+    {
+      "id": "continuity_drift",
+      "name": "Object and wardrobe continuity",
+      "whatToCheck": "Props, costumes, hair, and backgrounds stay physically consistent between adjacent shots: no objects appearing/vanishing or changing form without cause.",
+      "evidence": "timestamp"
+    },
+    {
+      "id": "lip_sync",
+      "name": "Lip-sync integrity",
+      "whatToCheck": "Lip movement plausibly matches the dialogue audio in language and timing on every on-camera line.",
+      "evidence": "timestamp"
+    },
+    {
+      "id": "anatomy_text_artifacts",
+      "name": "Anatomy and in-scene text",
+      "whatToCheck": "Hands, limbs, and body geometry stay plausible; any text visible inside the scene (signs, phones, documents) is stable and readable, not garbled glyphs.",
+      "evidence": "timestamp"
+    }
+  ],
+  "visualDirection": [
+    {
+      "id": "caption_collision",
+      "name": "No story-critical info in the caption band",
+      "severity": "high",
+      "whatToCheck": "No crucial evidence, on-screen text, or decisive action sits where captions or app chrome will cover it (protect roughly the top 10%, bottom 20%, and side 5-6% of frame).",
+      "sourceRef": "Standalone framework p.11, p.18; house framing standard (mobile-first framework p.4)"
+    },
+    {
+      "id": "reveal_proof_reaction",
+      "name": "Reveals carry proof + reaction (+ consequence)",
+      "severity": "high",
+      "whatToCheck": "Every important reveal has a readable proof shot and a reaction shot; a consequence shot is expected on major reveals.",
+      "sourceRef": "Standalone framework pp.12, 14-15, 18"
+    },
+    {
+      "id": "dialogue_masking",
+      "name": "Dialogue never masked",
+      "severity": "high",
+      "whatToCheck": "Score, stings, or effects never bury a story-relevant line; dialogue intelligibility stays primary.",
+      "sourceRef": "Standalone framework p.7, p.18"
+    },
+    {
+      "id": "eyeline_continuity",
+      "name": "Eyelines and screen direction consistent",
+      "severity": "standard",
+      "whatToCheck": "Eyelines match across cuts and screen direction stays coherent, so spatial relationships remain inferable.",
+      "sourceRef": "Standalone framework p.7, p.17"
+    },
+    {
+      "id": "insert_readability",
+      "name": "Plot-critical objects get readable inserts",
+      "severity": "standard",
+      "whatToCheck": "Anything crucial but visually small or text-based (documents, phone screens, jewelry) receives a close readable insert or staging prominence (~85% of frame for text objects).",
+      "sourceRef": "Standalone framework pp.5, 7; mobile-first framework pp.10-11"
+    },
+    {
+      "id": "hook_visual",
+      "name": "The hook is an image, not just a line",
+      "severity": "standard",
+      "whatToCheck": "The opening hook is represented visually; if the hook is verbal, a counter-image or proof insert carries it.",
+      "sourceRef": "Standalone framework p.5, p.17, p.18"
+    },
+    {
+      "id": "cliffhanger_visual",
+      "name": "The episode ends on a visual question",
+      "severity": "standard",
+      "whatToCheck": "The final frame implies a next action or unresolved threat - a visual question, not merely a spoken one.",
+      "sourceRef": "Standalone framework p.6, p.14"
+    },
+    {
+      "id": "safe_area_text",
+      "name": "Critical text/action inside safe areas",
+      "severity": "standard",
+      "whatToCheck": "Critical text and action stay inside action-safe/graphics-safe margins (EBU-style 3.5%/5% referenced by the source; localized text still fits after expansion).",
+      "sourceRef": "Standalone framework p.7, p.16"
+    }
+  ],
+  "promotableMoments": {
+    "name": "Promotable moments",
+    "purpose": "Identify which beats would cut into a scroll-stopping ad clip - the industry's #1 promotion decider. Non-scored call-out.",
+    "count": { "min": 1, "max": 3 },
+    "clipLengthSeconds": { "min": 3, "max": 15 },
+    "criteria": [
+      "Peak conflict, reveal, or emotional spike",
+      "Works with zero context - a stranger understands it mid-scroll",
+      "Visually legible at phone size (faces readable, action clear)",
+      "Ends on or contains an open question"
+    ],
+    "output": {
+      "timestampStart": "seconds",
+      "timestampEnd": "seconds",
+      "reason": "one line on why this beat would stop a scroll",
+      "suggestedCaption": "optional ad-caption line"
+    }
+  }
+}
