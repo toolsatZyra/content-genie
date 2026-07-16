@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Interactive solution-architecture walkthrough of the Zyra Devotional Director pipeline.">
+  <title>Zyra Devotional Director — Agent Flow</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="Zyra Devotional Director home">
+      <span class="brand-mark" aria-hidden="true">Z</span>
+      <span><strong>Zyra</strong><small>Devotional Director</small></span>
+    </a>
+    <div class="topbar-meta">
+      <span class="status-dot" aria-hidden="true"></span>
+      Architecture explainer · corrected UX contract v0.3
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero" aria-labelledby="page-title">
+      <div class="eyebrow"><span>Your script, untouched</span><i></i><span>A finished cinematic episode</span></div>
+      <h1 id="page-title">A film studio that lives<br><em>inside an agent</em></h1>
+      <p>The user supplies the exact script, chooses the visual world, and locks the cast. From there, an AI crew directs, generates, edits, scores, checks, repairs, and returns the final devotional film.</p>
+      <div class="hero-metrics" aria-label="Pipeline summary">
+        <div><strong>9</strong><span>launch journey stages</span></div>
+        <div><strong>5</strong><span>production agents</span></div>
+        <div><strong>4</strong><span>intentional human decisions</span></div>
+        <div><strong>117</strong><span>real selectable looks</span></div>
+      </div>
+    </section>
+
+    <nav class="tabs" role="tablist" aria-label="Explainer views">
+      <button id="tab-flow" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="panel-flow">
+        <span>01</span> How it works
+      </button>
+      <button id="tab-tech" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-tech" tabindex="-1">
+        <span>02</span> Technical blueprint
+      </button>
+    </nav>
+
+    <section id="panel-flow" class="tab-panel" role="tabpanel" aria-labelledby="tab-flow">
+      <div class="control-bar">
+        <div>
+          <span class="control-label">Product scope</span>
+          <p>The launch flow goes from locked assets straight to final video. Preview the later clip-review add-on separately.</p>
+        </div>
+        <div class="segmented" role="group" aria-label="Select product scope">
+          <button type="button" data-scope="launch" class="is-active" aria-pressed="true">Launch flow</button>
+          <button type="button" data-scope="future" aria-pressed="false">+ Future clip review</button>
+        </div>
+      </div>
+
+      <div class="journey-shell">
+        <aside class="stage-rail" aria-label="Production stages">
+          <div class="stage-rail-head">
+            <span>Production journey</span>
+            <strong id="rail-progress">01 / 09</strong>
+          </div>
+          <div id="stage-list" class="stage-list"></div>
+        </aside>
+
+        <article class="stage-workspace" aria-live="polite">
+          <div class="stage-progress"><span id="progress-fill"></span></div>
+          <div class="stage-kicker">
+            <div>
+              <span id="stage-id">S0</span>
+              <span id="stage-phase">Understand</span>
+            </div>
+            <span id="stage-agent" class="agent-chip">Story &amp; Scripture Agent</span>
+          </div>
+
+          <div class="two-panel">
+            <section class="explain-panel" aria-labelledby="stage-title">
+              <div class="panel-label"><span>01</span> What’s happening</div>
+              <h2 id="stage-title"></h2>
+              <p id="stage-summary" class="stage-summary"></p>
+
+              <div class="signal-flow" aria-label="Current stage data flow">
+                <div><small>Input</small><strong id="stage-input"></strong></div>
+                <i aria-hidden="true"><b></b></i>
+                <div><small>Agent action</small><strong id="stage-action"></strong></div>
+                <i aria-hidden="true"><b></b></i>
+                <div><small>Typed output</small><strong id="stage-output"></strong></div>
+              </div>
+
+              <div class="detail-grid">
+                <div>
+                  <h3>Inside this stage</h3>
+                  <ul id="stage-steps" class="check-list"></ul>
+                </div>
+                <div>
+                  <h3>Evidence that must pass</h3>
+                  <ul id="stage-contracts" class="contract-list"></ul>
+                </div>
+              </div>
+            </section>
+
+            <section class="viewer-panel" aria-labelledby="viewer-title">
+              <div class="panel-label"><span>02</span> What the user sees / viewer feels</div>
+              <div id="viewer-frame" class="viewer-frame">
+                <img id="viewer-image" alt="" hidden>
+                <div id="viewer-schematic" class="viewer-schematic" hidden></div>
+                <div class="frame-ui" aria-hidden="true">
+                  <span>9:16 master</span>
+                  <span>00:<b id="frame-time">00</b></span>
+                </div>
+                <div id="viewer-badge" class="viewer-badge"></div>
+              </div>
+              <div class="viewer-copy">
+                <h3 id="viewer-title"></h3>
+                <p id="viewer-caption"></p>
+              </div>
+              <div id="viewer-gallery" class="viewer-gallery" hidden></div>
+            </section>
+          </div>
+
+          <section id="intervention-card" class="intervention-card" aria-labelledby="intervention-title">
+            <div class="intervention-icon" aria-hidden="true"><span></span></div>
+            <div>
+              <div class="intervention-heading">
+                <span id="intervention-status" class="intervention-status"></span>
+              <h3 id="intervention-title">Human touchpoint</h3>
+              </div>
+              <p id="intervention-copy"></p>
+              <small id="intervention-trigger"></small>
+            </div>
+          </section>
+
+          <footer class="stage-footer">
+            <div class="key-hint"><kbd>←</kbd><kbd>→</kbd> move through stages</div>
+            <div class="stage-actions">
+              <button id="prev-stage" class="button secondary" type="button">Previous</button>
+              <button id="next-stage" class="button primary" type="button">Next stage <span aria-hidden="true">→</span></button>
+            </div>
+          </footer>
+        </article>
+      </div>
+
+      <details class="all-stages">
+        <summary><span>View the whole journey at once</span><small id="map-summary">9 stages · 4 human decisions · one autonomous production tunnel</small></summary>
+        <div id="system-map" class="system-map"></div>
+      </details>
+    </section>
+
+    <section id="panel-tech" class="tab-panel" role="tabpanel" aria-labelledby="tab-tech" hidden>
+      <div class="tech-intro">
+        <div>
+          <span class="section-number">02 / Technical blueprint</span>
+          <h2>The script stays human-authored.<br><em>Agents build the film around it.</em></h2>
+        </div>
+        <p>Agents never own state directly. The input script is content-addressed and immutable; production intelligence lives in sidecar annotations. Every later decision becomes a versioned artifact and every release requires machine evidence.</p>
+      </div>
+
+      <section class="architecture-card" aria-labelledby="architecture-title">
+        <div class="section-heading">
+          <div><span>Architecture</span><h3 id="architecture-title">Five agents, one durable state machine</h3></div>
+          <span class="pill">Provider-agnostic</span>
+        </div>
+        <div class="architecture-stack">
+          <div class="orchestrator-row">
+            <div class="orchestrator"><small>Control plane</small><strong>Episode Orchestrator</strong><span>state · revisions · budgets · retries · audit</span></div>
+          </div>
+          <div class="agent-row" aria-label="Production agent team">
+            <div><span>01</span><strong>Story &amp;<br>Scripture</strong><small>source · citations · sidecars</small></div>
+            <div><span>02</span><strong>Visual Canon &amp;<br>Production Design</strong><small>identity · world</small></div>
+            <div><span>03</span><strong>Audio<br>Performance</strong><small>voice · score · mix</small></div>
+            <div><span>04</span><strong>Generation<br>&amp; Edit</strong><small>frames · motion · EDD</small></div>
+            <div><span>05</span><strong>QC &amp;<br>Release</strong><small>evidence · repair · publish</small></div>
+          </div>
+          <div class="spine-row">
+            <span>Typed contracts</span><i></i><span>Artifact store</span><i></i><span>Capability registry</span><i></i><span>Independent evaluators</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="tech-grid">
+        <section class="tech-card immutable-card" aria-labelledby="script-contract-title">
+          <div class="section-heading"><div><span>Non-negotiable input contract</span><h3 id="script-contract-title">The script never changes</h3></div><span class="pill accent">Exact mode</span></div>
+          <div class="immutable-contract">
+            <div><small>Immutable payload</small><strong>Dialogue · speaker · addressee · action · scene order</strong></div>
+            <span aria-hidden="true">+</span>
+            <div><small>Additive sidecar only</small><strong>Pronunciation · emotion · timing · coverage · source flags</strong></div>
+          </div>
+          <p class="tech-note">If a factual, cultural, rights, or production issue is blocking, the system asks the user for a corrected script revision. It never silently rewrites the supplied text.</p>
+        </section>
+
+        <section class="tech-card" aria-labelledby="contracts-title">
+          <div class="section-heading"><div><span>Release logic</span><h3 id="contracts-title">Quality contract graph</h3></div></div>
+          <div class="contract-stack">
+            <div><span>01</span><strong>Hard invariants</strong><small>source, dignity, anatomy, identity, consent</small></div>
+            <div><span>02</span><strong>Modality floors</strong><small>story, visual, voice, sound, captions</small></div>
+            <div><span>03</span><strong>Evidence confidence</strong><small>independent detectors + calibrated judges</small></div>
+            <div><span>04</span><strong>Aesthetic ranking</strong><small>cinematic unity, emotion, rhythm, memorability</small></div>
+          </div>
+          <p class="tech-note">A high overall score can never compensate for a failed hard invariant. Rubric v1 is diagnostic; v2 must be calibrated before it can authorize release.</p>
+        </section>
+
+        <section class="tech-card terminal-card" aria-labelledby="state-title">
+          <div class="section-heading"><div><span>Runtime</span><h3 id="state-title">Terminal outcomes</h3></div></div>
+          <div class="state-grid">
+            <div class="state ready"><span></span><strong>Ready</strong><small>all contracts pass</small></div>
+            <div class="state repair"><span></span><strong>Repair</strong><small>smallest causal unit</small></div>
+            <div class="state closed"><span></span><strong>Fail closed</strong><small>confidence or quality floor fails</small></div>
+            <div class="state unsupported"><span></span><strong>Unsupported</strong><small>outside certified content class</small></div>
+          </div>
+          <p class="tech-note">Cost exhaustion never lowers the quality floor. A provider fallback cannot silently change identity, look, voice, or policy.</p>
+        </section>
+      </div>
+
+      <section class="rubric-bridge" aria-labelledby="rubric-title">
+        <div class="section-heading">
+          <div><span>Evaluation design</span><h3 id="rubric-title">From broad v1 scores to stage-specific v2 contracts</h3></div>
+          <span class="pill">Evidence before score</span>
+        </div>
+        <div class="rubric-grid">
+          <div class="rubric-current">
+            <span>Repository rubrics · v1</span>
+            <div><strong>12</strong><p>script parameters</p><small>hook, stakes, pacing, reveal, cliffhanger, dialogue, continuity, cultural fit…</small></div>
+            <div><strong>15</strong><p>visual parameters</p><small>first frame, story clarity, vertical composition, emotion, reveal, rhythm, sound…</small></div>
+            <div><strong>12</strong><p>explicit checks</p><small>4 AI-artifact checks + 8 visual-direction checks</small></div>
+          </div>
+          <div class="rubric-arrow" aria-hidden="true"><span>compile</span><i>→</i></div>
+          <div class="rubric-target">
+            <span>Release contracts · v2</span>
+            <div><b>S2</b><strong>Story</strong><small>events · causality · fidelity · engagement</small></div>
+            <div><b>S4</b><strong>Voice</strong><small>pronunciation · identity · performance · joins</small></div>
+            <div><b>S5–S7</b><strong>Visual</strong><small>plan · keyframe · motion · continuity</small></div>
+            <div><b>S8–S9</b><strong>Sound &amp; finish</strong><small>score · SFX · mix · captions · grade</small></div>
+            <div><b>S10</b><strong>Final episode</strong><small>hard gates · floors · confidence · taste</small></div>
+          </div>
+        </div>
+        <p class="rubric-note">The v1 script rubric becomes diagnostic in exact-script mode: it may warn the user about hook, pacing or clarity, but it cannot rewrite the supplied script. The weights cannot authorize release until calibrated against qualified human labels. Hard invariants, modality floors and evidence confidence remain non-compensatory.</p>
+      </section>
+
+      <section class="intervention-matrix" aria-labelledby="human-matrix-title">
+        <div class="section-heading">
+          <div><span>Human-in-the-loop</span><h3 id="human-matrix-title">Every intervention, and what replaces it</h3></div>
+          <span class="pill accent">Launch: four intentional decisions</span>
+        </div>
+        <div class="matrix-table" role="table" aria-label="Human intervention replacement matrix">
+          <div class="matrix-row matrix-head" role="row"><span>Human decision</span><span>What the user does</span><span>What the agent does next</span><span>UX rule</span></div>
+          <div class="matrix-row" role="row"><strong>1 · Submit exact script</strong><span>Paste or upload the complete script</span><span>Hashes it; adds production annotations in a separate sidecar</span><span>No rewrite button and no silent “improvement”</span></div>
+          <div class="matrix-row" role="row"><strong>2 · Pick the look</strong><span>Choose among 117 looks; Glowing Divine Realism is default</span><span>Derives and locks the reusable Nano Banana style tail</span><span>No Recommended tab; tail is inspectable, not another mandatory form</span></div>
+          <div class="matrix-row" role="row"><strong>3 · Lock cast &amp; locations</strong><span>Accept each AI option, edit its prompt and regenerate, or upload an image</span><span>Persists the chosen anchors, then creates character sheets automatically</span><span>Three obvious actions on every asset; no hidden workflow</span></div>
+          <div class="matrix-row" role="row"><strong>4 · Review final video</strong><span>Watch the finished episode and accept or request a targeted rerun</span><span>Exports the passing revision and packages every editable ingredient</span><span>The user is reviewing a film—not operating a pipeline</span></div>
+          <div class="matrix-row planned" role="row"><strong>Later · Review clips</strong><span>Accept, reject, edit prompt/references, or regenerate a clip before edit</span><span>Rebuilds only affected dependencies and reconforms the edit</span><span>Planned add-on; deliberately excluded from the launch flow</span></div>
+        </div>
+        <p class="matrix-footnote"><strong>Design principle:</strong> human taste is concentrated where it compounds—script, world, identity, and final film. The expensive operational middle stays autonomous and remains inspectable rather than becoming a sequence of approval forms.</p>
+      </section>
+
+      <section class="credentials" aria-labelledby="credentials-title">
+        <div class="section-heading">
+          <div><span>Integration inventory</span><h3 id="credentials-title">API keys and production secrets</h3></div>
+          <span class="inventory-date">Presence checked 16 Jul 2026 · values never displayed</span>
+        </div>
+        <div class="credential-summary">
+          <div><strong>4</strong><span>provider keys present</span></div>
+          <div><strong>10</strong><span>core credential groups still needed</span></div>
+          <div><strong>5</strong><span>optional / later values</span></div>
+        </div>
+        <div class="credential-columns">
+          <div class="credential-group available">
+            <div class="credential-head"><span class="availability-dot"></span><div><strong>Already available</strong><small>Detected in local configuration</small></div></div>
+            <div id="keys-present" class="key-list"></div>
+          </div>
+          <div class="credential-group missing">
+            <div class="credential-head"><span class="availability-dot"></span><div><strong>Still needed</strong><small>Required for the first production-capable build</small></div></div>
+            <div id="keys-needed" class="key-list"></div>
+          </div>
+        </div>
+
+        <details class="optional-keys">
+          <summary><span>Optional, later, or vendor-dependent credentials</span><small>Open inventory</small></summary>
+          <div id="keys-optional" class="key-list optional-grid"></div>
+        </details>
+
+        <div class="security-callout">
+          <span aria-hidden="true">!</span>
+          <p><strong>Secret-handling rule:</strong> the HTML contains names and presence status only. Keys stay server-side in a secret manager; agents receive scoped capability calls, never raw credentials. The locally configured OpenAI key is explicitly marked for rotation before production.</p>
+        </div>
+      </section>
+
+      <section class="build-sequence" aria-labelledby="build-title">
+        <div class="section-heading"><div><span>Recommended implementation</span><h3 id="build-title">Build the quality laboratory first</h3></div></div>
+        <ol>
+          <li><span>0A</span><div><strong>Measurement lab</strong><small>gold set, seeded defects, evaluator calibration, capability bake-offs</small></div></li>
+          <li><span>0B</span><div><strong>Audio + continuity spine</strong><small>pronunciation, performance selection, identity locks, EDD</small></div></li>
+          <li><span>0C</span><div><strong>Autonomous pilot</strong><small>five predeclared episodes; three consecutive no-touch successes</small></div></li>
+          <li><span>1</span><div><strong>Internal studio shell</strong><small>collaboration, queues, publishing, analytics—after quality is demonstrated</small></div></li>
+        </ol>
+      </section>
+    </section>
+  </main>
+
+  <footer class="page-footer">
+    <span>Zyra Devotional Director · Solution architecture walkthrough</span>
+    <span>AI-generated visual examples · not production frames</span>
+  </footer>
+
+  <div id="look-modal" class="look-modal" hidden>
+    <div class="look-modal-backdrop" data-close-look></div>
+    <section class="look-library" role="dialog" aria-modal="true" aria-labelledby="look-modal-title">
+      <header class="look-library-head">
+        <div><span>Visual universe</span><h2 id="look-modal-title">Choose the physics of your film</h2><p>117 real looks from AI Director. Indian Mythology opens first; the Recommended layer has been removed.</p></div>
+        <button type="button" class="look-close" data-close-look aria-label="Close look library">×</button>
+      </header>
+      <div class="look-controls">
+        <div id="look-families" class="look-families" role="tablist" aria-label="Look families"></div>
+        <div class="look-search-row">
+          <label><span>Search</span><input id="look-search" type="search" placeholder="rain, warm, epic, ink, temple…"></label>
+          <button id="look-bw" type="button" aria-pressed="false">B&amp;W only</button>
+          <strong id="look-count">117 looks</strong>
+        </div>
+      </div>
+      <div class="look-library-body">
+        <div id="look-grid" class="look-grid"></div>
+        <aside class="look-inspector">
+          <span>Selected look</span>
+          <div class="look-inspector-image"><img id="look-inspector-image" alt=""></div>
+          <h3 id="look-inspector-name"></h3>
+          <p id="look-inspector-feel"></p>
+          <details open><summary>Generated look DNA</summary><p id="look-inspector-tail"></p></details>
+          <button id="use-look" type="button">Use this look <span>→</span></button>
+        </aside>
+      </div>
+    </section>
+  </div>
+
+  <script src="looks.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
