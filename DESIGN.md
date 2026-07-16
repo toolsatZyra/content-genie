@@ -79,7 +79,9 @@ Look thumbnails are visual choices first and text labels second. Character and l
 
 ## Monica
 
-Monica is Genie’s Quality Director and release authority.
+Monica is Genie’s machine Quality Director and release orchestrator. She
+certifies that the configured quality contract has passed and prepares the
+release evidence; the permitted human reviewer remains the release authority.
 
 She is represented as a warm orbiting light rather than a humanoid avatar. This avoids false anthropomorphism while still creating a memorable, friendly presence.
 
@@ -148,6 +150,111 @@ There are four intentional human decisions before autonomy:
 4. Accept, redirect, or upload every generated character and location anchor.
 
 After the world is locked, the system produces autonomously until final-film review. The prototype contains no hidden clip-review gate.
+
+## Product shell: the Studio Atrium
+
+Living Cinema is the experience inside one Episode. Production also requires a
+persistent shared Studio Atrium around it.
+
+The Atrium contains:
+
+- **Home / My Work:** actionable reviews, blockers, active productions, and
+  recently completed films;
+- **Series:** visual worlds containing versioned World Bibles and Episodes;
+- **Productions:** all running, waiting, repairing, exporting, and blocked jobs;
+- **Monica Inbox:** deduplicated work items and deep-linked notifications;
+- **Library:** searchable approved, superseded, archived, and downloadable
+  masters.
+
+The Atrium is not a generic administrative dashboard. Series appear as authored
+worlds with cover art, signature color, principal cast, and sound identity.
+Episodes appear as film objects with poster frames and meaningful stage
+progress. Dense list/table views remain available for high-volume operation,
+but are not the default emotional presentation.
+
+Inside Living Cinema, the Atrium recedes into a slim Studio Dock containing:
+
+- back to Series;
+- active-job count;
+- action-required count;
+- quick production switcher;
+- Monica;
+- current collaborators.
+
+Leaving an Episode never pauses its server-owned production.
+
+## Series and Episode visual behavior
+
+A Series home should communicate both identity and activity:
+
+- cover frame and Series title;
+- pinned look and World Bible release;
+- approved characters and locations;
+- narrator and score identity;
+- active Episodes;
+- Episodes waiting for review;
+- material Series changes;
+- a dominant **Create next episode** action.
+
+An Episode clearly distinguishes:
+
+- inherited Series assets;
+- Episode overrides;
+- updates available from a newer Series Release;
+- the exact configuration pinned by its active production run;
+- current master, repair branch, approval, and export state.
+
+Series changes never silently alter active or completed Episodes. Adoption is a
+visible, versioned action with an impact preview.
+
+## Monica Repair Room
+
+The final-screen **Request a targeted repair** action opens an immersive Repair
+Room rather than a small generic chat widget.
+
+The final film remains dominant. A structured brief sits beside it. The user
+may:
+
+- pause and add a note at the current playhead;
+- mark an in/out range;
+- select transcript words;
+- enter timecodes manually;
+- add, edit, reorder, or remove practical feedback rows.
+
+Each feedback row contains:
+
+- timestamp or range;
+- captured frame;
+- original plain-language direction;
+- resolved shot/transcript/track target;
+- Monica's interpretation;
+- status, clarification, cost, and eventual evidence.
+
+Monica's conversation explains ambiguity, conflicts, dependency impact, cost,
+and results. The structured rows—not raw chat messages—are the auditable source
+of truth.
+
+Before execution, Monica shows:
+
+- rows merged into repair units;
+- what will change;
+- what remains locked;
+- affected shots, tracks, transitions, and dependencies;
+- estimated cost/time range;
+- unsupported, conflicting, or script-changing requests.
+
+After execution, the room provides:
+
+- original/revised A/B playback;
+- loops for affected ranges;
+- before/after frames;
+- row-by-row resolution status;
+- complete regression-QC result;
+- rollback and approval.
+
+The UI must never imply that a selected ten-frame range guarantees a ten-frame
+generation repair. It shows both the user's requested range and Monica's actual
+safe repair scope.
 
 ## Adversarial review changes
 

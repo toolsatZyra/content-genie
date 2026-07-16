@@ -1,0 +1,84 @@
+{
+  "snapshot_version": 1,
+  "retrieved_at": "2026-07-17T00:00:00+05:30",
+  "purpose": "Design-time price and capability evidence. This is not an account canary receipt and does not enable production traffic.",
+  "sources": [
+    {
+      "capability": "gen_video",
+      "provider": "fal.ai",
+      "endpoint": "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
+      "source_url": "https://fal.ai/models/fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
+      "observed_billing": {
+        "unit": "generated_second",
+        "usd_per_unit": 0.07,
+        "page_example": "5 seconds costs USD 0.35"
+      },
+      "verification_state": "official_documentation_observed"
+    },
+    {
+      "capability": "gen_video",
+      "provider": "fal.ai",
+      "endpoint": "fal-ai/kling-video/v3/pro/image-to-video",
+      "source_url": "https://fal.ai/models/fal-ai/kling-video/v3/pro/image-to-video",
+      "observed_billing": {
+        "unit": "generated_second",
+        "usd_per_unit_audio_off": 0.112,
+        "usd_per_unit_audio_on": 0.168,
+        "usd_per_unit_voice_control": 0.196,
+        "note": "The embedded generic endpointBilling field showed 0.14 while the endpoint-specific pricing table and pricingInfoOverride showed 0.112 with audio off. Genie uses the conservative live account quote at dispatch and blocks if evidence disagrees."
+      },
+      "verification_state": "official_documentation_observed_with_discrepancy"
+    },
+    {
+      "capability": "gen_video",
+      "provider": "fal.ai",
+      "endpoint": "bytedance/seedance-2.0/reference-to-video",
+      "source_url": "https://fal.ai/models/bytedance/seedance-2.0/reference-to-video",
+      "observed_billing": {
+        "unit": "generated_second",
+        "usd_per_unit_720p_standard_no_video_input": 0.3034,
+        "usd_per_unit_720p_standard_with_video_input": 0.1814,
+        "usd_per_unit_720p_fast_no_video_input": 0.2419,
+        "usd_per_unit_720p_fast_with_video_input": 0.1452,
+        "usd_per_unit_1080p_standard_no_video_input": 0.682,
+        "note": "The rendered table showed 0.3024 for standard 720p without video input, while endpoint pricingInfoOverride showed 0.3034. The design BOM uses 0.3034."
+      },
+      "verification_state": "official_documentation_observed_with_discrepancy"
+    },
+    {
+      "capability": "edit_image",
+      "provider": "fal.ai",
+      "endpoint": "fal-ai/nano-banana-2/edit",
+      "source_url": "https://fal.ai/models/fal-ai/nano-banana-2/edit",
+      "observed_billing": {
+        "unit": "image",
+        "usd_per_unit_standard": 0.08,
+        "two_k_multiplier": 1.5,
+        "four_k_multiplier": 2.0,
+        "web_search_surcharge_usd": 0.015
+      },
+      "verification_state": "official_documentation_observed"
+    },
+    {
+      "capability": "upscale",
+      "provider": "fal.ai",
+      "endpoint": "fal-ai/topaz/upscale/video",
+      "source_url": "https://fal.ai/models/fal-ai/topaz/upscale/video",
+      "observed_billing": {
+        "unit": "input_second",
+        "usd_per_unit_up_to_720p": 0.01,
+        "usd_per_unit_720p_to_1080p": 0.02,
+        "usd_per_unit_above_1080p": 0.08,
+        "sixty_fps_multiplier": 2.0
+      },
+      "verification_state": "official_documentation_observed"
+    }
+  ],
+  "production_enablement_requirements": [
+    "Persist a content-addressed raw schema/documentation snapshot and SHA-256.",
+    "Persist an authenticated account capability and rate-card receipt.",
+    "Run a bounded canary and persist request, output, media-probe, cost, and retention evidence.",
+    "Resolve every documentation-versus-account discrepancy fail-closed.",
+    "Verify account concurrency and five-episodes-per-day capacity."
+  ]
+}

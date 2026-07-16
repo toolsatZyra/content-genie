@@ -17,17 +17,25 @@
 
   <div class="app-shell">
     <header class="topbar">
-      <button class="brand" type="button" data-go="script" aria-label="Go to the beginning">
+      <button class="brand" type="button" data-view="home" aria-label="Open Studio Home">
         <span class="brand-seal">G</span>
         <span class="brand-copy"><strong>Genie</strong><small>by Zyra</small></span>
       </button>
 
-      <div class="episode-title">
-        <span class="live-pulse"></span>
-        <div><small>Episode 01</small><strong>Neelkanth — The Poison of the Ocean</strong></div>
-      </div>
+      <nav class="studio-nav" aria-label="Studio navigation">
+        <button type="button" class="is-active" data-view="home" aria-current="page">Home</button>
+        <button type="button" data-view="series">Series</button>
+        <button type="button" data-view="episode">Living Cinema</button>
+      </nav>
 
       <div class="top-actions">
+        <button class="work-switcher-button" type="button" data-open-workspace-panel="jobs" aria-label="Open active productions">
+          <span class="work-spark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span><small>Studio activity</small><strong>3 active · 2 need review</strong></span>
+        </button>
+        <button class="inbox-button" type="button" data-open-workspace-panel="inbox" aria-label="Open Monica Inbox, 2 items need review">
+          <span aria-hidden="true">✦</span><b>2</b>
+        </button>
         <button class="monica-status" type="button" data-open-monica aria-label="Open Monica quality director">
           <span class="monica-mini"><i></i></span>
           <span><small>Quality Director</small><strong>Monica is watching</strong></span>
@@ -36,8 +44,205 @@
       </div>
     </header>
 
-    <div class="prototype-banner" role="note"><span>Interactive design prototype</span><p>Voice playback, media generation, QC evidence and export are simulated for UI approval.</p></div>
+    <div class="prototype-banner" role="note"><span>Interactive design prototype</span><p>Voice playback, media generation, QC evidence, notifications, repairs and export are simulated for UI approval.</p></div>
     <div id="stage-announcer" class="visually-hidden" role="status" aria-live="polite"></div>
+
+    <section class="workspace-view studio-atrium is-active" data-workspace-view="home" aria-labelledby="atrium-title">
+      <header class="atrium-hero">
+        <div>
+          <span class="stage-number">The Studio Atrium · Friday, 17 July</span>
+          <h1 id="atrium-title">Good morning.<br><em>Two films need your eye.</em></h1>
+          <p>Monica keeps every production moving in the background. Return only when your creative judgement is needed.</p>
+        </div>
+        <button class="new-production-orb" type="button" data-view="series">
+          <span>✦</span><strong>Create</strong><small>series or episode</small>
+        </button>
+      </header>
+
+      <div class="atrium-grid">
+        <section class="attention-gallery" aria-labelledby="attention-title">
+          <header class="section-heading">
+            <div><small>Your screening room</small><h2 id="attention-title">Needs your eye</h2></div>
+            <button type="button" data-open-workspace-panel="inbox">Open Monica Inbox <span>2</span></button>
+          </header>
+          <div class="attention-reel">
+            <article class="attention-card attention-premiere">
+              <img src="../agent-flow/assets/looks/glowing-divine-realism.webp" alt="">
+              <div class="attention-wash"></div>
+              <span class="attention-state">Final film ready</span>
+              <div class="attention-copy"><small>NEELKANTH · EPISODE 01</small><h3>The Poison of the Ocean</h3><p>Monica completed the episode-level review. The candidate is waiting for final human approval.</p></div>
+              <button type="button" data-open-episode="premiere" data-episode-key="neelkanth01">Enter the premiere <b>→</b></button>
+            </article>
+            <article class="attention-card attention-repair">
+              <img src="../agent-flow/assets/looks/moonlit-day-for-night-blue.webp" alt="">
+              <div class="attention-wash"></div>
+              <span class="attention-state">Repair plan ready</span>
+              <div class="attention-copy"><small>SHIVA PURAN · EPISODE 04</small><h3>The Moon Finds Refuge</h3><p>Three timecoded notes have been resolved into two repair work units. Your confirmation is needed before regeneration.</p></div>
+              <button type="button" data-open-repair>Review Monica’s plan <b>→</b></button>
+            </article>
+          </div>
+        </section>
+
+        <aside class="studio-pulse" aria-labelledby="pulse-title">
+          <header class="section-heading">
+            <div><small>Background work</small><h2 id="pulse-title">Studio pulse</h2></div>
+            <button type="button" data-open-workspace-panel="jobs">See all</button>
+          </header>
+          <div class="pulse-list">
+            <button type="button" class="pulse-item" data-open-episode="create" data-episode-key="durga02">
+              <span class="pulse-art"><img src="../agent-flow/assets/looks/divine-fury.webp" alt=""></span>
+              <span class="pulse-copy"><small>DURGA · EPISODE 02</small><strong>Mahishasura’s Last Stand</strong><em>Generating motion candidates · shot set 5 of 9</em></span>
+              <span class="stage-meter" aria-label="Production stage 2 of 4"><i style="--stage:50%"></i></span>
+            </button>
+            <button type="button" class="pulse-item" data-open-repair>
+              <span class="pulse-art"><img src="../agent-flow/assets/looks/moonlit-day-for-night-blue.webp" alt=""></span>
+              <span class="pulse-copy"><small>SHIVA PURAN · EPISODE 04</small><strong>The Moon Finds Refuge</strong><em>Awaiting repair-plan confirmation</em></span>
+              <span class="attention-dot" aria-hidden="true"></span>
+            </button>
+            <button type="button" class="pulse-item" data-open-episode="world" data-episode-key="krishna08">
+              <span class="pulse-art"><img src="../agent-flow/assets/looks/devotional-temple-gold.webp" alt=""></span>
+              <span class="pulse-copy"><small>KRISHNA LEELAS · EPISODE 08</small><strong>The Govardhan Promise</strong><em>New location anchor needs approval</em></span>
+              <span class="attention-dot" aria-hidden="true"></span>
+            </button>
+          </div>
+          <p class="truth-note"><span>◌</span> Stage meters show completed work units, never fabricated provider percentages.</p>
+        </aside>
+      </div>
+
+      <section class="series-shelf" aria-labelledby="recent-series-title">
+        <header class="section-heading">
+          <div><small>Return to a story world</small><h2 id="recent-series-title">Recent series</h2></div>
+          <div class="shelf-actions">
+            <label><span class="visually-hidden">Search series and episodes</span><input id="studio-search" type="search" placeholder="Search series, episodes, characters…"></label>
+            <button type="button" data-view="series">View all series</button>
+          </div>
+        </header>
+        <div class="series-card-grid" id="series-card-grid">
+          <button class="series-card" type="button" data-searchable="Neelkanth Shiva Parvati Kailash Poison Ocean" data-view="series">
+            <img src="../agent-flow/assets/looks/glowing-divine-realism.webp" alt="">
+            <span class="series-card-wash"></span>
+            <span class="series-card-copy"><small>4 EPISODES · 1 ACTIVE</small><strong>Neelkanth</strong><em>Shiva · Parvati · Kailash</em></span>
+          </button>
+          <button class="series-card" type="button" data-searchable="Krishna Leelas Radha Vrindavan Govardhan" data-view="series">
+            <img src="../agent-flow/assets/looks/devotional-temple-gold.webp" alt="">
+            <span class="series-card-wash"></span>
+            <span class="series-card-copy"><small>12 EPISODES · 1 NEEDS REVIEW</small><strong>Krishna Leelas</strong><em>Krishna · Radha · Vrindavan</em></span>
+          </button>
+          <button class="series-card" type="button" data-searchable="Durga Saptashati Mahishasura Devi" data-view="series">
+            <img src="../agent-flow/assets/looks/divine-fury.webp" alt="">
+            <span class="series-card-wash"></span>
+            <span class="series-card-copy"><small>3 EPISODES · 1 ACTIVE</small><strong>Durga Saptashati</strong><em>Durga · Mahishasura · Himalaya</em></span>
+          </button>
+        </div>
+        <p id="studio-search-empty" class="empty-search" hidden>No simulated series or episode matches that search.</p>
+      </section>
+    </section>
+
+    <section class="workspace-view series-home" data-workspace-view="series" aria-labelledby="series-title" hidden>
+      <header class="series-hero">
+        <img src="../agent-flow/assets/looks/glowing-divine-realism.webp" alt="">
+        <div class="series-hero-wash"></div>
+        <button class="back-to-atrium" type="button" data-view="home">← Studio Home</button>
+        <div class="series-identity">
+          <span class="stage-number">Series world · Bible release 04</span>
+          <h1 id="series-title">Neelkanth</h1>
+          <p>Stories of Shiva’s boundless compassion, stillness and cosmic responsibility.</p>
+          <div class="series-facts"><span>4 episodes</span><span>3 recurring characters</span><span>2 sacred locations</span></div>
+        </div>
+        <button class="new-episode-button" type="button" data-new-episode><span>✦</span><strong>Create next episode</strong><small>Inherit this world automatically</small></button>
+      </header>
+
+      <div class="series-tablist" role="tablist" aria-label="Series sections">
+        <button type="button" role="tab" aria-selected="true" aria-controls="series-episodes" id="episodes-tab" data-series-tab="episodes">Episodes</button>
+        <button type="button" role="tab" aria-selected="false" aria-controls="series-bible" id="bible-tab" data-series-tab="bible">World Bible</button>
+        <button type="button" role="tab" aria-selected="false" aria-controls="series-activity" id="activity-tab" data-series-tab="activity">Activity</button>
+      </div>
+
+      <section id="series-episodes" class="series-panel" role="tabpanel" aria-labelledby="episodes-tab" data-series-panel="episodes">
+        <header class="section-heading">
+          <div><small>One world, many films</small><h2>Episodes</h2></div>
+          <label class="series-filter"><span class="visually-hidden">Search this series</span><input id="episode-search" type="search" placeholder="Search episodes…"></label>
+        </header>
+        <div class="episode-orbit">
+          <button class="episode-tile is-featured" type="button" data-episode-search="01 Poison Ocean Neelkanth" data-open-episode="premiere" data-episode-key="neelkanth01">
+            <span class="episode-poster"><img src="../agent-flow/assets/looks/glowing-divine-realism.webp" alt=""><i>Ready for review</i></span>
+            <span class="episode-info"><small>EPISODE 01</small><strong>The Poison of the Ocean</strong><em>Final candidate · awaiting your eye</em></span>
+          </button>
+          <button class="episode-tile" type="button" data-episode-search="02 Ganga Descent Shiva" data-open-episode="script" data-episode-key="neelkanth02">
+            <span class="episode-poster"><img src="../agent-flow/assets/looks/top-down-aerial-epic.webp" alt=""><i>Draft</i></span>
+            <span class="episode-info"><small>EPISODE 02</small><strong>The Descent of Ganga</strong><em>Script started · world inherited</em></span>
+          </button>
+          <button class="episode-tile" type="button" data-episode-search="03 Third Eye Kama" data-open-episode="create" data-episode-key="neelkanth03">
+            <span class="episode-poster"><img src="../agent-flow/assets/looks/divine-fury.webp" alt=""><i>Producing</i></span>
+            <span class="episode-info"><small>EPISODE 03</small><strong>When the Third Eye Opened</strong><em>Motion candidates · shot set 3 of 8</em></span>
+          </button>
+          <button class="episode-tile" type="button" data-episode-search="04 Moon Chandra Refuge Repair" data-open-repair>
+            <span class="episode-poster"><img src="../agent-flow/assets/looks/moonlit-day-for-night-blue.webp" alt=""><i>Repair plan</i></span>
+            <span class="episode-info"><small>EPISODE 04</small><strong>The Moon Finds Refuge</strong><em>Monica needs plan confirmation</em></span>
+          </button>
+        </div>
+      </section>
+
+      <section id="series-bible" class="series-panel" role="tabpanel" aria-labelledby="bible-tab" data-series-panel="bible" hidden>
+        <header class="bible-heading">
+          <div><span class="stage-number">Pinned creative canon</span><h2>The world remembers.</h2><p>Every new episode begins with the latest approved release, then pins its own immutable snapshot.</p></div>
+          <div class="bible-release"><small>Current release</small><strong>04</strong><span>Approved 16 Jul</span></div>
+        </header>
+        <div class="bible-ledger">
+          <article class="bible-look">
+            <img src="../agent-flow/assets/looks/glowing-divine-realism.webp" alt="">
+            <span class="bible-overlay"></span>
+            <div><small>Default visual universe</small><h3>Glowing Divine Realism</h3><p>Sacred radiance, cinematic faces and controlled gold-blue atmosphere.</p><span class="inherit-chip">Inherited by new episodes</span></div>
+          </article>
+          <section class="bible-collection" aria-labelledby="character-bible-title">
+            <header><div><small>Identity anchors</small><h3 id="character-bible-title">Recurring characters</h3></div><button type="button">Manage</button></header>
+            <div class="anchor-grid">
+              <button type="button"><img src="../agent-flow/assets/looks/glowing-divine-realism.webp" alt=""><span><strong>Lord Shiva</strong><small>Primary form · 4 episodes</small></span></button>
+              <button type="button"><img src="../agent-flow/assets/emotional-performance.png" alt=""><span><strong>Goddess Parvati</strong><small>Primary form · 3 episodes</small></span></button>
+              <button type="button"><span class="anchor-symbol">न</span><span><strong>Nandi</strong><small>Primary form · 2 episodes</small></span></button>
+            </div>
+          </section>
+          <section class="bible-collection" aria-labelledby="location-bible-title">
+            <header><div><small>Spatial anchors</small><h3 id="location-bible-title">Sacred locations</h3></div><button type="button">Manage</button></header>
+            <div class="anchor-grid">
+              <button type="button"><img src="../agent-flow/assets/looks/top-down-aerial-epic.webp" alt=""><span><strong>Mount Kailash</strong><small>Master environment · researched</small></span></button>
+              <button type="button"><img src="../agent-flow/assets/looks/devotional-temple-gold.webp" alt=""><span><strong>Kailash sanctum</strong><small>Interior environment</small></span></button>
+            </div>
+          </section>
+          <aside class="inheritance-map">
+            <header><small>Episode 05 will inherit</small><strong>World Bible release 04</strong></header>
+            <ul><li>Look pack and palette</li><li>Shiva, Parvati and Nandi identity packs</li><li>Kailash environments</li><li>Male narrator and pronunciation lexicon</li></ul>
+            <p>Any episode override remains local until you explicitly propose it for the Series Bible.</p>
+          </aside>
+        </div>
+      </section>
+
+      <section id="series-activity" class="series-panel" role="tabpanel" aria-labelledby="activity-tab" data-series-panel="activity" hidden>
+        <header class="section-heading"><div><small>Auditable collaboration</small><h2>Recent activity</h2></div></header>
+        <ol class="activity-thread">
+          <li><span>Today</span><div><strong>Monica prepared a repair plan</strong><p>Episode 04 · three notes grouped into two repair work units.</p></div></li>
+          <li><span>Yesterday</span><div><strong>Aarav approved the Kailash environment</strong><p>Promoted to World Bible release 04 after continuity review.</p></div></li>
+          <li><span>15 Jul</span><div><strong>Maya started Episode 03 production</strong><p>Pinned World Bible release 03; newer canon remains optional.</p></div></li>
+        </ol>
+      </section>
+    </section>
+
+    <section class="workspace-view episode-workspace" data-workspace-view="episode" hidden>
+      <div class="episode-context">
+        <button id="episode-series-link" type="button" data-view="series">← Neelkanth</button>
+        <span class="live-pulse"></span>
+        <div><small id="episode-context-meta">Episode 01 · Living Cinema</small><strong id="episode-context-title">The Poison of the Ocean</strong></div>
+        <button type="button" data-open-workspace-panel="jobs">Leave running in background</button>
+      </div>
+      <div class="episode-revision-strip" aria-label="Selected Episode aggregate state">
+        <span><small>Episode aggregate</small><strong id="episode-aggregate-id">EP-NEE-01</strong></span>
+        <span><small>Series release</small><strong id="episode-series-release">04 · pinned</strong></span>
+        <span><small>Production config</small><strong id="episode-config-revision">Revision 07</strong></span>
+        <span><small>Artifact revision</small><strong id="episode-revision-state">Candidate 01</strong></span>
+        <span><small>Durable job</small><strong id="episode-job-state">No paid job enqueued</strong></span>
+        <span><small>Freshness</small><strong id="episode-freshness-state">Current</strong></span>
+      </div>
+      <p id="representative-flow-note" class="representative-flow-note" hidden>Simulation note: this switched Episode aggregate uses the approved Neelkanth chamber content as a representative flow; production state remains isolated to the selected aggregate.</p>
 
     <nav class="journey" aria-label="Film creation journey">
       <div class="journey-line"><span id="journey-progress"></span></div>
@@ -83,7 +288,7 @@
 
 यह कथा याद दिलाती है—सच्चा सामर्थ्य वही है, जो संसार के विष को स्वयं सहकर भी दूसरों की रक्षा करे।</textarea>
             <div class="script-foot">
-              <span><strong id="word-count">103</strong> words · approx. <strong id="duration-estimate">68 sec</strong></span>
+              <span><strong id="word-count">103</strong> words · pre-lock text estimate <strong id="duration-estimate">68 sec</strong> · target 60–120 sec</span>
               <span class="hash">SHA · <b id="script-hash">calculating…</b></span>
             </div>
           </div>
@@ -144,6 +349,11 @@
               <input id="pace" type="range" min="0" max="100" value="58" aria-label="Narration pace">
               <span>Cinematic</span>
               <output id="pace-output">0.96×</output>
+            </div>
+            <div class="performance-version">
+              <span><small>Post-TTS duration · simulated</small><strong id="post-tts-duration">01:08</strong></span>
+              <span><small>Performance revision</small><strong id="performance-version">Voice 01</strong></span>
+              <p>Pace or performance changes create a new voice revision and mark shot timing, captions and the mix stale.</p>
             </div>
           </div>
         </div>
@@ -244,17 +454,45 @@
           <span class="lock-sigil">✦</span>
           <p><strong>Once accepted, Genie quietly builds the complete reference pack.</strong> Expressions, full-body views, ornaments, weapons, reverse angles and lighting variants are generated and checked automatically.</p>
         </div>
+        <div class="world-prerequisite-grid" aria-label="Simulated automatic prerequisites before production">
+          <span><i>01</i><strong>Identity reference packs</strong><small>Simulated · generated from accepted anchors</small></span>
+          <span><i>02</i><strong>Character sheets</strong><small>Simulated · forms, expressions, angles and attributes</small></span>
+          <span><i>03</i><strong>Machine cultural preflight</strong><small>Simulated · iconography and dignity blockers checked</small></span>
+        </div>
+        <section class="production-authorization" aria-labelledby="production-authorization-title">
+          <div>
+            <small>Simulated pre-production quote</small>
+            <h2 id="production-authorization-title">Authorize cost before sealing this world.</h2>
+          </div>
+          <div class="authorization-evidence">
+            <span><i>✓</i><strong>Character sheets ready</strong><small>Automatic reference-pack prerequisite</small></span>
+            <span><i>✓</i><strong>Source and rights ready</strong><small>Simulated provenance packet attached</small></span>
+            <span><i>✓</i><strong>Machine cultural preflight clear</strong><small>Qualified human approval is still required at release</small></span>
+            <span><i>◇</i><strong>Provider quote · simulated</strong><small>Low $24 · expected $31 · high $38</small></span>
+          </div>
+          <label class="range-authorization"><input id="authorize-range" type="checkbox"><span><strong>Reserve and authorize a simulated $40 hard ceiling</strong><small>The quote, ceiling, pinned Series Release and Episode configuration are recorded in one atomic authorization. No paid job can begin before it exists.</small></span></label>
+        </section>
+        <fieldset class="world-authorization">
+          <legend>Atomic World Lock authorization · simulated</legend>
+          <div class="series-editor-credential"><span>AUTHORIZED SERIES EDITOR</span><strong>Current reviewer · qualified to bind World Bible release 04</strong><small>The decision applies only to Episode aggregate EP-NEE-01 and its pinned asset revisions.</small></div>
+          <div class="world-decision-options">
+            <label><input type="radio" name="world-decision" value="pending" checked><span><strong>Pending</strong><small>Keep production blocked</small></span></label>
+            <label><input type="radio" name="world-decision" value="authorize"><span><strong>Authorize</strong><small>Record this pinned release</small></span></label>
+            <label><input type="radio" name="world-decision" value="deny"><span><strong>Deny</strong><small>Return anchors for correction</small></span></label>
+          </div>
+          <p id="world-authorization-state" role="status">Pending · no version-bound authorization record exists yet.</p>
+        </fieldset>
 
         <footer class="stage-cta">
           <button class="text-action" type="button" data-prev>← Back to look</button>
-          <button class="primary-action" id="world-continue" type="button" data-next disabled>Lock the world <b>→</b></button>
+          <button class="primary-action" id="world-continue" type="button" disabled>Record authorization &amp; prepare production <b>→</b></button>
         </footer>
       </section>
 
       <section class="stage" data-screen="create" aria-labelledby="create-title" hidden>
         <header class="stage-intro inline creation-intro">
           <div><span class="stage-number">05 / Autonomous production</span><h1 id="create-title">The studio awakens.</h1></div>
-          <div class="creation-cost"><small>Live estimate</small><strong>$<span id="cost-value">0.84</span></strong><em>of $50 ceiling</em></div>
+          <div class="creation-estimate"><small>Authorized production contract</small><strong id="budget-state">Simulated · $40 hard ceiling · release 04</strong><em>Recorded with the World Lock</em></div>
         </header>
 
         <div class="production-theatre">
@@ -264,7 +502,7 @@
             <div class="production-frame">
               <img id="production-image" src="../agent-flow/assets/looks/glowing-divine-realism.webp" alt="Current generated frame">
               <div class="scan-line"></div>
-              <div class="production-state" role="status" aria-live="polite"><span id="production-percent">0%</span><strong id="production-label">Ready to direct</strong></div>
+              <div class="production-state" role="status" aria-live="polite"><span id="production-stage">Ready</span><strong id="production-label">Ready to direct</strong></div>
             </div>
             <div class="production-controls">
               <button id="start-production" class="summon-button" type="button"><span>✦</span><strong>Begin autonomous production</strong><small>Monica may repair any failing shot automatically</small></button>
@@ -296,7 +534,7 @@
       <section class="stage" data-screen="premiere" aria-labelledby="premiere-title" hidden>
         <header class="stage-intro premiere-intro">
           <div><span class="stage-number">06 / Final review</span><h1 id="premiere-title">Your film is ready<br>to be felt.</h1></div>
-          <div class="release-seal"><span>MONICA · SAMPLE</span><strong>Release state</strong><small>0 critical defects</small></div>
+          <div class="release-seal"><span>MONICA · SAMPLE</span><strong>Checks complete</strong><small>Evidence opens in production</small></div>
         </header>
 
         <div class="premiere-room">
@@ -313,13 +551,19 @@
           <div class="premiere-details">
             <div class="premiere-heading"><small>NEELKANTH · EPISODE 01</small><h2>The Poison of the Ocean</h2><p id="final-meta">1080 × 1920 · Hindi · Male narrator · Glowing Divine Realism</p></div>
             <div class="final-verdicts">
-              <span><i>✓</i><strong>Exact narration</strong><small>ASR verified</small></span>
-              <span><i>✓</i><strong>Visual continuity</strong><small>7 shots passed</small></span>
+              <span><i>✓</i><strong>Exact narration</strong><small>Manifest, alignment and ASR evidence reconciled</small></span>
+              <span><i>✓</i><strong>Visual continuity</strong><small>Shot set reviewed</small></span>
               <span><i>✓</i><strong>Audio finish</strong><small>Voice, score &amp; SFX</small></span>
-              <span><i>✓</i><strong>Cultural check</strong><small>No blockers</small></span>
+              <span><i>✓</i><strong>Machine cultural preflight</strong><small>Simulated · no machine blockers</small></span>
             </div>
+            <div class="approval-ledger" aria-label="Separate release approval records">
+              <span><i>✓</i><strong>Monica machine readiness</strong><small>Simulated evidence bundle ready</small></span>
+              <span><i id="creative-approval-mark">○</i><strong>Human creative approval</strong><small id="creative-approval-state">Awaiting current reviewer</small></span>
+              <span><i id="cultural-approval-mark">○</i><strong>Qualified cultural approval</strong><small id="cultural-approval-state">Awaiting authorized reviewer</small></span>
+            </div>
+            <p class="reviewer-credential"><span>SIMULATED CURRENT REVIEWER</span><strong>Creative owner · devotional-film cultural approval authorized</strong><small>One action may submit both human decisions, but Genie stores them as separate records with separate evidence.</small></p>
             <div class="final-buttons">
-              <button id="approve-film" class="approve-film" type="button"><span>✦</span> Approve &amp; export</button>
+              <button id="approve-film" class="approve-film" type="button"><span>✦</span> Record both approvals &amp; export</button>
               <button id="repair-film" type="button">Request a targeted repair</button>
             </div>
             <p id="final-message" role="status" aria-live="polite">Sample final-review state. In production, every verdict opens its stored evidence.</p>
@@ -332,6 +576,7 @@
         </footer>
       </section>
     </main>
+    </section>
   </div>
 
   <button class="monica-orb" type="button" data-open-monica aria-label="Open Monica quality panel">
@@ -357,12 +602,17 @@
     <section class="command-palette" role="dialog" aria-modal="true" aria-label="Genie command palette">
       <header><span>✦</span><input id="command-input" type="search" placeholder="Go to a chamber or ask Genie…" aria-label="Command search"><kbd>ESC</kbd></header>
       <div class="command-list" id="command-list">
+        <button type="button" data-command-view="home"><span>H</span><strong>Open Studio Home</strong><small>Attention and active work</small></button>
+        <button type="button" data-command-view="series"><span>S</span><strong>Open Neelkanth series</strong><small>Episodes and World Bible</small></button>
+        <button type="button" data-command-panel="jobs"><span>J</span><strong>Show active productions</strong><small>Background work switcher</small></button>
+        <button type="button" data-command-panel="inbox"><span>I</span><strong>Open Monica Inbox</strong><small>Reviews and decisions</small></button>
         <button type="button" data-command-stage="script"><span>01</span><strong>Open exact script</strong><small>Source chamber</small></button>
         <button type="button" data-command-stage="voice"><span>02</span><strong>Choose narrator</strong><small>Performance chamber</small></button>
         <button type="button" data-command-stage="look"><span>03</span><strong>Explore 117 looks</strong><small>Visual universe</small></button>
         <button type="button" data-command-stage="world"><span>04</span><strong>Review characters &amp; locations</strong><small>World lock</small></button>
         <button type="button" data-command-stage="create"><span>05</span><strong>Watch autonomous production</strong><small>Creation tunnel</small></button>
         <button type="button" data-command-stage="premiere"><span>06</span><strong>Review final film</strong><small>Premiere room</small></button>
+        <button type="button" data-command-repair><span>R</span><strong>Open Monica Repair Room</strong><small>Timecoded repair brief</small></button>
       </div>
     </section>
   </div>
@@ -385,6 +635,165 @@
       <textarea id="asset-prompt">Calm, compassionate and immeasurably powerful. Blue-grey complexion, matted locks, crescent moon, rudraksha and trishul. Symmetrical portrait, steady gaze, no scene action.</textarea>
       <div class="locked-dna"><span>LOOK DNA · LOCKED</span><p id="locked-look-dna">Glowing devotional realism, sacred radiance, cinematic facial detail, controlled gold-blue palette and atmospheric depth.</p></div>
       <button id="regenerate-asset" class="primary-action" type="button">Regenerate this option <b>↻</b></button>
+    </section>
+  </div>
+
+  <div id="workspace-panel-overlay" class="workspace-panel-overlay" hidden>
+    <button class="overlay-dismiss" type="button" data-close-workspace-panel aria-label="Close studio activity panel"></button>
+    <aside class="workspace-panel" role="dialog" aria-modal="true" aria-labelledby="workspace-panel-title">
+      <header>
+        <div><small>Keep work moving</small><h2 id="workspace-panel-title">Studio activity</h2></div>
+        <button type="button" data-close-workspace-panel aria-label="Close studio activity panel">×</button>
+      </header>
+      <div class="workspace-panel-tabs" role="tablist" aria-label="Studio activity sections">
+        <button type="button" role="tab" aria-selected="true" data-workspace-tab="jobs">Active productions <span>3</span></button>
+        <button type="button" role="tab" aria-selected="false" data-workspace-tab="inbox">Monica Inbox <span>2</span></button>
+      </div>
+      <section class="workspace-tab-panel" data-workspace-tab-panel="jobs">
+        <p class="panel-intro">These server-owned jobs continue when you close this panel or leave the episode.</p>
+        <div class="job-stack">
+          <button type="button" data-open-episode="create" data-episode-key="durga02">
+            <span class="job-thumb"><img src="../agent-flow/assets/looks/divine-fury.webp" alt=""></span>
+            <span class="job-copy"><small>DURGA · EPISODE 02</small><strong>Mahishasura’s Last Stand</strong><em>Motion candidates · shot set 5 of 9</em><span class="work-unit-track"><i style="--stage:50%"></i></span></span>
+            <b>Open</b>
+          </button>
+          <button type="button" data-open-episode="create" data-episode-key="ramayana06">
+            <span class="job-thumb"><img src="../agent-flow/assets/looks/golden-fantasy-epic.webp" alt=""></span>
+            <span class="job-copy"><small>RAMAYANA · EPISODE 06</small><strong>Hanuman Crosses the Ocean</strong><em>Episode review · 2 work units remain</em><span class="work-unit-track"><i style="--stage:75%"></i></span></span>
+            <b>Open</b>
+          </button>
+          <button type="button" data-open-repair>
+            <span class="job-thumb"><img src="../agent-flow/assets/looks/moonlit-day-for-night-blue.webp" alt=""></span>
+            <span class="job-copy"><small>SHIVA PURAN · EPISODE 04</small><strong>The Moon Finds Refuge</strong><em>Paused safely · repair plan needs approval</em><span class="work-unit-track"><i style="--stage:25%"></i></span></span>
+            <b>Review</b>
+          </button>
+        </div>
+      </section>
+      <section class="workspace-tab-panel" data-workspace-tab-panel="inbox" hidden>
+        <p class="panel-intro">Only decisions that need human judgement appear here. Routine retries remain with Monica.</p>
+        <div class="inbox-stack">
+          <button type="button" data-open-episode="premiere" data-episode-key="neelkanth01">
+            <span class="inbox-sigil is-review">◉</span>
+            <span><small>FINAL REVIEW · NEELKANTH 01</small><strong>The film is ready for your eye</strong><em>Review the candidate, approve it, or send timecoded notes.</em></span>
+            <b>Now</b>
+          </button>
+          <button type="button" data-open-repair>
+            <span class="inbox-sigil is-repair">✦</span>
+            <span><small>REPAIR PLAN · SHIVA PURAN 04</small><strong>Monica resolved three notes into two tasks</strong><em>One confirmation starts the versioned repair batch.</em></span>
+            <b>Plan</b>
+          </button>
+          <button type="button" data-open-episode="world" data-episode-key="krishna08">
+            <span class="inbox-sigil">◇</span>
+            <span><small>WORLD LOCK · KRISHNA LEELAS 08</small><strong>A new location anchor awaits approval</strong><em>Existing characters and visual look are already inherited.</em></span>
+            <b>Asset</b>
+          </button>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <div id="repair-overlay" class="repair-overlay" hidden>
+    <section class="repair-room" role="dialog" aria-modal="true" aria-labelledby="repair-room-title">
+      <header class="repair-room-header">
+        <div class="repair-title">
+          <span class="monica-core"><i></i></span>
+          <div><small>Monica Repair Room · simulated workflow</small><h2 id="repair-room-title">Direct the smallest safe change.</h2></div>
+        </div>
+        <div class="repair-version"><small>Base candidate</small><strong>Revision 01</strong></div>
+        <button type="button" data-close-repair aria-label="Close Monica Repair Room">×</button>
+      </header>
+
+      <div class="repair-progress" aria-label="Repair workflow">
+        <button type="button" class="is-active" data-repair-step="brief" aria-current="step" aria-disabled="true" tabindex="-1"><span>1</span><strong>Timecoded brief</strong></button>
+        <i></i>
+        <button type="button" data-repair-step="plan" aria-disabled="true" tabindex="-1"><span>2</span><strong>Monica’s plan</strong></button>
+        <i></i>
+        <button type="button" data-repair-step="result" aria-disabled="true" tabindex="-1"><span>3</span><strong>A/B result</strong></button>
+      </div>
+
+      <div class="repair-layout">
+        <aside class="repair-screening">
+          <div class="repair-film-frame">
+            <img id="repair-preview-image" src="../agent-flow/assets/looks/glowing-divine-realism.webp" alt="Repair preview frame">
+            <span class="repair-frame-label" id="repair-frame-label">Base candidate · Revision 01</span>
+            <div class="repair-caption" lang="hi">सृष्टि की रक्षा के लिए महादेव ने वह भयंकर विष पी लिया।</div>
+          </div>
+          <div class="repair-transport">
+            <button type="button" id="repair-play" aria-label="Play or pause repair preview">▶</button>
+            <label for="repair-playhead"><span class="visually-hidden">Repair preview playhead</span><input id="repair-playhead" type="range" min="0" max="68" step=".1" value="34.2"></label>
+            <output id="repair-playhead-label" for="repair-playhead">00:34.2</output>
+          </div>
+          <div class="repair-timeline" aria-label="Episode tracks">
+            <span><small>VIDEO</small><i class="track-clips"></i></span>
+            <span><small>VOICE</small><i class="track-voice"></i></span>
+            <span><small>MUSIC + SFX</small><i class="track-audio"></i></span>
+            <b id="repair-timeline-cursor" style="--cursor:50.3%"></b>
+          </div>
+          <button class="capture-note" type="button" id="capture-repair-note"><span>＋</span><strong>Add note at <b id="capture-time">00:34.2</b></strong><small>Start a timestamped feedback row</small></button>
+          <p class="repair-scope-note"><span>◌</span> Your time range marks where you noticed the issue. Monica displays the actual shot, transition, or audio scope before any repair begins.</p>
+        </aside>
+
+        <div class="repair-workbench">
+          <section data-repair-view="brief" aria-labelledby="repair-brief-title">
+            <header class="repair-view-heading">
+              <div><small>Structured conversation</small><h3 id="repair-brief-title">Tell Monica what should change.</h3><p>Each row stays independently traceable. Plain language is welcome; the supplied narration remains locked.</p></div>
+              <span class="script-guard">Script words locked</span>
+            </header>
+            <div id="repair-clarification-banner" class="repair-clarification-banner" role="alert" hidden></div>
+            <div id="repair-rows" class="repair-rows"></div>
+            <div class="repair-brief-actions">
+              <button type="button" id="add-repair-row">＋ Add another feedback row</button>
+              <button type="button" class="primary-action" id="build-repair-plan">Let Monica build the plan <b>→</b></button>
+            </div>
+          </section>
+
+          <section data-repair-view="plan" aria-labelledby="repair-plan-title" hidden>
+            <header class="repair-view-heading">
+              <div><small>Interpretation preview</small><h3 id="repair-plan-title">One safe plan, not one blind call per note.</h3><p>Monica merges overlaps, checks dependencies and protects every unaffected asset.</p></div>
+              <span class="plan-ready">Ready for confirmation</span>
+            </header>
+            <div class="monica-plan-summary">
+              <span class="monica-large"><i></i></span>
+              <div><small>MONICA UNDERSTOOD</small><p id="plan-summary-copy">The selected notes can be resolved as a versioned repair batch without changing the supplied script or narrator identity.</p></div>
+            </div>
+            <div id="repair-task-list" class="repair-task-list"></div>
+            <div class="repair-plan-manifest">
+              <span><small>Exact plan hash</small><strong id="repair-plan-hash">RP-PENDING</strong></span>
+              <span><small>Dependency scope</small><strong id="repair-dependency-scope">Pending validated notes</strong></span>
+              <span><small>Expected · simulated</small><strong id="repair-expected-cost">Pending quote</strong></span>
+              <span><small>High · simulated</small><strong id="repair-high-cost">Pending quote</strong></span>
+            </div>
+            <label class="repair-ceiling-confirm"><input id="repair-ceiling-confirm" type="checkbox"><span><strong id="repair-ceiling-copy">Authorize a simulated hard ceiling of $18</strong><small>Monica must stop before paid enqueue if the provider high estimate exceeds this record.</small></span></label>
+            <div class="repair-guardrails">
+              <span><i>✓</i><strong>Unchanged</strong><small>Exact narration and word order</small></span>
+              <span><i>✓</i><strong>Pinned</strong><small>Series look and identity anchors</small></span>
+              <span><i>✓</i><strong>Rechecked</strong><small>Affected boundaries and full episode</small></span>
+              <span><i>◇</i><strong>Range estimate</strong><small>Shown by providers before execution</small></span>
+            </div>
+            <div class="repair-plan-actions">
+              <button type="button" data-repair-back="brief">← Refine notes</button>
+              <button type="button" class="primary-action" id="apply-repair-plan" disabled>Apply versioned repair <b>✦</b></button>
+            </div>
+          </section>
+
+          <section data-repair-view="result" aria-labelledby="repair-result-title" hidden>
+            <header class="repair-view-heading">
+              <div><small>Simulated repaired candidate</small><h3 id="repair-result-title">Every note accounted for.</h3><p>The previous candidate is preserved. Compare the affected range before promoting Candidate 02 to final review.</p></div>
+              <span class="result-ready">Regression checks complete</span>
+            </header>
+            <div class="ab-switch" role="group" aria-label="Compare repair versions">
+              <button type="button" class="is-active" data-version-preview="before" aria-pressed="true"><small>A · BEFORE</small><strong>Revision 01</strong></button>
+              <button type="button" data-version-preview="after" aria-pressed="false"><small>B · REPAIRED</small><strong>Revision 02</strong></button>
+            </div>
+            <div id="repair-resolution-list" class="repair-resolution-list"></div>
+            <div class="repair-result-note"><span>✦</span><p><strong>Monica rechecked more than the edited frames.</strong> The repaired artifacts, neighboring shot boundaries, mix continuity, script alignment and complete episode candidate were reviewed again in this simulated result.</p></div>
+            <div class="repair-plan-actions">
+              <button type="button" data-repair-back="brief">Add or revise feedback</button>
+              <button type="button" class="primary-action" id="accept-repair-result">Promote Candidate 02 to final review <b>→</b></button>
+            </div>
+          </section>
+        </div>
+      </div>
     </section>
   </div>
 

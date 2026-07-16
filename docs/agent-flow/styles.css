@@ -44,6 +44,27 @@ button { font: inherit; }
   background-size: 11px 13px, 17px 19px;
 }
 
+.archive-notice {
+  margin: 22px auto 0;
+  width: min(1180px, calc(100% - 40px));
+  padding: 12px 16px;
+  border: 1px solid rgba(176, 76, 35, .35);
+  border-left: 4px solid var(--saffron-dark);
+  background: #fff5e8;
+  color: #4b2a1c;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.archive-notice strong {
+  margin-right: 4px;
+}
+
+.archive-notice a {
+  color: inherit;
+  font-weight: 700;
+}
+
 [hidden] { display: none !important; }
 
 .topbar {

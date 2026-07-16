@@ -1,7 +1,10 @@
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+const scrollBehavior = () => reducedMotion.matches ? "auto" : "smooth";
 
 const stageOrder = ["script", "voice", "look", "world", "create", "premiere"];
+let currentWorkspaceView = "home";
 let currentStage = "script";
 let selectedVoice = "male";
 let selectedLook = "glowing-divine-realism";
@@ -17,7 +20,35 @@ let toastTimer = null;
 let returnFocus = null;
 let vaultQuery = "";
 let vaultLimit = 24;
+let repairNoteSequence = 3;
+let repairPlaybackTimer = null;
+let worldAuthorizationDecision = "pending";
+let worldAuthorizationRecorded = false;
+let performanceVersion = 1;
 const completedStages = new Set();
+const episodeAggregates = {
+  neelkanth01: { series: "Neelkanth", number: "01", title: "The Poison of the Ocean", id: "EP-NEE-01", release: "04", config: "07", job: "No paid job enqueued" },
+  neelkanth02: { series: "Neelkanth", number: "02", title: "The Descent of Ganga", id: "EP-NEE-02", release: "04", config: "01", job: "No paid job enqueued" },
+  neelkanth03: { series: "Neelkanth", number: "03", title: "When the Third Eye Opened", id: "EP-NEE-03", release: "03", config: "05", job: "JOB-NEE-03-PROD · running" },
+  durga02: { series: "Durga Saptashati", number: "02", title: "Mahishasura’s Last Stand", id: "EP-DUR-02", release: "02", config: "04", job: "JOB-DUR-02-PROD · running" },
+  krishna08: { series: "Krishna Leelas", number: "08", title: "The Govardhan Promise", id: "EP-KRI-08", release: "06", config: "02", job: "No paid job enqueued" },
+  ramayana06: { series: "Ramayana", number: "06", title: "Hanuman Crosses the Ocean", id: "EP-RAM-06", release: "05", config: "03", job: "JOB-RAM-06-QC · running" },
+};
+let activeEpisodeKey = "neelkanth01";
+let repairNotes = [
+  {
+    id: 1,
+    start: "00:18.4",
+    end: "00:22.1",
+    text: "Shiva’s rudraksha beads change shape during the camera move. Keep them identical to the approved character reference. Do not change his face or the camera direction.",
+  },
+  {
+    id: 2,
+    start: "00:41.0",
+    end: "00:44.5",
+    text: "The score is overpowering the narrator here. Keep every spoken word and the same emotional performance, but let the voice sit clearly above the music.",
+  },
+];
 
 const defaultAssetPrompts = {
   shiva: "Calm, compassionate and immeasurably powerful. Blue-grey complexion, matted locks, crescent moon, rudraksha and trishul. Symmetrical identity portrait, steady gaze, no scene action.",
@@ -76,9 +107,119 @@ const stageMessages = {
   voice: "I will compare the spoken audio against the exact script and check Sanskrit pronunciation before any visual generation begins.",
   look: "This choice becomes a versioned Look Pack. It will govern colour, light, material, camera mood and visual consistency.",
   world: "I’m waiting for your taste. After acceptance, identity and environment reference packs will be generated and checked automatically.",
-  create: "The crew is dormant. When you begin, I will score every candidate and repair the smallest failing unit.",
-  premiere: "The final candidate has passed the launch quality contract. You may approve it or request one precise repair."
+  create: "The crew is dormant. When you begin, I will evaluate every candidate against the launch rubrics and repair the smallest failing unit.",
+  premiere: "Provisional automated QC passed for this final-review candidate. Separate creative and qualified cultural approvals are still required."
 };
+
+const workspaceMessages = {
+  home: "I’m coordinating the whole studio. Active productions keep moving in the background; the Inbox only surfaces decisions that need human judgement.",
+  series: "This Series Bible is the memory of the story world. New episodes inherit an approved release and pin it so later canon changes cannot silently alter production.",
+  episode: "Living Cinema is the focused episode room. You can leave at any point without interrupting durable production work.",
+};
+
+function setWorkspaceView(view, shouldFocus = true) {
+  if (!["home", "series", "episode"].includes(view)) return;
+  currentWorkspaceView = view;
+  $$("[data-workspace-view]").forEach((screen) => {
+    const active = screen.dataset.workspaceView === view;
+    screen.hidden = !active;
+    screen.classList.toggle("is-active", active);
+  });
+  $$(".studio-nav [data-view]").forEach((button) => {
+    const active = button.dataset.view === view;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-current", active ? "page" : "false");
+  });
+  $("#monica-current-stage").textContent = view === "episode"
+    ? currentStage[0].toUpperCase() + currentStage.slice(1)
+    : view === "home" ? "Studio Home" : "Series World";
+  $("#monica-drawer-message").textContent = view === "episode" ? stageMessages[currentStage] : workspaceMessages[view];
+  const heading = view === "home" ? $("#atrium-title") : view === "series" ? $("#series-title") : $(`[data-screen="${currentStage}"] h1`);
+  $("#stage-announcer").textContent = `${heading?.textContent || view} opened`;
+  if (shouldFocus && heading) {
+    heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+  }
+  window.scrollTo({ top: 0, behavior: scrollBehavior() });
+}
+
+function primeEpisodeThrough(stage) {
+  const targetIndex = stageIndex(stage);
+  if (targetIndex < 0) return;
+  if (targetIndex >= stageIndex("voice")) {
+    scriptLocked = true;
+    $("#script-input").readOnly = true;
+    $("#lock-script").innerHTML = "Words locked <b>✓</b>";
+    $("#unlock-script").hidden = false;
+    $("#paste-script").hidden = true;
+    $("#upload-script").hidden = true;
+    completedStages.add("script");
+  }
+  if (targetIndex >= stageIndex("look")) completedStages.add("voice");
+  if (targetIndex >= stageIndex("world")) completedStages.add("look");
+  if (targetIndex >= stageIndex("create")) {
+    $$(".world-asset").forEach((card) => {
+      card.classList.add("is-accepted");
+      $(".asset-state", card).textContent = "Identity anchor locked ✓";
+      const acceptButton = $('[data-asset-action="accept"]', card);
+      acceptButton.textContent = "Accepted ✓";
+      acceptButton.setAttribute("aria-pressed", "true");
+    });
+    worldAuthorizationDecision = "authorize";
+    worldAuthorizationRecorded = true;
+    $("#authorize-range").checked = true;
+    $("#budget-state").textContent = "Simulated · $40 hard ceiling · release 04";
+    $("#start-production").disabled = false;
+    $("#start-production").innerHTML = "<span>✦</span><strong>Begin autonomous production</strong><small>Atomic World Lock and simulated cost ceiling recorded</small>";
+    $$('[name="world-decision"]').forEach((input) => { input.checked = input.value === "authorize"; });
+    completedStages.add("world");
+    updateWorldState();
+  }
+  highestUnlocked = Math.max(highestUnlocked, targetIndex);
+  if (stage === "premiere") {
+    productionState = "complete";
+    productionProgress = 100;
+    completedStages.add("create");
+    $("#premiere-button").disabled = false;
+  }
+  refreshNavigation();
+}
+
+function selectEpisodeAggregate(key = "neelkanth01") {
+  const episode = episodeAggregates[key] || episodeAggregates.neelkanth01;
+  activeEpisodeKey = key in episodeAggregates ? key : "neelkanth01";
+  $("#episode-series-link").textContent = `← ${episode.series}`;
+  $("#episode-context-meta").textContent = `Episode ${episode.number} · Living Cinema`;
+  $("#episode-context-title").textContent = episode.title;
+  $("#episode-aggregate-id").textContent = episode.id;
+  $("#episode-series-release").textContent = `${episode.release} · pinned`;
+  $("#episode-config-revision").textContent = `Revision ${episode.config}`;
+  $("#episode-job-state").textContent = episode.job;
+  $("#episode-revision-state").textContent = episode.revision || "Draft revision";
+  $("#episode-freshness-state").textContent = episode.freshness || "Current";
+  $("#episode-freshness-state").classList.toggle("is-stale", /stale|invalid/i.test(episode.freshness || ""));
+  $("#representative-flow-note").hidden = activeEpisodeKey === "neelkanth01";
+}
+
+function openEpisodeAt(stage = currentStage, episodeKey = activeEpisodeKey) {
+  selectEpisodeAggregate(episodeKey);
+  primeEpisodeThrough(stage);
+  setWorkspaceView("episode", false);
+  setStage(stage);
+  closeWorkspacePanel(false);
+}
+
+function setSeriesTab(tab) {
+  $$("[data-series-tab]").forEach((button) => {
+    const active = button.dataset.seriesTab === tab;
+    button.setAttribute("aria-selected", String(active));
+    button.tabIndex = active ? 0 : -1;
+  });
+  $$("[data-series-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.seriesPanel !== tab;
+  });
+  $("#stage-announcer").textContent = `${tab === "bible" ? "World Bible" : tab[0].toUpperCase() + tab.slice(1)} opened`;
+}
 
 function stageIndex(stage) {
   return stageOrder.indexOf(stage);
@@ -117,7 +258,11 @@ function invalidateFrom(stage) {
   const index = stageIndex(stage);
   stageOrder.slice(index).forEach((item) => completedStages.delete(item));
   highestUnlocked = Math.min(highestUnlocked, index);
+  setEpisodeAggregateState({ job: "No paid job enqueued", freshness: `Stale after ${stage} revision`, revision: "Draft revision" });
   if (index <= stageIndex("world")) {
+    worldAuthorizationDecision = "pending";
+    worldAuthorizationRecorded = false;
+    $$('[name="world-decision"]').forEach((input) => { input.checked = input.value === "pending"; });
     $$(".world-asset").forEach((card) => {
       card.classList.remove("is-accepted");
       $(".asset-state", card).textContent = "Awaiting your eye";
@@ -135,6 +280,7 @@ function invalidateProductionOnly() {
   completedStages.delete("create");
   completedStages.delete("premiere");
   highestUnlocked = completedStages.has("world") ? stageIndex("create") : Math.min(highestUnlocked, stageIndex("world"));
+  setEpisodeAggregateState({ job: "No paid job enqueued", freshness: "Stale after performance/config revision", revision: "Draft revision" });
   resetProduction();
   refreshNavigation();
 }
@@ -144,6 +290,10 @@ function invalidateWorldAsset(card) {
   completedStages.delete("create");
   completedStages.delete("premiere");
   highestUnlocked = stageIndex("world");
+  setEpisodeAggregateState({ job: "No paid job enqueued", freshness: "Stale after world-anchor revision", revision: "Draft revision" });
+  worldAuthorizationDecision = "pending";
+  worldAuthorizationRecorded = false;
+  $$('[name="world-decision"]').forEach((input) => { input.checked = input.value === "pending"; });
   card.classList.remove("is-accepted");
   $(".asset-state", card).textContent = "Awaiting your eye";
   const acceptButton = $('[data-asset-action="accept"]', card);
@@ -171,15 +321,17 @@ function rememberFocus() {
 }
 
 function syncBodyLock() {
-  const modalOpen = ["#command-palette", "#look-vault", "#prompt-sheet"]
+  const modalOpen = ["#command-palette", "#look-vault", "#prompt-sheet", "#workspace-panel-overlay", "#repair-overlay"]
     .some((selector) => !$(selector).hidden);
   document.body.style.overflow = modalOpen ? "hidden" : "";
   $(".app-shell").inert = modalOpen;
   $(".monica-orb").inert = modalOpen;
+  $("#monica-drawer").inert = modalOpen;
 }
 
 function restoreFocus() {
-  if (returnFocus?.isConnected) returnFocus.focus();
+  if (returnFocus?.isConnected && !returnFocus.closest("[hidden]")) returnFocus.focus();
+  else $(".brand")?.focus();
   returnFocus = null;
 }
 
@@ -200,6 +352,7 @@ function setStage(stage) {
   $("#journey-progress").style.width = `${(index / (stageOrder.length - 1)) * 100}%`;
   $("#monica-current-stage").textContent = stage[0].toUpperCase() + stage.slice(1);
   $("#monica-drawer-message").textContent = stageMessages[stage];
+  if (currentWorkspaceView !== "episode") setWorkspaceView("episode", false);
   updateBlockers();
   const heading = $(`[data-screen="${stage}"] h1`);
   $("#stage-announcer").textContent = `${heading?.textContent || stage} opened`;
@@ -207,7 +360,7 @@ function setStage(stage) {
     heading.tabIndex = -1;
     heading.focus({ preventScroll: true });
   }
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  window.scrollTo({ top: 0, behavior: scrollBehavior() });
 }
 
 function updateBlockers() {
@@ -216,8 +369,24 @@ function updateBlockers() {
   else if (!completedStages.has("voice") && highestUnlocked <= stageIndex("voice")) blocker = "Narrator not confirmed";
   else if (!completedStages.has("look") && highestUnlocked <= stageIndex("look")) blocker = "Look not confirmed";
   else if (acceptedAssets().length < 3 && highestUnlocked >= stageIndex("world")) blocker = `${3 - acceptedAssets().length} world choices`;
+  else if (!worldAuthorizationRecorded && highestUnlocked >= stageIndex("world")) blocker = "Series authorization pending";
   else if (productionState !== "complete" && highestUnlocked >= stageIndex("create")) blocker = "Film not generated";
   $("#monica-blockers").textContent = blocker;
+}
+
+function setEpisodeAggregateState({ job, freshness, revision } = {}) {
+  const episode = episodeAggregates[activeEpisodeKey];
+  if (episode) {
+    if (job) episode.job = job;
+    if (revision) episode.revision = revision;
+    if (freshness) episode.freshness = freshness;
+  }
+  if (job) $("#episode-job-state").textContent = job;
+  if (revision) $("#episode-revision-state").textContent = revision;
+  if (freshness) {
+    $("#episode-freshness-state").textContent = freshness;
+    $("#episode-freshness-state").classList.toggle("is-stale", /stale|invalid/i.test(freshness));
+  }
 }
 
 function nextStage() {
@@ -244,7 +413,8 @@ function renderStars() {
 async function updateScriptStats() {
   const words = $("#script-input").value.trim().split(/\s+/).filter(Boolean).length;
   $("#word-count").textContent = String(words);
-  $("#duration-estimate").textContent = `${Math.max(1, Math.round((words / 90) * 60))} sec`;
+  const duration = Math.max(1, Math.round((words / 90) * 60));
+  $("#duration-estimate").textContent = `${duration} sec · ${duration >= 60 && duration <= 120 ? "within target" : "outside target"}`;
   const data = new TextEncoder().encode($("#script-input").value);
   const digest = await crypto.subtle.digest("SHA-256", data);
   const hash = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("").toUpperCase();
@@ -410,9 +580,31 @@ function acceptedAssets() {
 
 function updateWorldState() {
   const count = acceptedAssets().length;
+  const costAuthorized = $("#authorize-range").checked;
   $("#asset-ready-count").textContent = `${count} / 3`;
-  $("#world-continue").disabled = count < 3;
+  $("#world-continue").disabled = count < 3 || !costAuthorized || worldAuthorizationDecision !== "authorize";
+  if (worldAuthorizationRecorded) {
+    $("#world-authorization-state").textContent = "Recorded atomically · quote, $40 ceiling, World Bible release 04 and Episode aggregate EP-NEE-01 are bound.";
+  } else if (worldAuthorizationDecision === "authorize") {
+    $("#world-authorization-state").textContent = count < 3
+      ? "Authorization selected, but all three anchors must be accepted before the record can be written."
+      : !costAuthorized
+        ? "World decision selected, but the current quote and hard ceiling must also be authorized."
+        : "Ready to record atomically · quote, ceiling, pinned release and asset revisions will be bound to EP-NEE-01.";
+  } else if (worldAuthorizationDecision === "deny") {
+    $("#world-authorization-state").textContent = "Denied · production remains blocked and the accepted anchors must be corrected or reconsidered.";
+  } else {
+    $("#world-authorization-state").textContent = "Pending · no version-bound authorization record exists yet.";
+  }
   updateBlockers();
+}
+
+function resetWorldAuthorization() {
+  worldAuthorizationDecision = "pending";
+  worldAuthorizationRecorded = false;
+  $("#authorize-range").checked = false;
+  $$('[name="world-decision"]').forEach((input) => { input.checked = input.value === "pending"; });
+  updateWorldState();
 }
 
 function toggleAsset(card) {
@@ -470,6 +662,18 @@ function setQualityCheck(index, status) {
   $("small", item).textContent = status === "is-pass" ? "Passed" : status === "is-checking" ? "Checking…" : "Not started";
 }
 
+function resetReviewApprovals(message = "Sample final-review state. In production, every verdict opens its stored evidence.") {
+  $("#approve-film").disabled = false;
+  $("#approve-film").innerHTML = "<span>✦</span> Record both approvals & export";
+  $("#creative-approval-mark").textContent = "○";
+  $("#cultural-approval-mark").textContent = "○";
+  $("#creative-approval-state").textContent = "Awaiting current reviewer";
+  $("#cultural-approval-state").textContent = "Awaiting authorized reviewer";
+  $("#creative-approval-mark").closest("span").classList.remove("is-approved");
+  $("#cultural-approval-mark").closest("span").classList.remove("is-approved");
+  $("#final-message").textContent = message;
+}
+
 function resetProduction() {
   if (productionTimer) clearInterval(productionTimer);
   productionTimer = null;
@@ -477,30 +681,32 @@ function resetProduction() {
   productionState = "idle";
   $(".production-theatre").setAttribute("aria-busy", "false");
   $(".production-frame").classList.remove("is-running");
-  $("#production-percent").textContent = "0%";
-  $("#cost-value").textContent = "0.84";
+  $("#production-stage").textContent = "Ready";
+  $("#budget-state").textContent = worldAuthorizationRecorded
+    ? "Simulated · $40 hard ceiling · release 04"
+    : "Quote and ceiling authorization required";
   $("#production-label").textContent = "Ready to direct";
   $("#production-image").src = assetPath(selectedLook);
   $("#final-film-image").src = assetPath(selectedLook);
   $("#monica-score").textContent = "Waiting";
   $("#monica-note").innerHTML = "<span>◌</span><p>Simulated preview: Monica will explain repairs in plain language while the studio keeps moving.</p>";
   $("#creation-note").textContent = "Nothing has been generated yet";
-  $("#start-production").disabled = false;
-  $("#start-production").innerHTML = "<span>✦</span><strong>Begin autonomous production</strong><small>Monica may repair any failing shot automatically</small>";
+  if (!worldAuthorizationRecorded) $("#authorize-range").checked = false;
+  $("#start-production").disabled = !worldAuthorizationRecorded;
+  $("#start-production").innerHTML = worldAuthorizationRecorded
+    ? "<span>✦</span><strong>Begin autonomous production</strong><small>Atomic World Lock and simulated cost ceiling recorded</small>"
+    : "<span>✦</span><strong>Complete the World Lock first</strong><small>Quote, hard ceiling and Series release must be authorized together</small>";
   $("#pause-production").disabled = true;
   $("#pause-production").textContent = "Pause after current shot";
   $("#premiere-button").disabled = true;
   $$(".shot-card").forEach((card) => card.classList.remove("is-active", "is-done"));
   for (let index = 0; index < 6; index += 1) setQualityCheck(index, "");
-  $("#approve-film").innerHTML = "<span>✦</span> Approve & export";
-  $("#final-message").textContent = "Sample final-review state. In production, every verdict opens its stored evidence.";
+  resetReviewApprovals();
   updateBlockers();
 }
 
 function updateProduction() {
   productionProgress = Math.min(100, productionProgress + 2);
-  $("#production-percent").textContent = `${productionProgress}%`;
-  $("#cost-value").textContent = (0.84 + productionProgress * .276).toFixed(2);
   $(".production-frame").classList.add("is-running");
   $("#pause-production").disabled = false;
   $("#start-production").disabled = true;
@@ -513,12 +719,22 @@ function updateProduction() {
   const shot = shots[shotIndex];
   $("#production-image").src = assetPath(shot.image.replace(".webp", ""));
   $("#production-label").textContent = `${shot.title} · ${shot.model}`;
+  $("#production-stage").textContent = productionProgress < 12
+    ? "Planning"
+    : productionProgress < 82
+      ? `Shot ${shotIndex + 1} of ${shots.length}`
+      : productionProgress < 94 ? "Assembly" : "Episode review";
+  $("#budget-state").textContent = productionProgress < 12
+    ? "Provider estimates are being grouped"
+    : "Quality-first routing · range retained in job record";
 
   const qualityIndex = Math.min(5, Math.floor(productionProgress / 17));
   for (let index = 0; index < 6; index += 1) {
     setQualityCheck(index, index < qualityIndex ? "is-pass" : index === qualityIndex ? "is-checking" : "");
   }
-  $("#monica-score").textContent = productionProgress < 18 ? "Observing" : `${Math.min(96, 72 + Math.floor(productionProgress / 4))}/100`;
+  $("#monica-score").textContent = productionProgress < 18
+    ? "Observing"
+    : productionProgress < 42 ? "Reviewing" : productionProgress < 60 ? "Repairing" : "Evidence building";
 
   if (productionProgress === 42) {
     $("#monica-note").innerHTML = "<span>✦</span><p>Sample repair: Shot 04 showed unstable rudraksha beads, so Monica rejects only that candidate and requests stronger identity references.</p>";
@@ -534,8 +750,13 @@ function startProduction() {
     showToast("Lock all world anchors before production");
     return;
   }
+  if (!worldAuthorizationRecorded) {
+    showToast("Record the atomic World Lock and cost authorization before production");
+    return;
+  }
   if (productionState === "idle") productionProgress = 0;
   productionState = "running";
+  setEpisodeAggregateState({ job: "JOB-NEE-01-PROD · running", freshness: "Current · inputs pinned", revision: "Production revision 01" });
   $(".production-theatre").setAttribute("aria-busy", "true");
   $("#pause-production").textContent = "Pause after current shot";
   $("#creation-note").textContent = "Prototype simulation running in this page";
@@ -548,6 +769,7 @@ function pauseProduction() {
     clearInterval(productionTimer);
     productionTimer = null;
     productionState = "paused";
+    setEpisodeAggregateState({ job: "JOB-NEE-01-PROD · paused safely" });
     $(".production-theatre").setAttribute("aria-busy", "false");
     $("#pause-production").textContent = "Resume production";
     $("#creation-note").textContent = "Production paused safely after the current step";
@@ -555,6 +777,7 @@ function pauseProduction() {
   }
   if (productionState === "paused") {
     productionState = "running";
+    setEpisodeAggregateState({ job: "JOB-NEE-01-PROD · running" });
     $(".production-theatre").setAttribute("aria-busy", "true");
     $("#pause-production").textContent = "Pause after current shot";
     productionTimer = setInterval(updateProduction, 95);
@@ -566,21 +789,367 @@ function finishProduction() {
   clearInterval(productionTimer);
   productionTimer = null;
   productionState = "complete";
+  setEpisodeAggregateState({ job: "JOB-NEE-01-PROD · completed", freshness: "Current · regression checked", revision: "Candidate 01" });
   $(".production-theatre").setAttribute("aria-busy", "false");
   $(".production-frame").classList.remove("is-running");
   $$(".shot-card").forEach((card) => { card.classList.remove("is-active"); card.classList.add("is-done"); });
   for (let index = 0; index < 6; index += 1) setQualityCheck(index, "is-pass");
-  $("#monica-score").textContent = "94/100";
+  $("#monica-score").textContent = "Evidence ready";
+  $("#production-stage").textContent = "Candidate ready";
+  $("#budget-state").textContent = "Simulated run · provider quote intentionally omitted";
   $("#production-label").textContent = "Sample candidate assembled";
   $("#production-image").src = assetPath(selectedLook);
   $("#final-film-image").src = assetPath(selectedLook);
   $("#monica-note").innerHTML = "<span>✓</span><p>Simulation complete. In production, each pass would link to versioned evidence and thresholds.</p>";
-  $("#creation-note").textContent = "Simulated · 1 targeted repair · $28.44";
+  $("#creation-note").textContent = "Simulated · one targeted repair · complete shot set";
   $("#premiere-button").disabled = false;
   $("#start-production").innerHTML = "<span>✓</span><strong>Simulation complete</strong><small>7 shots · final mix · captions · sample evidence</small>";
   $("#pause-production").disabled = true;
   updateBlockers();
   showToast("The final film is ready");
+}
+
+function openWorkspacePanel(tab = "jobs") {
+  const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  closeCommand(false);
+  closeVault(false);
+  closePrompt(false);
+  closeRepair(false);
+  returnFocus = trigger?.closest?.("#repair-overlay") ? $("#repair-film") : trigger;
+  setWorkspacePanelTab(tab);
+  $("#workspace-panel-overlay").hidden = false;
+  syncBodyLock();
+  $(".workspace-panel [data-close-workspace-panel]").focus();
+}
+
+function closeWorkspacePanel(shouldRestore = true) {
+  if ($("#workspace-panel-overlay").hidden) return;
+  $("#workspace-panel-overlay").hidden = true;
+  syncBodyLock();
+  if (shouldRestore) restoreFocus();
+}
+
+function setWorkspacePanelTab(tab) {
+  $$("[data-workspace-tab]").forEach((button) => {
+    const active = button.dataset.workspaceTab === tab;
+    button.setAttribute("aria-selected", String(active));
+    button.tabIndex = active ? 0 : -1;
+  });
+  $$("[data-workspace-tab-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.workspaceTabPanel !== tab;
+  });
+}
+
+function formatTimecode(value) {
+  const seconds = Math.max(0, Number(value) || 0);
+  const minutes = Math.floor(seconds / 60);
+  const remaining = (seconds % 60).toFixed(1).padStart(4, "0");
+  return `${String(minutes).padStart(2, "0")}:${remaining}`;
+}
+
+function parseTimecode(value) {
+  const match = String(value).trim().match(/^(\d{2}):([0-5]\d)(?:\.(\d))?$/);
+  if (!match) return null;
+  const seconds = Number(match[1]) * 60 + Number(match[2]) + Number(`0.${match[3] || 0}`);
+  return seconds <= 68 ? seconds : null;
+}
+
+function detectScriptChangeIntent(text) {
+  const query = text.toLowerCase()
+    .replace(/do not change (?:the )?(?:words|script|line|narration)/g, "")
+    .replace(/don['’]t change (?:the )?(?:words|script|line|narration)/g, "")
+    .replace(/keep (?:every|the|all) (?:spoken )?(?:word|words|script|line)/g, "");
+  return /rewrite|change (?:the )?(?:word|words|script|line|narration)|remove (?:this |the )?(?:sentence|line|word)|add (?:a |another )?(?:sentence|line)|replace (?:this |the )?(?:sentence|line|word)|say something different|different words/.test(query);
+}
+
+function repairDirection(text) {
+  const query = text.toLowerCase();
+  if (/more|increase|raise|louder|brighter|faster|longer|stronger/.test(query)) return 1;
+  if (/less|reduce|lower|quieter|darker|slower|shorter|softer/.test(query)) return -1;
+  return 0;
+}
+
+function validateRepairNotes() {
+  const errors = new Map(repairNotes.map((note) => [note.id, []]));
+  repairNotes.forEach((note) => {
+    const start = parseTimecode(note.start);
+    const end = note.end.trim() ? parseTimecode(note.end) : null;
+    if (!note.start.trim()) errors.get(note.id).push("Start time is required.");
+    else if (start === null) errors.get(note.id).push("Use MM:SS.d within the 01:08 sample timeline.");
+    if (note.end.trim() && end === null) errors.get(note.id).push("End time must use MM:SS.d within the 01:08 sample timeline.");
+    if (start !== null && end !== null && end <= start) errors.get(note.id).push("End time must be later than start time.");
+    if (!note.text.trim()) errors.get(note.id).push("Feedback cannot be empty.");
+    if (detectScriptChangeIntent(note.text)) {
+      errors.get(note.id).push("Script-change request detected. Targeted repair cannot alter supplied words; create a new script version or clarify that only performance/visual treatment should change.");
+    }
+    if (/lip[ -]?sync|new dialogue|add dialogue|horizontal|16:9|landscape version/.test(note.text.toLowerCase())) {
+      errors.get(note.id).push("Unsupported launch-scope request detected. This repair room supports the existing vertical, background-narration episode only.");
+    }
+  });
+
+  for (let leftIndex = 0; leftIndex < repairNotes.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < repairNotes.length; rightIndex += 1) {
+      const left = repairNotes[leftIndex];
+      const right = repairNotes[rightIndex];
+      const leftStart = parseTimecode(left.start);
+      const rightStart = parseTimecode(right.start);
+      if (leftStart === null || rightStart === null) continue;
+      const leftEnd = parseTimecode(left.end) ?? leftStart + .1;
+      const rightEnd = parseTimecode(right.end) ?? rightStart + .1;
+      const overlaps = leftStart < rightEnd && rightStart < leftEnd;
+      const sameDomain = interpretRepair(left.text).kind === interpretRepair(right.text).kind;
+      const opposed = repairDirection(left.text) * repairDirection(right.text) === -1;
+      if (overlaps && sameDomain && opposed) {
+        const message = `Potential conflict with feedback ${rightIndex + 1}: overlapping directions appear to oppose each other. Clarify which instruction wins.`;
+        const reciprocal = `Potential conflict with feedback ${leftIndex + 1}: overlapping directions appear to oppose each other. Clarify which instruction wins.`;
+        errors.get(left.id).push(message);
+        errors.get(right.id).push(reciprocal);
+      }
+    }
+  }
+  return { errors, valid: [...errors.values()].every((messages) => messages.length === 0) };
+}
+
+function applyRepairValidation(showBanner = false) {
+  const validation = validateRepairNotes();
+  let firstMessage = "";
+  $$(".repair-row").forEach((row) => {
+    const messages = validation.errors.get(Number(row.dataset.repairRow)) || [];
+    const message = $(".repair-row-message", row);
+    const hasConflict = messages.some((item) => item.startsWith("Potential conflict"));
+    row.classList.toggle("is-invalid", messages.length > 0 && !hasConflict);
+    row.classList.toggle("is-conflicted", hasConflict);
+    $$("input, textarea", row).forEach((field) => field.setAttribute("aria-invalid", String(messages.length > 0)));
+    message.hidden = messages.length === 0;
+    message.textContent = messages.join(" ");
+    if (!firstMessage && messages.length) firstMessage = messages[0];
+  });
+  const banner = $("#repair-clarification-banner");
+  banner.hidden = !showBanner || validation.valid;
+  banner.textContent = validation.valid ? "" : `Monica cannot build the repair plan yet. ${firstMessage}`;
+  return validation.valid;
+}
+
+function escapeHTML(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function stableRepairPlanHash(notes) {
+  const payload = JSON.stringify(notes.map(({ start, end, text }) => ({ start, end, text })));
+  let hash = 2166136261;
+  for (let index = 0; index < payload.length; index += 1) {
+    hash ^= payload.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `RP-${(hash >>> 0).toString(16).toUpperCase().padStart(8, "0")}`;
+}
+
+function interpretRepair(text) {
+  const query = text.toLowerCase();
+  if (detectScriptChangeIntent(text)) {
+    return {
+      kind: "clarification",
+      title: "Clarification required: script revision",
+      summary: "Targeted repair protects the exact supplied narration. Clarify a performance or visual change, or create a new script version before continuing.",
+      chips: ["script locked", "human decision", "plan blocked"],
+    };
+  }
+  if (/music|score|voice|narrat|sfx|sound|audio|pronunciation|loud/.test(query)) {
+    return {
+      kind: "audio",
+      title: "Audio and mix repair",
+      summary: "Preserve the exact narration and voice identity; adjust the affected stem or performance, rebuild the mix seam, then recheck alignment and loudness.",
+      chips: ["voice locked", "stem-level", "mix boundary"],
+    };
+  }
+  if (/caption|subtitle|word|spelling|text/.test(query)) {
+    return {
+      kind: "caption",
+      title: "Caption alignment repair",
+      summary: "Keep the supplied words immutable; correct timing or presentation for the selected caption group and rerun alignment checks.",
+      chips: ["script locked", "caption group", "alignment"],
+    };
+  }
+  if (/face|character|rudraksha|crown|ornament|costume|eye|hand|body|look/.test(query)) {
+    return {
+      kind: "visual",
+      title: "Identity-led shot repair",
+      summary: "Regenerate the underlying shot with approved identity anchors, preserve requested camera intent, then inspect both neighboring boundaries and episode continuity.",
+      chips: ["identity anchor", "whole shot", "boundary QC"],
+    };
+  }
+  return {
+    kind: "edit",
+    title: "Editorial repair",
+    summary: "Map the note to the smallest safe shot, transition or timing unit, preserve unaffected tracks, then reassemble and rerun episode-level checks.",
+    chips: ["minimal scope", "timeline-aware", "regression QC"],
+  };
+}
+
+function interpretationMarkup(note) {
+  const interpretation = interpretRepair(note.text);
+  return `<small>Monica’s interpretation</small><strong>${interpretation.title}</strong><p>${interpretation.summary}</p><div>${interpretation.chips.map((chip) => `<span>${chip}</span>`).join("")}</div>`;
+}
+
+function renderRepairRows() {
+  $("#repair-rows").innerHTML = repairNotes.map((note, index) => `<article class="repair-row" data-repair-row="${note.id}">
+    <div class="repair-time-fields">
+      <label>Start<input type="text" inputmode="decimal" value="${escapeHTML(note.start)}" data-repair-start aria-label="Feedback ${index + 1} start time"></label>
+      <label>End<input type="text" inputmode="decimal" value="${escapeHTML(note.end)}" data-repair-end aria-label="Feedback ${index + 1} end time"></label>
+    </div>
+    <div class="repair-feedback">
+      <label for="repair-feedback-${note.id}">Feedback ${index + 1}</label>
+      <textarea id="repair-feedback-${note.id}" data-repair-text>${escapeHTML(note.text)}</textarea>
+    </div>
+    <div class="repair-interpretation" aria-live="polite">${interpretationMarkup(note)}</div>
+    <button class="remove-repair-row" type="button" data-remove-repair aria-label="Remove feedback ${index + 1}">×</button>
+    <p class="repair-row-message" role="alert" hidden></p>
+  </article>`).join("");
+
+  $$(".repair-row").forEach((row) => {
+    const note = repairNotes.find((item) => item.id === Number(row.dataset.repairRow));
+    $("[data-repair-start]", row).addEventListener("input", (event) => { note.start = event.target.value; applyRepairValidation(false); });
+    $("[data-repair-end]", row).addEventListener("input", (event) => { note.end = event.target.value; applyRepairValidation(false); });
+    $("[data-repair-text]", row).addEventListener("input", (event) => {
+      note.text = event.target.value;
+      $(".repair-interpretation", row).innerHTML = interpretationMarkup(note);
+      applyRepairValidation(false);
+    });
+    $("[data-remove-repair]", row).addEventListener("click", () => {
+      if (repairNotes.length === 1) {
+        showToast("Keep one feedback row, or close the Repair Room without applying changes");
+        return;
+      }
+      repairNotes = repairNotes.filter((item) => item.id !== note.id);
+      renderRepairRows();
+      $("#stage-announcer").textContent = "Feedback row removed";
+    });
+  });
+  applyRepairValidation(false);
+}
+
+function addRepairNote(timecode = formatTimecode($("#repair-playhead").value)) {
+  repairNoteSequence += 1;
+  repairNotes.push({
+    id: repairNoteSequence,
+    start: timecode,
+    end: "",
+    text: "",
+  });
+  renderRepairRows();
+  const row = $(`[data-repair-row="${repairNoteSequence}"]`);
+  row?.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
+  $("[data-repair-text]", row)?.focus();
+}
+
+function setRepairView(view) {
+  $$("[data-repair-view]").forEach((section) => {
+    section.hidden = section.dataset.repairView !== view;
+  });
+  const order = ["brief", "plan", "result"];
+  const activeIndex = order.indexOf(view);
+  $$("[data-repair-step]").forEach((button) => {
+    const index = order.indexOf(button.dataset.repairStep);
+    button.classList.toggle("is-active", index === activeIndex);
+    button.classList.toggle("is-complete", index < activeIndex);
+    button.setAttribute("aria-current", index === activeIndex ? "step" : "false");
+  });
+  $(".repair-workbench").scrollTo({ top: 0, behavior: scrollBehavior() });
+}
+
+function renderRepairPlan() {
+  if (!applyRepairValidation(true)) {
+    $("#repair-clarification-banner").scrollIntoView({ behavior: scrollBehavior(), block: "center" });
+    return false;
+  }
+  const populated = repairNotes.filter((note) => note.text.trim());
+  if (!populated.length) {
+    showToast("Describe at least one repair before Monica builds the plan");
+    $("[data-repair-text]")?.focus();
+    return false;
+  }
+  const grouped = new Map();
+  populated.forEach((note) => {
+    const interpretation = interpretRepair(note.text);
+    if (!grouped.has(interpretation.kind)) grouped.set(interpretation.kind, []);
+    grouped.get(interpretation.kind).push({ note, interpretation });
+  });
+  $("#plan-summary-copy").textContent = `${populated.length} feedback ${populated.length === 1 ? "row has" : "rows have"} been resolved into ${grouped.size} repair work ${grouped.size === 1 ? "unit" : "units"}. Overlapping dependencies are grouped so Monica does not make one blind generation call per row.`;
+  const taskLabels = {
+    visual: ["VISUAL", "Regenerate identity-anchored shot candidate", "Rebuild the full underlying shot and inspect adjacent transitions."],
+    audio: ["AUDIO", "Repair affected audio stem and mix boundary", "Preserve words and voice identity; reassemble the continuous mix."],
+    caption: ["CAPTION", "Realign caption group", "Correct the selected presentation unit against locked narration timestamps."],
+    edit: ["EDIT", "Rebuild the smallest timeline dependency", "Preserve unaffected tracks and inspect the resulting episode rhythm."],
+  };
+  $("#repair-task-list").innerHTML = [...grouped.entries()].map(([kind, items], index) => {
+    const [label, title, detail] = taskLabels[kind];
+    const range = escapeHTML(items.map(({ note }) => note.end ? `${note.start}–${note.end}` : note.start).join(", "));
+    return `<article class="repair-task"><span>${String(index + 1).padStart(2, "0")}</span><div><small>${label} · ${range}</small><strong>${title}</strong><em>${detail}</em></div><b>${items.length} ${items.length === 1 ? "note" : "notes"}</b></article>`;
+  }).join("");
+  const expected = 4 + grouped.size * 3;
+  const high = expected + Math.max(3, grouped.size * 2);
+  $("#repair-plan-hash").textContent = stableRepairPlanHash(populated);
+  $("#repair-dependency-scope").textContent = [...grouped.keys()].map((kind) => `${kind} + boundaries`).join(" · ");
+  $("#repair-expected-cost").textContent = `$${expected} expected`;
+  $("#repair-high-cost").textContent = `$${high} high`;
+  $("#repair-ceiling-confirm").checked = false;
+  $("#repair-ceiling-confirm").disabled = high > 18;
+  $("#repair-ceiling-copy").textContent = high > 18
+    ? `High estimate $${high} exceeds the simulated $18 ceiling · revise scope or raise authorization`
+    : "Authorize a simulated hard ceiling of $18";
+  $("#apply-repair-plan").disabled = true;
+  $("#repair-resolution-list").innerHTML = populated.map((note) => {
+    const interpretation = interpretRepair(note.text);
+    return `<article class="repair-resolution"><span>${escapeHTML(note.end ? `${note.start}–${note.end}` : note.start)}</span><div><strong>${interpretation.title}</strong><small>${escapeHTML(note.text)}</small></div><b>RESOLVED</b></article>`;
+  }).join("");
+  return true;
+}
+
+function openRepair() {
+  const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  closeCommand(false);
+  closeVault(false);
+  closePrompt(false);
+  closeWorkspacePanel(false);
+  returnFocus = trigger?.closest?.("#workspace-panel-overlay") ? $(".inbox-button") : trigger;
+  renderRepairRows();
+  setRepairView("brief");
+  setVersionPreview("before");
+  $("#repair-overlay").hidden = false;
+  syncBodyLock();
+  $("[data-close-repair]").focus();
+}
+
+function closeRepair(shouldRestore = true) {
+  if ($("#repair-overlay").hidden) return;
+  if (repairPlaybackTimer) clearInterval(repairPlaybackTimer);
+  repairPlaybackTimer = null;
+  $("#repair-play").textContent = "▶";
+  $("#repair-overlay").hidden = true;
+  syncBodyLock();
+  if (shouldRestore) restoreFocus();
+}
+
+function setVersionPreview(version) {
+  $$("[data-version-preview]").forEach((button) => {
+    const active = button.dataset.versionPreview === version;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  $("#repair-preview-image").style.opacity = ".35";
+  setTimeout(() => {
+    $("#repair-preview-image").src = version === "before"
+      ? assetPath("moonlit-day-for-night-blue")
+      : assetPath("glowing-divine-realism");
+    $("#repair-frame-label").textContent = version === "before"
+      ? "A · Base candidate · Revision 01"
+      : "B · Repaired candidate · Revision 02";
+    $("#repair-preview-image").style.opacity = "1";
+  }, 120);
 }
 
 function openMonica() {
@@ -596,6 +1165,8 @@ function openCommand() {
   const trigger = document.activeElement;
   closeVault(false);
   closePrompt(false);
+  closeWorkspacePanel(false);
+  closeRepair(false);
   returnFocus = trigger?.closest?.("#look-vault, #prompt-sheet") ? $("[data-open-command]") : trigger;
   $("#command-palette").hidden = false;
   syncBodyLock();
@@ -629,6 +1200,9 @@ function resetFilm() {
   scriptLocked = false;
   selectedVoice = "male";
   selectedLook = "glowing-divine-realism";
+  worldAuthorizationDecision = "pending";
+  worldAuthorizationRecorded = false;
+  performanceVersion = 1;
   assetPrompts = { ...defaultAssetPrompts };
   activeAsset = null;
   returnFocus = null;
@@ -643,6 +1217,9 @@ function resetFilm() {
   $("#voice-play span").textContent = "Hear the opening";
   $("#pace").value = "58";
   $("#pace-output").textContent = "0.96×";
+  $("#post-tts-duration").textContent = "01:08";
+  $("#performance-version").textContent = "Voice 01";
+  $$('[name="world-decision"]').forEach((input) => { input.checked = input.value === "pending"; });
   $("#vault-search").value = "";
   $("#script-input").value = "";
   $("#script-input").readOnly = false;
@@ -668,6 +1245,114 @@ function resetFilm() {
 }
 
 function wireEvents() {
+  $$("[data-view]").forEach((button) => button.addEventListener("click", () => setWorkspaceView(button.dataset.view)));
+  $$("[data-open-episode]").forEach((button) => button.addEventListener("click", () => openEpisodeAt(button.dataset.openEpisode, button.dataset.episodeKey)));
+  $$("[data-new-episode]").forEach((button) => button.addEventListener("click", () => {
+    resetFilm();
+    selectEpisodeAggregate("neelkanth02");
+    showToast("New episode started with World Bible release 04 ready to inherit after the script is locked");
+  }));
+  $$("[data-series-tab]").forEach((button) => {
+    button.addEventListener("click", () => setSeriesTab(button.dataset.seriesTab));
+    button.addEventListener("keydown", (event) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const tabs = $$("[data-series-tab]");
+      const current = tabs.indexOf(button);
+      const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+      tabs[next].focus();
+      setSeriesTab(tabs[next].dataset.seriesTab);
+    });
+  });
+  $("#studio-search").addEventListener("input", (event) => {
+    const query = event.target.value.trim().toLowerCase();
+    let visible = 0;
+    $$("#series-card-grid [data-searchable]").forEach((card) => {
+      card.hidden = query && !card.dataset.searchable.toLowerCase().includes(query);
+      if (!card.hidden) visible += 1;
+    });
+    $("#studio-search-empty").hidden = visible !== 0;
+  });
+  $("#episode-search").addEventListener("input", (event) => {
+    const query = event.target.value.trim().toLowerCase();
+    $$(".episode-tile").forEach((card) => {
+      card.hidden = query && !card.dataset.episodeSearch.toLowerCase().includes(query);
+    });
+  });
+  $$("[data-open-workspace-panel]").forEach((button) => button.addEventListener("click", () => openWorkspacePanel(button.dataset.openWorkspacePanel)));
+  $$("[data-close-workspace-panel]").forEach((button) => button.addEventListener("click", closeWorkspacePanel));
+  $$("[data-workspace-tab]").forEach((button) => {
+    button.addEventListener("click", () => setWorkspacePanelTab(button.dataset.workspaceTab));
+    button.addEventListener("keydown", (event) => {
+      if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+      event.preventDefault();
+      const tabs = $$("[data-workspace-tab]");
+      const next = (tabs.indexOf(button) + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+      tabs[next].focus();
+      setWorkspacePanelTab(tabs[next].dataset.workspaceTab);
+    });
+  });
+  $$("[data-open-repair]").forEach((button) => button.addEventListener("click", openRepair));
+  $$("[data-close-repair]").forEach((button) => button.addEventListener("click", closeRepair));
+  $("#repair-playhead").addEventListener("input", (event) => {
+    const timecode = formatTimecode(event.target.value);
+    $("#repair-playhead-label").textContent = timecode;
+    $("#capture-time").textContent = timecode;
+    const cursor = `${(Number(event.target.value) / Number(event.target.max)) * 100}%`;
+    $("#repair-timeline-cursor").style.setProperty("--cursor", cursor);
+  });
+  $("#repair-play").addEventListener("click", () => {
+    if (repairPlaybackTimer) {
+      clearInterval(repairPlaybackTimer);
+      repairPlaybackTimer = null;
+      $("#repair-play").textContent = "▶";
+      return;
+    }
+    $("#repair-play").textContent = "Ⅱ";
+    repairPlaybackTimer = setInterval(() => {
+      const playhead = $("#repair-playhead");
+      const next = Number(playhead.value) + .5;
+      playhead.value = next > Number(playhead.max) ? 0 : next;
+      playhead.dispatchEvent(new Event("input"));
+    }, 400);
+  });
+  $("#capture-repair-note").addEventListener("click", () => addRepairNote());
+  $("#add-repair-row").addEventListener("click", () => addRepairNote(""));
+  $("#build-repair-plan").addEventListener("click", () => {
+    if (renderRepairPlan()) setRepairView("plan");
+  });
+  $("#repair-ceiling-confirm").addEventListener("change", (event) => {
+    $("#apply-repair-plan").disabled = !event.target.checked;
+  });
+  $$("[data-repair-back]").forEach((button) => button.addEventListener("click", () => setRepairView(button.dataset.repairBack)));
+  $("#apply-repair-plan").addEventListener("click", () => {
+    if (!$("#repair-ceiling-confirm").checked) {
+      showToast("Confirm the simulated hard ceiling before Monica enqueues paid repair work");
+      $("#repair-ceiling-confirm").focus();
+      return;
+    }
+    const button = $("#apply-repair-plan");
+    button.disabled = true;
+    button.innerHTML = "Simulating durable repair… <b>◌</b>";
+    $("#repair-frame-label").textContent = "Repair batch running · base preserved";
+    setEpisodeAggregateState({ job: "JOB-NEE-01-REPAIR · running", revision: "Repair revision 02", freshness: "Repair in progress" });
+    setTimeout(() => {
+      button.disabled = false;
+      button.innerHTML = "Apply versioned repair <b>✦</b>";
+      setVersionPreview("after");
+      setRepairView("result");
+      setEpisodeAggregateState({ job: "JOB-NEE-01-REPAIR · completed", freshness: "Current · repaired candidate checked", revision: "Candidate 02" });
+      $("#stage-announcer").textContent = "Simulated repaired candidate is ready for comparison";
+    }, 900);
+  });
+  $$("[data-version-preview]").forEach((button) => button.addEventListener("click", () => setVersionPreview(button.dataset.versionPreview)));
+  $("#accept-repair-result").addEventListener("click", () => {
+    closeRepair();
+    resetReviewApprovals("Prototype: Candidate 02 is now the current final-review target. Both prior approval records are absent or revoked; Revision 01 remains preserved for rollback and audit.");
+    setEpisodeAggregateState({ job: "No active job", freshness: "Current · awaiting both approvals", revision: "Candidate 02" });
+    $("#stage-announcer").textContent = "Candidate 02 promoted to final review; creative and qualified cultural approvals are required";
+    showToast("Candidate 02 promoted; both human approvals are required");
+  });
   $$("[data-stage]").forEach((button) => button.addEventListener("click", () => setStage(button.dataset.stage)));
   $$("[data-go]").forEach((button) => button.addEventListener("click", () => setStage(button.dataset.go)));
   $$("[data-next]").forEach((button) => button.addEventListener("click", nextStage));
@@ -687,7 +1372,16 @@ function wireEvents() {
   });
   $("#pace").addEventListener("input", (event) => {
     if (productionState !== "idle") invalidateProductionOnly();
-    $("#pace-output").textContent = `${(0.82 + Number(event.target.value) * .0024).toFixed(2)}×`;
+    const rate = 0.82 + Number(event.target.value) * .0024;
+    $("#pace-output").textContent = `${rate.toFixed(2)}×`;
+    const duration = Math.max(60, Math.min(120, Math.round(68 * (.96 / rate))));
+    $("#post-tts-duration").textContent = formatTimecode(duration).replace(".0", "");
+    setEpisodeAggregateState({ freshness: "Stale · performance timing changed" });
+  });
+  $("#pace").addEventListener("change", () => {
+    performanceVersion += 1;
+    $("#performance-version").textContent = `Voice ${String(performanceVersion).padStart(2, "0")}`;
+    showToast("Simulated voice revision created; timing-dependent artifacts are stale");
   });
   $("#open-look-vault").addEventListener("click", openVault);
   $("#inspect-dna").addEventListener("click", () => showToast("Look DNA: sacred radiance · gold-blue palette · cinematic facial detail · atmospheric depth"));
@@ -707,6 +1401,26 @@ function wireEvents() {
     if (button.dataset.assetAction === "prompt") openPrompt(card);
     if (button.dataset.assetAction === "upload") showToast(`Prototype: upload your own ${$(".asset-kind", card).textContent.toLowerCase()} reference`);
   }));
+  $$('[name="world-decision"]').forEach((input) => input.addEventListener("change", (event) => {
+    worldAuthorizationDecision = event.target.value;
+    worldAuthorizationRecorded = false;
+    updateWorldState();
+  }));
+  $("#world-continue").addEventListener("click", () => {
+    if (acceptedAssets().length !== 3 || worldAuthorizationDecision !== "authorize" || !$("#authorize-range").checked) {
+      showToast("Accept every anchor, authorize the quote ceiling and approve the pinned Series release");
+      return;
+    }
+    worldAuthorizationRecorded = true;
+    $("#episode-freshness-state").textContent = "Current · release 04 bound";
+    $("#budget-state").textContent = "Simulated · $40 hard ceiling · release 04";
+    $("#start-production").disabled = false;
+    $("#start-production").innerHTML = "<span>✦</span><strong>Begin autonomous production</strong><small>Atomic World Lock and simulated cost ceiling recorded</small>";
+    $("#creation-note").textContent = "Atomic operating authorization recorded; no additional creative gate exists before final review";
+    updateWorldState();
+    completeStage("world", "create");
+    showToast("Simulated quote, ceiling and World Lock recorded atomically");
+  });
   $$("[data-close-prompt]").forEach((button) => button.addEventListener("click", closePrompt));
   $("#regenerate-asset").addEventListener("click", () => {
     if (!activeAsset) return;
@@ -723,6 +1437,13 @@ function wireEvents() {
     }, 900);
   });
   $("#start-production").addEventListener("click", startProduction);
+  $("#authorize-range").addEventListener("change", () => {
+    if (worldAuthorizationRecorded) {
+      worldAuthorizationRecorded = false;
+      setEpisodeAggregateState({ job: "No paid job enqueued", freshness: "Stale · authorization changed", revision: "Draft revision" });
+    }
+    updateWorldState();
+  });
   $("#pause-production").addEventListener("click", pauseProduction);
   $("#final-play").addEventListener("click", () => {
     const film = $(".final-film");
@@ -750,13 +1471,19 @@ function wireEvents() {
     }, 750);
   });
   $("#approve-film").addEventListener("click", () => {
+    $("#approve-film").disabled = true;
     $("#approve-film").innerHTML = "<span>✓</span> Approved in prototype";
-    $("#final-message").textContent = "Prototype approval recorded. Production export will package MP4, captions, stems and evidence.";
-    showToast("Prototype: final approval and export state confirmed");
+    $("#creative-approval-mark").textContent = "✓";
+    $("#cultural-approval-mark").textContent = "✓";
+    $("#creative-approval-state").textContent = "Simulated human creative record stored";
+    $("#cultural-approval-state").textContent = "Simulated qualified cultural record stored";
+    $("#creative-approval-mark").closest("span").classList.add("is-approved");
+    $("#cultural-approval-mark").closest("span").classList.add("is-approved");
+    $("#final-message").textContent = "Prototype: two separate human approval records were stored, then export packaging was requested.";
+    showToast("Prototype: creative and qualified cultural approvals recorded separately");
   });
   $("#repair-film").addEventListener("click", () => {
-    $("#final-message").textContent = "Prototype repair state: select a timestamp, inspect references and describe only what should change.";
-    showToast("Prototype: targeted repair editor opens here");
+    openRepair();
   });
   $("#create-another").addEventListener("click", resetFilm);
   $$("[data-open-monica]").forEach((button) => button.addEventListener("click", openMonica));
@@ -765,8 +1492,21 @@ function wireEvents() {
   $$("[data-close-command]").forEach((button) => button.addEventListener("click", closeCommand));
   $("#command-input").addEventListener("input", (event) => filterCommands(event.target.value));
   $$("[data-command-stage]").forEach((button) => button.addEventListener("click", () => {
-    setStage(button.dataset.commandStage);
+    openEpisodeAt(button.dataset.commandStage);
     closeCommand();
+  }));
+  $$("[data-command-view]").forEach((button) => button.addEventListener("click", () => {
+    setWorkspaceView(button.dataset.commandView);
+    closeCommand();
+  }));
+  $$("[data-command-panel]").forEach((button) => button.addEventListener("click", () => {
+    const tab = button.dataset.commandPanel;
+    closeCommand(false);
+    openWorkspacePanel(tab);
+  }));
+  $$("[data-command-repair]").forEach((button) => button.addEventListener("click", () => {
+    closeCommand(false);
+    openRepair();
   }));
   document.addEventListener("keydown", (event) => {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
@@ -774,7 +1514,9 @@ function wireEvents() {
       openCommand();
     }
     if (event.key === "Escape") {
-      if (!$("#command-palette").hidden) closeCommand();
+      if (!$("#repair-overlay").hidden) closeRepair();
+      else if (!$("#workspace-panel-overlay").hidden) closeWorkspacePanel();
+      else if (!$("#command-palette").hidden) closeCommand();
       else if (!$("#look-vault").hidden) closeVault();
       else if (!$("#prompt-sheet").hidden) closePrompt();
       else closeMonica();
@@ -784,6 +1526,8 @@ function wireEvents() {
         $("#command-palette [role='dialog']"),
         $("#look-vault [role='dialog']"),
         $("#prompt-sheet [role='dialog']"),
+        $("#workspace-panel-overlay [role='dialog']"),
+        $("#repair-overlay [role='dialog']"),
       ].find((candidate) => candidate && !candidate.closest("[hidden]"));
       if (!dialog) return;
       const focusable = $$("button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])", dialog)
@@ -808,9 +1552,10 @@ renderStars();
 renderWaveform();
 renderLooks();
 renderShots();
+renderRepairRows();
 updateScriptStats();
 updateWorldState();
 updateFinalMetadata();
 wireEvents();
 resetProduction();
-setStage("script");
+setWorkspaceView("home", false);
