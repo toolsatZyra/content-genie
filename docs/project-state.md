@@ -49,7 +49,7 @@ current worktree before relying on any status below.
 - GitHub: `https://github.com/toolsatZyra/content-genie.git`
 - Branch: `main`
 - Last pushed checkpoint at time of this update:
-  `453b6a9 design(ui): add Living Cinema approval prototype`
+  `2b1db34 design: finalize end-to-end Genie architecture`
 - The repository intentionally has no persistent `origin`.
 - Push with the explicit URL, for example:
 
@@ -79,10 +79,14 @@ must never be copied into documentation or logs:
 
 Known environment gaps/state:
 
-- Supabase MCP currently requests authentication.
-- A global Supabase CLI was not found.
-- Vercel CLI/project link is not configured; this is expected.
-- The owner will create/link the Vercel project after the repository is ready.
+- Supabase CLI access is authenticated to project `content-genie`
+  (`fnxztrqsqucojcvabjhk`); the connected Supabase workflow must be used for
+  database work.
+- Local Docker is unavailable, so database verification must use isolated
+  remote/test paths rather than assuming a local Supabase stack.
+- Vercel CLI/project link is not authenticated. Create/link it only if
+  non-interactive credentials become available; otherwise the owner will do so
+  when the repository is ready.
 
 ## 4. Current design artifacts
 
@@ -103,6 +107,14 @@ Known environment gaps/state:
   release-authority policy.
 - `docs/reference-porting-map.md` — verified AI Director porting map.
 - `docs/sdlc.md` — phased adversarial SDLC.
+- `docs/implementation-plan.md` — authoritative work packages and phase gates.
+- `docs/traceability.md` — human-readable requirement/checkpoint ledger.
+- `reference/acceptance/traceability-plan.v1.json` — reproducibly generated
+  machine acceptance plan.
+- `reference/acceptance/traceability-evidence.v1.json` — durable evidence
+  source; currently empty until implementation checkpoints are committed.
+- `docs/implementation-plan-adversarial-review.md` — independent plan-gate
+  report.
 - `reference/rubric-config/` — research rubric inputs, not sufficient alone as
   runtime release logic.
 - `docs/archive/research-design-2026-07-10.md` — superseded research design.
@@ -138,23 +150,25 @@ Known environment gaps/state:
 
 ## 6. Immediate next sequence
 
-Completed design gate:
+Completed gates:
 
-- independent cold retest: PASS with zero P0/P1/P2;
-- deterministic design/rubric/provider checks: PASS;
-- desktop/mobile browser, overflow, console, World Lock and repair-state smoke:
-  PASS;
-- Word review artifact generated and visually/structurally QA'd.
+- design: independent cold retest PASS with no P0/P1, deterministic checks and
+  interactive browser smoke passed, Word review artifact QA'd and pushed;
+- implementation plan: two independent frozen retests PASS with no P0/P1;
+- generated acceptance ledger: 207 requirements, 280 checkpoint obligations,
+  49 valid work packages, exact verification/checkpoint matching, and
+  adversarial rejection of stale or fabricated proof.
 
 Immediate next sequence:
 
-1. Commit and push the design checkpoint.
-2. Create `docs/implementation-plan.md`, `docs/traceability.md`, environment
-   contract, migration plan, and verification matrix.
-3. Run a cold plan review, revise, commit, and push.
-4. Bootstrap and implement Phases 1–4, with an independent test/code review and
-   adversarial runtime pass after each phase.
-5. Ship the deployment runbook and Vercel-ready repository.
+1. Commit and push the implementation-plan checkpoint.
+2. Build Phase 0 foundation: pinned Next.js/React workspace, typed environment
+   boundary, test harnesses, diagnostics, and Living Cinema application shell.
+3. Commit evidence, run independent review and adversarial runtime checks, then
+   push the Phase 0 checkpoint.
+4. Implement Phases 1–4 in order, repeating the same evidence/review/push gate.
+5. Ship the deployment runbook and Vercel-ready repository; link Vercel if
+   authenticated access becomes available.
 
 ## 7. Verification standard
 

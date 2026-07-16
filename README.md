@@ -6,7 +6,8 @@ episodes. A durable agent crew plans, casts, generates, edits, scores,
 quality-controls, repairs, and packages each film while users continue working
 on other productions.
 
-**Status:** design gate passed; implementation planning is next.
+**Status:** design and implementation-plan gates passed; production
+implementation is in progress.
 
 **Owner review artifact:** [`Genie by Zyra - End-to-End Solution Design.docx`](docs/Genie%20by%20Zyra%20-%20End-to-End%20Solution%20Design.docx)
 
@@ -41,13 +42,21 @@ on other productions.
      verification process.
 13. **[`docs/project-state.md`](docs/project-state.md)** — durable continuation
      handoff protecting against context degradation.
-14. **`.env.local`** — local credentials (git-ignored; never commit).
+14. **[`docs/implementation-plan.md`](docs/implementation-plan.md)** —
+    executable phased build plan and work-package contracts.
+15. **[`docs/traceability.md`](docs/traceability.md)** and
+    **[`reference/acceptance/`](reference/acceptance/)** — authoritative
+    human-readable requirements and generated acceptance ledger.
+16. **[`docs/implementation-plan-adversarial-review.md`](docs/implementation-plan-adversarial-review.md)**
+    — independent plan-gate findings, resolutions, and final verdict.
+17. **`.env.local`** — local credentials (git-ignored; never commit).
 
 ## Build order
 
 The phase plan, requirements traceability, acceptance gates, and verification
-commands live in `docs/implementation-plan.md` once the design adversarial review
-is closed.
+commands live in `docs/implementation-plan.md`. Generated status is not proof:
+an obligation becomes verified only when its fingerprinted, committed evidence
+passes the acceptance-ledger validator.
 
 ## External assets this project ports
 

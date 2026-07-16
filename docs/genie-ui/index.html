@@ -558,12 +558,12 @@
             </div>
             <div class="approval-ledger" aria-label="Separate release approval records">
               <span><i>✓</i><strong>Monica machine readiness</strong><small>Simulated evidence bundle ready</small></span>
-              <span><i id="creative-approval-mark">○</i><strong>Human creative approval</strong><small id="creative-approval-state">Awaiting current reviewer</small></span>
               <span><i id="cultural-approval-mark">○</i><strong>Qualified cultural approval</strong><small id="cultural-approval-state">Awaiting authorized reviewer</small></span>
+              <span><i id="creative-approval-mark">○</i><strong>Human creative approval</strong><small id="creative-approval-state">Unavailable until cultural approval</small></span>
             </div>
-            <p class="reviewer-credential"><span>SIMULATED CURRENT REVIEWER</span><strong>Creative owner · devotional-film cultural approval authorized</strong><small>One action may submit both human decisions, but Genie stores them as separate records with separate evidence.</small></p>
+            <p class="reviewer-credential"><span>SIMULATED CURRENT REVIEWER</span><strong>Creative owner · devotional-film cultural approval authorized</strong><small>Genie records cultural review first. Only that exact approved candidate can then enter the separate creative/final decision.</small></p>
             <div class="final-buttons">
-              <button id="approve-film" class="approve-film" type="button"><span>✦</span> Record both approvals &amp; export</button>
+              <button id="approve-film" class="approve-film" type="button"><span>✦</span> Record qualified cultural review</button>
               <button id="repair-film" type="button">Request a targeted repair</button>
             </div>
             <p id="final-message" role="status" aria-live="polite">Sample final-review state. In production, every verdict opens its stored evidence.</p>
@@ -778,7 +778,7 @@
 
           <section data-repair-view="result" aria-labelledby="repair-result-title" hidden>
             <header class="repair-view-heading">
-              <div><small>Simulated repaired candidate</small><h3 id="repair-result-title">Every note accounted for.</h3><p>The previous candidate is preserved. Compare the affected range before promoting Candidate 02 to final review.</p></div>
+              <div><small>Simulated repaired candidate</small><h3 id="repair-result-title">Every note accounted for.</h3><p>The previous candidate is preserved. Compare the affected range before promoting Candidate 02 to qualified cultural review.</p></div>
               <span class="result-ready">Regression checks complete</span>
             </header>
             <div class="ab-switch" role="group" aria-label="Compare repair versions">
@@ -789,7 +789,7 @@
             <div class="repair-result-note"><span>✦</span><p><strong>Monica rechecked more than the edited frames.</strong> The repaired artifacts, neighboring shot boundaries, mix continuity, script alignment and complete episode candidate were reviewed again in this simulated result.</p></div>
             <div class="repair-plan-actions">
               <button type="button" data-repair-back="brief">Add or revise feedback</button>
-              <button type="button" class="primary-action" id="accept-repair-result">Promote Candidate 02 to final review <b>→</b></button>
+              <button type="button" class="primary-action" id="accept-repair-result">Promote Candidate 02 to qualified review <b>→</b></button>
             </div>
           </section>
         </div>

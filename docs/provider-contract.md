@@ -220,6 +220,48 @@ No update overwrites historical cost. Retries point to their parent attempt.
 Unknown billing blocks a claim of final cost accuracy but does not erase the
 liability.
 
+### 6.1 Preflight micro-envelope and broker trust boundary
+
+A Phase 2 preflight provider request uses a separate micro envelope defined by
+sections 4.3.2 and 4.3.3 of `docs/state-and-data-contract.md`. It never borrows
+the production high envelope and can never claim `gen_video`, render, export,
+approval, or publication scope.
+
+Before a preflight request can enter `queued`, the broker verifies all of:
+
+1. an authoritative, nonterminal preflight run/stage/attempt with the exact
+   configuration candidate, authority epoch, input hash, lease, and fence;
+2. a current confirmed micro quote, active authorization, sole reservation,
+   and one exact unused allowed-capability slot;
+3. current authenticated provider capability/rate evidence;
+4. a Vercel-issued, registered one-attempt capability grant whose subject and
+   scope match the request;
+5. a separate Trigger-project service assertion whose Ed25519 signature,
+   `client_id`, environment, Trigger project, `kid`, `iss`, `aud`,
+   task/run/stage subject, `iat`, `nbf`, ≤60-second `exp`, and unique `jti`
+   match the server-only broker registry; and
+6. an atomic `broker_assertion.consume` plus slot claim before the provider key
+   is loaded.
+
+The service assertion authenticates the calling deployment only. The
+capability grant authorizes only the registered attempt. Neither can substitute
+for quote, budget, fence, policy, or provider-capability checks. Trigger
+projects hold only their own broker-client private signing key and never a
+provider key. Postgres stores public verification keys and hashed assertion
+JTIs, never broker-client private keys.
+
+Key rotation permits a bounded documented overlap of public-key versions.
+Unknown, expired, not-yet-valid, disabled, wrong-environment, or revoked keys
+fail closed. Revocation or client disable invalidates unexpired assertion JTIs
+and wins any race before provider dispatch. Replay, wrong-project use, and
+grant/assertion subject mismatch are mandatory security alerts. Every rejection
+records safe correlation and reason codes without the assertion, grant, prompt,
+or provider secret.
+
+Provider outputs always enter the quarantine contract before becoming
+authoritative. Output-producing account canaries cannot run until the
+quarantine and malicious-media suite passes.
+
 ## 7. Capability freshness
 
 The scheduled capability-sync job:

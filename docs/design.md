@@ -776,8 +776,8 @@ Do not overload one status field.
 
 Episode workflow:
 
-`draft | world_setup | ready_to_produce | awaiting_final_review | approved |
-delivered | archived | abandoned`
+`draft | world_setup | ready_to_produce | pending_qualified_review |
+awaiting_final_review | approved | delivered | archived | abandoned`
 
 Production-run lifecycle:
 
@@ -791,11 +791,13 @@ repairing | regression_qc | ready_for_review | accepted | rejected | failed |
 canceled | superseded`
 
 `accepted` means the repaired candidate was selected as the Episode's current
-final-review target. It never means release approval. Selection atomically
-supersedes the prior active creative-approval selection, clears the prior
-cultural-decision selection, returns the Episode to `awaiting_final_review`,
-and creates a fresh review item. Both human decisions must then be recorded
-against the exact repaired master.
+qualified-review target. It never means release approval. Selection atomically
+supersedes the prior active creative/final-review selection, clears the prior
+cultural-decision selection, returns the Episode to
+`pending_qualified_review`, and creates a fresh qualified-cultural-review
+item. Only a new qualified cultural approval bound to the exact repaired
+master, policy, source, evidence, and competency versions can advance it to
+`awaiting_final_review`; the separate creative/final decision follows.
 
 Export lifecycle:
 

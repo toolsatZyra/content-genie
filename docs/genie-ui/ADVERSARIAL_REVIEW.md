@@ -51,7 +51,7 @@ The strongest product decision is that chat is not the system of record for repa
 | Accepting cards looked like an instant World Lock | Added a qualified Series-editor decision with pending, authorize, deny, and recorded states bound to one Episode aggregate and pinned release |
 | Character sheets and cultural readiness could appear bypassed | Added automatic identity packs, character sheets, deity/temple/source/rights readiness, and machine cultural preflight before autonomy |
 | Paid generation could begin without an auditable operating ceiling | Added clearly simulated low/expected/high quote values plus reserve/authorize hard-ceiling confirmation before enqueue |
-| Machine readiness could be mistaken for human approval | Premiere now separates Monica readiness, human creative approval, and qualified cultural approval as three records |
+| Machine readiness could be mistaken for human approval | Premiere now sequences Monica readiness, exact qualified cultural approval, and then separate human creative/final approval as three records |
 | Repair timestamps and directions were accepted as arbitrary strings | Added deterministic `MM:SS.d` bounds, required feedback, end-after-start validation, conflict detection, unsupported-scope flags, and script-change clarification |
 | Repair spend and dependency closure were opaque | Added task dependency scopes, deterministic plan hash, expected/high simulated quote, and a hard-ceiling gate |
 | The UI still looked like one global mutable job | Added independent Episode aggregate records, pinned Series/config revisions, durable-job labels, artifact revisions, and stale/current markers |
@@ -106,9 +106,9 @@ These remain production capabilities rather than claims made by the static simul
   offenders, zero console errors, and zero page errors
 - Desktop interaction smoke: Home → Series → Episode Premiere → Monica Repair
   Room all became visible as expected
-- State-integrity smoke: Repair Plan → repaired candidate → promote to review
-  left both human approval records awaiting and the artifact labelled
-  `Candidate 02`, never `Approved`
+- State-integrity smoke: Repair Plan → repaired candidate → promote to
+  qualified review left creative approval unavailable, superseded prior
+  decisions, and labelled the artifact `Candidate 02`, never `Approved`
 - Authorization-order smoke: after all three World anchors and the Series
   decision were selected, the World Lock remained disabled until the quote
   ceiling checkbox was authorized; the one atomic record then opened

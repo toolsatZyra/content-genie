@@ -115,7 +115,7 @@ Conflict response:
   "code": "VERSION_CONFLICT",
   "expectedVersion": 14,
   "currentVersion": 16,
-  "currentState": "awaiting_final_review",
+  "currentState": "pending_qualified_review",
   "conflictingEventIds": ["..."]
 }
 ```
@@ -131,9 +131,11 @@ without user or workflow re-evaluation.
 States:
 
 ```text
-draft -> world_setup -> ready_to_produce -> awaiting_final_review
-  -> approved -> delivered
-approved|delivered -> awaiting_final_review  (only through repaired-candidate promotion)
+draft -> world_setup -> ready_to_produce -> pending_qualified_review
+  -> awaiting_final_review -> approved -> delivered
+pending_qualified_review|awaiting_final_review|approved|delivered
+  -> pending_qualified_review
+  (only through repaired-candidate promotion)
 ```
 
 `archived` is reversible from quiescent states. `abandoned` is terminal for the
@@ -144,17 +146,20 @@ Episode identity; a restart creates a new Episode or explicit fork.
 | `episode.create` | none → `draft` | member+ | Active membership; Series accepts Episodes; unique episode number in Series | Create Episode, creator/owner, initial work item; `episode.created` | Same idempotency key returns same Episode |
 | `episode.begin_world_setup` | `draft` → `world_setup` | owner/member | Locked script revision exists; narrator selection valid; no active conflicting command | Pin script revision and draft configuration; `episode.world_setup_started` | Fix validation and retry same command |
 | `episode.mark_ready` | `world_setup` → `ready_to_produce` | user/workflow | Every required world asset accepted; character sheets/reference packs pass; source and rights review packet complete; deity/temple manifests complete when applicable; machine cultural preflight has no blocker; low/expected/high quote and hard ceiling current; configuration validation passes; publishable Series draft/release is coherent | Freeze configuration candidate; create start-production work item; `episode.ready_to_produce` | Failed preconditions produce explicit blockers; no partial transition |
-| `episode.mark_final_review_ready` | `ready_to_produce` → `awaiting_final_review` | workflow | Authoritative run succeeded; passing master and release-blocking QC verdict exist; master/config/run lineage matches | Set current review master; create review work item and notification; `episode.final_review_ready` | Reconciliation may replay event; uniqueness prevents duplicate work |
-| `episode.promote_repair_candidate` | `{awaiting_final_review, approved, delivered}` → `awaiting_final_review` | approver/workflow transaction | Repair branch is `ready_for_review`; exact repaired master/plan/QC versions are current; repaired master is `passing`; source master is current review/active master; expected Episode version; `aal2` | Set repaired master as current review target; mark any prior active creative approval selection `superseded`; clear any active cultural-decision selection because it binds the prior master; cancel unissued export work for the old selection; retain issued packages as historical/superseded; create one replacement final-review work item and notification; `episode.repair_candidate_promoted` | CAS conflict leaves branch `ready_for_review`; reload exact current target and retry or reject branch |
+| `episode.mark_machine_ready_for_qualified_review` | `ready_to_produce` → `pending_qualified_review` | workflow | Authoritative run succeeded; passing master and release-blocking machine-QC verdict exist; master/config/run/EDD/evidence lineage matches | Set the exact pending cultural-review target; create one qualified-cultural-review work item and notification; `episode.machine_ready_for_qualified_review` | Reconciliation may replay event; uniqueness prevents duplicate work |
+| `episode.mark_final_review_ready` | `pending_qualified_review` → `awaiting_final_review` | workflow | The exact pending master still has a passing release-blocking QC verdict; an active qualified cultural decision approves the exact master, policy, source packet, evidence bundle, and reviewer-competency versions; no cultural blocker or withdrawal; expected Episode version | Set the exact creative/final-review target; create one creative/final-review work item and notification; `episode.final_review_ready` | Reconciliation may replay event; stale or superseded cultural decisions cannot advance the Episode |
+| `episode.promote_repair_candidate` | `{pending_qualified_review, awaiting_final_review, approved, delivered}` → `pending_qualified_review` | approver/workflow transaction | Repair branch is `ready_for_review`; exact repaired master/plan/QC versions are current; repaired master is `passing`; source master is the exact current pending-review/review/active master; expected Episode and repair-branch versions; approver `aal2` | Set the repaired master as the new pending qualified-review target; supersede the old pending cultural-review target/work item and any prior active cultural-decision selection; mark any prior active creative approval/final-review selection `superseded`; cancel unissued export work for the old selection; retain issued packages as historical/superseded; create exactly one replacement qualified-cultural-review work item and notification; `episode.repair_candidate_promoted` | CAS conflict leaves branch `ready_for_review`; reload the exact current target and retry or reject the branch |
 | `episode.approve_master` | `awaiting_final_review` → `approved` | approver | Exact reviewed master is still current; QC contract passes; a separate qualified cultural decision approves the exact master/evidence versions; no blocker; `aal2`; CAS succeeds | Create immutable creative/final approval, close review item, enqueue exports; `master.approved`, `episode.approved` | Version conflict forces new review; never auto-approves replacement |
 | `episode.mark_delivered` | `approved` → `delivered` | workflow | Required approved-master export package is `ready`; checksums verified | Set delivered package; `episode.delivered` | Packaging retry occurs on export package, not Episode state rollback |
-| `episode.archive` | `{draft, world_setup, ready_to_produce, awaiting_final_review, approved, delivered}` → `archived` | owner/admin | No active production/repair/export, or explicit cancel-and-archive completed; retention policy recorded | Preserve prior state as `archived_from_state`; hide from defaults; `episode.archived` | Restore uses recorded prior state subject to freshness validation |
+| `episode.archive` | `{draft, world_setup, ready_to_produce, pending_qualified_review, awaiting_final_review, approved, delivered}` → `archived` | owner/admin | No active production/repair/export, or explicit cancel-and-archive completed; retention policy recorded | Preserve prior state as `archived_from_state`; hide from defaults; `episode.archived` | Restore uses recorded prior state subject to freshness validation |
 | `episode.restore` | `archived` → prior valid state | owner/admin | Retained dependencies still exist; permissions current; no legal deletion | Restore to prior state or `world_setup` if dependencies are stale; `episode.restored` | Block and show missing dependencies |
 | `episode.abandon` | `{draft, world_setup, ready_to_produce}` → `abandoned` | owner/admin | No approved master; active work canceled or superseded; explicit confirmation | Close work, release reservations, retain audit; `episode.abandoned` | Terminal; fork if work should resume |
 
 Prohibited:
 
 - `draft` directly to production or approval;
+- `pending_qualified_review` to `awaiting_final_review` without an active,
+  version-bound qualified cultural approval for the exact target;
 - `awaiting_final_review` to `approved` without a version-bound approval;
 - repaired-candidate selection directly to `approved`;
 - replacing the locked script under an existing configuration;
@@ -261,6 +266,96 @@ with reason. An independent parallel Episode remains reproducible against its
 older release. Conflicting accepted facts are never last-write-wins; a new
 proposal must rebase, branch, or supersede them through a new release.
 
+### 4.3.2 Preflight workflow and micro-spend authority
+
+A preflight workflow is durable authority for Phase 2 world candidates,
+quarantine ingest, narration/master-clock synthesis, and plan evaluation. It is
+not a production run and can never authorize production video, final approval,
+export, or publication.
+
+Preflight-run states:
+
+```text
+created -> queued -> running -> succeeded
+                    |  |  \
+                    |  |   -> failed
+                    |  -> waiting_external -> running
+                    -> waiting_decision -> queued|running
+created|queued|running|waiting_* -> paused -> queued
+nonterminal -> canceled|superseded
+```
+
+| Command | Preconditions | Atomic effect |
+|---|---|---|
+| `preflight.create` | Episode is `world_setup` or `ready_to_produce`; exact script lock and configuration-candidate version are current; one allowed kind (`world_anchor`, `secure_ingest`, `narration_clock`, `plan_evaluation`); no active authority for the same candidate/kind; any paid graph has an active exact micro quote, authorization, and reservation | Create the monotonic preflight run with a new authority epoch and exact script/config/quote pins; create its initial logical stages |
+| `preflight.enqueue` | `created` or resumable `paused`; inputs and any micro authority still current | `→ queued`; append one idempotent Trigger outbox command |
+| `preflight.started` | `queued`; Trigger execution identity claims by CAS | `→ running`; record execution and highest fence |
+| `preflight.wait_external` | `running`; at least one current provider request and no runnable stage | `→ waiting_external`; schedule reconciliation deadline |
+| `preflight.wait_decision` | `running`; an explicit fail-closed user/qualified-review work item exists | `→ waiting_decision`; notify the exact actor |
+| `preflight.pause/resume` | Authorized pause or circuit breaker; no irreversible commit in flight; resume revalidates all pins and micro balance | Pause new dispatch or `paused → queued`; preserve safe late-result reconciliation |
+| `preflight.succeed` | Every required stage and evaluator record passes; outputs are immutable promoted assets or versioned plan evidence; no blocker | `→ succeeded`; publish only the typed preflight result version |
+| `preflight.fail` | Terminal error or bounded cost/time/retry exhaustion | `→ failed`; release unused micro reservation and create actionable work |
+| `preflight.cancel` | Authorized cancel | `→ canceled`; fence attempts, request provider cancellation, retain cost/late-completion reconciliation |
+| `preflight.supersede` | Replacement has a higher authority epoch | `→ superseded`; old outputs remain evidence only |
+
+Each `preflight_stage_run` is a logical DAG node and each
+`preflight_stage_attempt` is immutable. Their states and
+`make_ready/claim/start/wait/heartbeat/succeed/fail/reap` commands use the
+Stage Attempt contract in section 4.5, but bind
+`(preflight_run_id, authority_epoch, attempt_no, fencing_token,
+input_manifest_hash)`. A production `stage_run` cannot satisfy a preflight FK
+and a preflight attempt cannot be attached to a production run. A stale fence,
+authority epoch, input hash, or configuration candidate can append diagnostic
+evidence but cannot promote output or spend another slot.
+
+Preflight micro-spend has separate state and tables:
+
+```text
+micro_quote: draft -> priced -> confirmed -> expired|superseded
+micro_authorization: pending -> active -> exhausted|released|revoked|expired
+micro_reservation: held -> partially_settled -> settled|released|expired
+```
+
+- `micro_quote.confirm` requires an itemized low/expected/high quote, a hard
+  ceiling, exact rate/capability evidence, and individually bounded request,
+  retry, and alternate slots. It rejects every production-video capability.
+- `micro_authorization.activate` requires an authenticated user decision,
+  exact quote/config/script hashes, expected Episode version, and AAL required
+  by the workspace spend policy.
+- `micro_reservation.hold` atomically creates the sole reservation for that
+  authorization and checks the workspace/episode micro ceiling. A duplicate
+  command returns the same reservation.
+- `micro_slot.claim` CAS-claims one unused exact quote line for an authoritative
+  preflight stage. It creates one provider request without reserving the
+  workspace balance again.
+- settlement is append-only. Release affects only unclaimed balance; late or
+  billable-no-asset results remain liabilities and evidence.
+- a micro authorization or slot can permit only
+  `gen_image`, `edit_image`, `gen_speech`, `align_speech`, `asr`,
+  `gen_music_preview`, `gen_sfx_preview`, or an explicitly zero-cost
+  read/evaluate operation. `gen_video`, render, export, approval, and publish
+  scopes are structurally invalid.
+
+### 4.3.3 Provider-broker client identity
+
+The provider broker authenticates the Trigger deployment separately from the
+one-attempt capability grant. Service identity alone grants no provider,
+budget, storage, command, approval, or export authority.
+
+| Command | Preconditions | Atomic effect |
+|---|---|---|
+| `broker_client.register` | Security admin `aal2`; unique Trigger project/environment/client ID; public key only | Create disabled client, audit event, and configuration version |
+| `broker_client.add_key` | Active/disabled client; unique `kid`; Ed25519 public key; bounded validity; rotation reason | Create immutable key version in `pending` |
+| `broker_client.activate_key` | Expected client/key versions; validity current; at most the explicitly bounded overlap set remains active | Activate `kid`; append audit/alert; never expose a private key |
+| `broker_client.revoke_key` | Expected version; security admin or incident authority; reason | Revoke immediately, invalidate all unexpired assertion JTIs for the key, alert, and block new broker calls |
+| `broker_client.disable` | Expected client version; reason | Disable client, revoke active keys and unexpired assertions, alert, and block all calls |
+| `broker_assertion.consume` | Broker has already verified EdDSA signature; exact allowlisted client/project/environment/`kid`; `iss`, `aud`, task/run/stage subject, `iat`, `nbf`, and ≤60-second `exp` match the registered attempt and capability grant; `jti` unseen | Insert hashed `jti` with unique constraint and expiry, then revalidate capability grant, quote slot, authority epoch and fence in the same transaction; replay or mismatch has no provider side effect |
+
+`broker_clients`, key versions, and consumed assertion JTIs are server-only.
+Private signing keys never enter Postgres. Rotation permits only a documented
+short overlap window. Revocation and replay rejection are immutable audit and
+mandatory security-alert events.
+
 ### 4.4 Production run
 
 States:
@@ -347,8 +442,8 @@ classified as `duplicate | stale | billable_no_asset | quarantined_asset`.
 
 | Command/event | Preconditions | State/effect |
 |---|---|---|
-| `provider.claim_authorized_slot` | Stage authoritative; quote/authorization/envelope reservation current; one exact unused quote-line slot matches endpoint, duration quantum, outputs and every price modifier; slot amount is inside the already-reserved high envelope | In one transaction create `reserved` provider request and unique request-to-slot claim by CAS; do **not** increment workspace reserved balance again |
-| `provider.enqueue` | Exact quote-line claim and parent high-envelope reservation live; capability/rate-card pins still verified/current; provider circuit not open | `reserved → queued`; outbox dispatch |
+| `provider.claim_authorized_slot` | Either an authoritative production stage with its current full-high envelope or an authoritative preflight stage with its current micro envelope; one exact unused quote-line slot matches allowed capability, endpoint, duration quantum, outputs and every price modifier; slot amount is inside the already-reserved parent envelope | In one transaction create `reserved` provider request and unique request-to-slot claim by CAS; record the exclusive parent authority kind/ID; do **not** increment workspace reserved balance again |
+| `provider.enqueue` | Exact quote-line claim and the matching production-high or preflight-micro reservation are live; capability/rate-card pins still verified/current; provider circuit not open; broker client assertion and one-attempt capability grant have been consumed/validated | `reserved → queued`; outbox dispatch |
 | `provider.submit` | Outbox claim; request idempotency unique | `queued → submitted`; store attempt without secret/raw body |
 | `provider.accepted` | Response maps to same provider account/request | `submitted → accepted`; save external job ID unique per account |
 | `provider.poll` | `{accepted, polling}`; next poll due; rate token acquired | `accepted → polling` or remain polling |
@@ -414,11 +509,11 @@ nonterminal -> failed|canceled|superseded
 | `repair.interpret` | At least one current row; source master unchanged | Create immutable interpretation version |
 | `repair.request_clarification` | Ambiguous/conflicting/unsupported row | `→ needs_clarification`; create deep-linked work item |
 | `repair.plan` | All rows resolvable; no unresolved overlap/contradiction/unsupported capability/script-changing request; script/culture locks preserved | Create ordered row interpretations, dependency closure, task DAG, actual repair ranges, low/expected/high delta quote, hard ceiling, and canonical plan hash |
-| `repair.confirm` | `awaiting_confirmation`; approver; exact plan hash and explicit hard-cost-ceiling acknowledgement; source master/EDD/config/Series Release still current; itemized high envelope includes billing quanta and every bounded retry slot and fits ceiling | Freeze plan; reserve full high envelope; `→ queued` |
+| `repair.confirm` | `awaiting_confirmation`; approver `aal2`; expected Episode/branch versions; exact plan hash and explicit hard-cost-ceiling acknowledgement; source master/EDD/config/Series Release still current; itemized high envelope includes billing quanta and every bounded retry slot and fits ceiling | In one transaction freeze the plan, create the version-bound repair budget authorization, create the sole high-envelope reservation, append audit/outbox records, and move `→ queued`; no provider work exists before commit |
 | `repair.execute` | Workflow claims branch authority epoch | `queued → repairing` |
 | `repair.begin_regression_qc` | All repair tasks complete; new EDD/master candidate committed | `repairing → regression_qc` |
 | `repair.ready_for_review` | Local, boundary, dependency, and full-master QC pass | `regression_qc → ready_for_review`; create A/B review item |
-| `repair.accept` | Exact repaired master/plan/QC versions; repaired master `passing`; CAS; approver `aal2` | In one transaction invoke `episode.promote_repair_candidate`, then `→ accepted`; this command can never approve a master or reuse prior creative/cultural decisions |
+| `repair.accept` | Exact repaired master/plan/QC versions; repaired master `passing`; source master is still the Episode review/active master; expected Episode/branch versions; approver `aal2` | In one transaction invoke `episode.promote_repair_candidate`, cancel unissued old exports, retain issued packages as historical/superseded, create the qualified-cultural-review item, then move the branch `→ accepted`; this command can never approve a master or reuse prior creative/cultural decisions |
 | `repair.reject` | Exact branch version | `→ rejected`; retain evidence and source master |
 
 Rows are canonical inputs. Chat messages may explain or clarify, but MUST NOT
@@ -645,6 +740,14 @@ composite foreign keys that prevent cross-workspace references.
 
 | Entity | Purpose | Required keys/invariants |
 |---|---|---|
+| `preflight_runs` | Durable Phase 2 workflow authority | Unique active authority per configuration candidate/kind; exact script/config/micro-authority pins; authority epoch |
+| `preflight_stage_runs` | Logical preflight DAG node | Unique `(preflight_run_id,stage_key,stage_revision)`; cannot reference a production run |
+| `preflight_stage_dependencies` | Preflight DAG edges | No self-edge; acyclic; exact typed input/output contract |
+| `preflight_stage_attempts` | Immutable retried preflight execution | Unique `(preflight_stage_run_id,attempt_no)`; lease, highest fencing token, input hash |
+| `preflight_stage_leases` | Time-bounded attempt claim | One current lease per attempt; expiry/heartbeat/fence |
+| `micro_quotes`, `micro_quote_lines` | Pre-lock itemized allowance | Exact script/config/rate/capability pins; production-video/render/export scopes prohibited; unique bounded slot |
+| `micro_authorizations` | User-approved pre-lock ceiling | One active authorization per confirmed quote; actor/AAL/decision/config hashes |
+| `micro_reservations` | Sole pre-lock held envelope | Unique authorization; append-only settlement; no double reservation |
 | `production_runs` | Durable execution envelope | One authoritative run per config; authority epoch |
 | `stage_runs` | Logical DAG node | Unique `(run_id,stage_key,stage_revision)` |
 | `stage_dependencies` | DAG edges and required output contracts | No self-edge; acyclic validation |
@@ -652,10 +755,13 @@ composite foreign keys that prevent cross-workspace references.
 | `provider_accounts` | Credential owner/config reference | Secret value never stored in row; environment secret reference |
 | `provider_capabilities` | Verified routing/price/retention data | Unique provider/model/capability/version/environment; `verified_at` |
 | `provider_evidence_snapshots` | Reproducible official/account schema, price, retention, and canary evidence | Raw object checksum, canonical hash, source URL, retrieval time, verification state |
-| `provider_requests` | Idempotent external operation | Unique provider-account idempotency key and external job ID; exactly one authorized quote-line claim before enqueue |
-| `provider_request_quote_claims` | Exactly-once consumption of an authorized request/retry/alternate slot | Unique provider request and unique quote line; immutable parent quote/authorization/envelope-reservation pins |
+| `provider_requests` | Idempotent external operation | Unique provider-account idempotency key and external job ID; exactly one authorized production-high or preflight-micro quote-line claim before enqueue |
+| `provider_request_quote_claims` | Exactly-once consumption of an authorized request/retry/alternate slot | Unique provider request and unique quote line; exclusive parent-authority kind/ID; immutable quote/authorization/envelope-reservation pins |
 | `provider_inbox_messages` | Raw-but-redacted callback/poll envelopes | Unique provider message/event hash; verification result |
 | `provider_late_completions` | Orthogonal duplicate/stale/late completion evidence | Request remains terminal; unique canonical event hash; cost and quarantined asset links |
+| `broker_clients` | Trigger-project service identity registry | Unique `(environment,trigger_project,client_id)`; enabled/disabled versioned status |
+| `broker_client_key_versions` | Immutable broker verification public keys | Unique `(broker_client_id,kid)`; Ed25519 public key, validity, pending/active/revoked; no private key |
+| `broker_assertion_jtis` | One-use service-assertion replay ledger | Unique hashed `jti`; exact client/key/task/run/stage/grant pins; issued/expiry/consumed/revoked timestamps |
 | `worker_capability_grants` | Short-lived single-attempt worker authority | Hashed `jti`, stage/fence/authority epoch, allowlisted RPC/object scope, expiry, consumed/revoked state |
 | `assets` | Stable logical asset | Workspace-scoped kind |
 | `asset_versions` | Immutable durable media/content version | Unique content hash where dedupe allowed; storage object exact version |
@@ -903,8 +1009,22 @@ create unique index budget_reservation_quote_uq
 create unique index provider_request_quote_claim_request_uq
   on private.provider_request_quote_claims (provider_request_id);
 
-create unique index provider_request_quote_claim_slot_uq
-  on private.provider_request_quote_claims (provider_quote_line_item_id);
+alter table private.provider_request_quote_claims
+  add constraint provider_request_quote_claim_exactly_one_slot_ck
+  check (
+    num_nonnulls(
+      provider_quote_line_item_id,
+      micro_quote_line_id
+    ) = 1
+  );
+
+create unique index provider_request_quote_claim_production_slot_uq
+  on private.provider_request_quote_claims (provider_quote_line_item_id)
+  where provider_quote_line_item_id is not null;
+
+create unique index provider_request_quote_claim_micro_slot_uq
+  on private.provider_request_quote_claims (micro_quote_line_id)
+  where micro_quote_line_id is not null;
 
 create unique index provider_cost_event_uq
   on private.cost_events (provider_account_id, provider_cost_event_id)
@@ -915,6 +1035,12 @@ Settlement is append-only. A charge after cancellation is recorded and consumes
 or exceeds the parent envelope reservation according to policy, but cannot
 revive the request. Unclaimed slots release only when the run/repair branch is
 terminal or a replacement quote atomically supersedes the authorization.
+
+`provider_quote_line_item_id` has an immutable FK to the production
+quote/authorization/high-envelope reservation. `micro_quote_line_id` has an
+immutable FK to the preflight micro quote/authorization/micro reservation. The
+XOR check and the two partial unique indexes make a cross-envelope or duplicate
+claim impossible even under concurrent transactions.
 
 ### 6.9 Repair ranges and master approval
 

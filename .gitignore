@@ -21,3 +21,4 @@ Thumbs.db
 .vercel/
 .superpowers/
 .playwright-mcp/
+supabase/.temp/

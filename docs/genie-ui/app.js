@@ -25,6 +25,7 @@ let repairPlaybackTimer = null;
 let worldAuthorizationDecision = "pending";
 let worldAuthorizationRecorded = false;
 let performanceVersion = 1;
+let culturalApprovalRecorded = false;
 const completedStages = new Set();
 const episodeAggregates = {
   neelkanth01: { series: "Neelkanth", number: "01", title: "The Poison of the Ocean", id: "EP-NEE-01", release: "04", config: "07", job: "No paid job enqueued" },
@@ -108,7 +109,7 @@ const stageMessages = {
   look: "This choice becomes a versioned Look Pack. It will govern colour, light, material, camera mood and visual consistency.",
   world: "I’m waiting for your taste. After acceptance, identity and environment reference packs will be generated and checked automatically.",
   create: "The crew is dormant. When you begin, I will evaluate every candidate against the launch rubrics and repair the smallest failing unit.",
-  premiere: "Provisional automated QC passed for this final-review candidate. Separate creative and qualified cultural approvals are still required."
+  premiere: "Provisional automated QC passed. Qualified cultural review comes first; only that exact approved candidate can then enter separate creative/final review."
 };
 
 const workspaceMessages = {
@@ -662,12 +663,13 @@ function setQualityCheck(index, status) {
   $("small", item).textContent = status === "is-pass" ? "Passed" : status === "is-checking" ? "Checking…" : "Not started";
 }
 
-function resetReviewApprovals(message = "Sample final-review state. In production, every verdict opens its stored evidence.") {
+function resetReviewApprovals(message = "Sample qualified-review state. In production, every verdict opens its stored evidence.") {
+  culturalApprovalRecorded = false;
   $("#approve-film").disabled = false;
-  $("#approve-film").innerHTML = "<span>✦</span> Record both approvals & export";
+  $("#approve-film").innerHTML = "<span>✦</span> Record qualified cultural review";
   $("#creative-approval-mark").textContent = "○";
   $("#cultural-approval-mark").textContent = "○";
-  $("#creative-approval-state").textContent = "Awaiting current reviewer";
+  $("#creative-approval-state").textContent = "Unavailable until cultural approval";
   $("#cultural-approval-state").textContent = "Awaiting authorized reviewer";
   $("#creative-approval-mark").closest("span").classList.remove("is-approved");
   $("#cultural-approval-mark").closest("span").classList.remove("is-approved");
@@ -1348,10 +1350,10 @@ function wireEvents() {
   $$("[data-version-preview]").forEach((button) => button.addEventListener("click", () => setVersionPreview(button.dataset.versionPreview)));
   $("#accept-repair-result").addEventListener("click", () => {
     closeRepair();
-    resetReviewApprovals("Prototype: Candidate 02 is now the current final-review target. Both prior approval records are absent or revoked; Revision 01 remains preserved for rollback and audit.");
-    setEpisodeAggregateState({ job: "No active job", freshness: "Current · awaiting both approvals", revision: "Candidate 02" });
-    $("#stage-announcer").textContent = "Candidate 02 promoted to final review; creative and qualified cultural approvals are required";
-    showToast("Candidate 02 promoted; both human approvals are required");
+    resetReviewApprovals("Prototype: Candidate 02 is now the pending qualified-review target. Prior decisions were superseded; Revision 01 remains preserved for rollback and audit.");
+    setEpisodeAggregateState({ job: "No active job", freshness: "Current · qualified cultural review required", revision: "Candidate 02" });
+    $("#stage-announcer").textContent = "Candidate 02 promoted to qualified cultural review; creative review is not yet available";
+    showToast("Candidate 02 promoted; qualified cultural review is required first");
   });
   $$("[data-stage]").forEach((button) => button.addEventListener("click", () => setStage(button.dataset.stage)));
   $$("[data-go]").forEach((button) => button.addEventListener("click", () => setStage(button.dataset.go)));
@@ -1471,16 +1473,24 @@ function wireEvents() {
     }, 750);
   });
   $("#approve-film").addEventListener("click", () => {
+    if (!culturalApprovalRecorded) {
+      culturalApprovalRecorded = true;
+      $("#cultural-approval-mark").textContent = "✓";
+      $("#cultural-approval-state").textContent = "Simulated qualified cultural record stored";
+      $("#cultural-approval-mark").closest("span").classList.add("is-approved");
+      $("#creative-approval-state").textContent = "Now available for current reviewer";
+      $("#approve-film").innerHTML = "<span>✦</span> Record creative approval & export";
+      $("#final-message").textContent = "Prototype: the exact culturally approved candidate has entered separate creative/final review.";
+      showToast("Qualified cultural approval stored; creative review is now available");
+      return;
+    }
     $("#approve-film").disabled = true;
     $("#approve-film").innerHTML = "<span>✓</span> Approved in prototype";
     $("#creative-approval-mark").textContent = "✓";
-    $("#cultural-approval-mark").textContent = "✓";
     $("#creative-approval-state").textContent = "Simulated human creative record stored";
-    $("#cultural-approval-state").textContent = "Simulated qualified cultural record stored";
     $("#creative-approval-mark").closest("span").classList.add("is-approved");
-    $("#cultural-approval-mark").closest("span").classList.add("is-approved");
-    $("#final-message").textContent = "Prototype: two separate human approval records were stored, then export packaging was requested.";
-    showToast("Prototype: creative and qualified cultural approvals recorded separately");
+    $("#final-message").textContent = "Prototype: the separate creative/final approval was stored after cultural approval, then export packaging was requested.";
+    showToast("Creative/final approval stored; export packaging requested");
   });
   $("#repair-film").addEventListener("click", () => {
     openRepair();

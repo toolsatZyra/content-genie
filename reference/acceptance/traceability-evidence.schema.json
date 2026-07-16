@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zyra.internal/schemas/traceability-evidence.v1.json",
+  "title": "Genie traceability evidence source",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "entries"],
+  "properties": {
+    "schemaVersion": {
+      "const": "traceability-evidence.v1"
+    },
+    "entries": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^(?:GEN-PROD-[0-9]{3}|AC-QC-[0-9]{3}|TM-[0-9]{2}|(?:GQC|CAL)-[A-Z]+-[0-9]{3})@(phase[0-4]|deployment|product_calibrated)$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/evidenceEntry"
+      }
+    }
+  },
+  "$defs": {
+    "evidenceArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^docs/evidence/[A-Za-z0-9._/-]+$",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "evidenceEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workPackages",
+        "obligationDefinitionHash",
+        "status",
+        "evidence",
+        "commit",
+        "verifiedAt"
+      ],
+      "properties": {
+        "workPackages": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(?:P[0-4]|D|C)-[0-9]{2}$"
+          }
+        },
+        "obligationDefinitionHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "status": {
+          "enum": [
+            "implemented_unverified",
+            "verified",
+            "failed",
+            "deferred_external",
+            "superseded"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidenceArtifact"
+          }
+        },
+        "commit": {
+          "type": ["string", "null"],
+          "pattern": "^[a-f0-9]{7,40}$"
+        },
+        "verifiedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}
