@@ -13,6 +13,7 @@ const allowedProductionLicenses = new Set([
 // the exception must never authorize unrelated LGPL packages.
 const packageScopedLicenseExceptions = new Map([
   ["@img/sharp-libvips-linux-x64", new Set(["LGPL-3.0-or-later"])],
+  ["@img/sharp-libvips-linuxmusl-x64", new Set(["LGPL-3.0-or-later"])],
 ]);
 
 function isAllowedPackageLicense(license, packageName) {

@@ -15,6 +15,15 @@ assert.deepEqual(
     rejected: [],
   },
 );
+assert.deepEqual(
+  evaluateProductionLicenses({
+    "LGPL-3.0-or-later": [{ name: "@img/sharp-libvips-linuxmusl-x64" }],
+  }),
+  {
+    packages: 1,
+    rejected: [],
+  },
+);
 assert.equal(
   evaluateProductionLicenses({
     "LGPL-3.0-or-later": [{ name: "unrelated-lgpl-package" }],
@@ -24,6 +33,12 @@ assert.equal(
 assert.equal(
   evaluateProductionLicenses({
     "AGPL-3.0": [{ name: "@img/sharp-libvips-linux-x64" }],
+  }).rejected.length,
+  1,
+);
+assert.equal(
+  evaluateProductionLicenses({
+    "AGPL-3.0": [{ name: "@img/sharp-libvips-linuxmusl-x64" }],
   }).rejected.length,
   1,
 );

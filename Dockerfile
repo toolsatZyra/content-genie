@@ -7,6 +7,8 @@ FROM base AS dependencies
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 RUN pnpm install --frozen-lockfile
+COPY scripts/license-policy.mjs scripts/check-licenses.mjs scripts/test-license-policy.mjs ./scripts/
+RUN pnpm scan:licenses
 
 FROM dependencies AS builder
 WORKDIR /app
