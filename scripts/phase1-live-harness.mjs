@@ -159,9 +159,7 @@ if (validateRealtime) {
     subscribe(outsiderChannel, "outsider"),
   ]);
   await waitFor(
-    () =>
-      ownerReplicationStatus === "ok" &&
-      outsiderReplicationStatus === "ok",
+    () => ownerReplicationStatus === "ok" && outsiderReplicationStatus === "ok",
     `Realtime replication readiness (owner=${ownerReplicationStatus}, outsider=${outsiderReplicationStatus})`,
     60_000,
   );
