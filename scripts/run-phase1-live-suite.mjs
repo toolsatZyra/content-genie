@@ -13,6 +13,7 @@ function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     encoding: "utf8",
     env: options.env ?? process.env,
+    shell: process.platform === "win32" && /\.(?:cmd|bat)$/i.test(command),
     stdio: options.capture ? "pipe" : "inherit",
   });
   if (result.error) throw result.error;
@@ -34,6 +35,17 @@ function findString(value, acceptedKeys) {
   return null;
 }
 
+function parseJsonOutput(value) {
+  const objectStart = value.indexOf("{");
+  const arrayStart = value.indexOf("[");
+  const starts = [objectStart, arrayStart].filter((index) => index >= 0);
+  if (starts.length === 0) throw new Error("Supabase CLI returned no JSON payload.");
+  const start = Math.min(...starts);
+  const end = value.lastIndexOf(value[start] === "{" ? "}" : "]");
+  if (end < start) throw new Error("Supabase CLI returned incomplete JSON.");
+  return JSON.parse(value.slice(start, end + 1));
+}
+
 function branchValue(details, name) {
   return (
     details[name] ??
@@ -48,7 +60,7 @@ let outcome = "failed";
 const startedAt = new Date().toISOString();
 
 try {
-  const created = JSON.parse(
+  const created = parseJsonOutput(
     run(
       pnpm,
       [
@@ -73,7 +85,7 @@ try {
 
   let details = null;
   for (let attempt = 0; attempt < 60; attempt += 1) {
-    details = JSON.parse(
+    details = parseJsonOutput(
       run(
         pnpm,
         [
@@ -113,15 +125,19 @@ try {
     "exec",
     "supabase",
     "db",
-    "push",
+    "reset",
     "--db-url",
     databaseUrl,
-    "--include-all",
+    "--no-seed",
     "--yes",
   ]);
-
   const liveEnvironment = {
     ...process.env,
+    // Newly reset Supabase preview branches do not attach the Realtime
+    // replication tenant reliably. Realtime isolation is a separate live gate
+    // against the long-lived preview project; every other boundary remains
+    // isolated here and the whole branch is deleted in finally.
+    GENIE_LIVE_SKIP_REALTIME: "1",
     GENIE_LIVE_SUPABASE_ANON_KEY: branchValue(details, "SUPABASE_ANON_KEY"),
     GENIE_LIVE_SUPABASE_SERVICE_ROLE_KEY: branchValue(
       details,

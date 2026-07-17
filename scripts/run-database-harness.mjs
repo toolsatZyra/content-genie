@@ -12,6 +12,7 @@ function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     encoding: "utf8",
     env: process.env,
+    shell: process.platform === "win32" && /\.(?:cmd|bat)$/i.test(command),
     stdio: options.capture ? "pipe" : "inherit",
   });
   if (result.error) throw result.error;
@@ -40,6 +41,17 @@ function findString(value, acceptedKeys) {
     if (found) return found;
   }
   return null;
+}
+
+function parseJsonOutput(value) {
+  const objectStart = value.indexOf("{");
+  const arrayStart = value.indexOf("[");
+  const starts = [objectStart, arrayStart].filter((index) => index >= 0);
+  if (starts.length === 0) throw new Error("Supabase CLI returned no JSON payload.");
+  const start = Math.min(...starts);
+  const end = value.lastIndexOf(value[start] === "{" ? "}" : "]");
+  if (end < start) throw new Error("Supabase CLI returned incomplete JSON.");
+  return JSON.parse(value.slice(start, end + 1));
 }
 
 function remoteDatabaseProof(databaseUrl, pass) {
@@ -74,7 +86,7 @@ async function runManagedBranchHarness() {
   let branchId = null;
 
   try {
-    const created = JSON.parse(
+    const created = parseJsonOutput(
       run(
         pnpm,
         [
@@ -99,7 +111,7 @@ async function runManagedBranchHarness() {
 
     let databaseUrl = null;
     for (let attempt = 0; attempt < 60 && !databaseUrl; attempt += 1) {
-      const details = JSON.parse(
+      const details = parseJsonOutput(
         run(
           pnpm,
           [
@@ -136,13 +148,16 @@ async function runManagedBranchHarness() {
         "exec",
         "supabase",
         "db",
-        "push",
+        "reset",
         "--db-url",
         databaseUrl,
-        "--include-all",
+        "--no-seed",
         "--yes",
       ],
-      { failureMessage: "Could not apply migrations to isolated Supabase branch." },
+      {
+        failureMessage:
+          "Could not fresh-apply migrations to the isolated Supabase branch.",
+      },
     );
     remoteDatabaseProof(databaseUrl, "after fresh apply");
 

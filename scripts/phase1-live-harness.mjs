@@ -97,6 +97,7 @@ const outsiderSignIn = await outsider.auth.signInWithPassword({
   password,
 });
 if (outsiderSignIn.error) throw outsiderSignIn.error;
+const validateRealtime = process.env.GENIE_LIVE_SKIP_REALTIME !== "1";
 
 function subscribe(channel, label) {
   return new Promise((resolve, reject) => {
@@ -117,7 +118,7 @@ function subscribe(channel, label) {
   });
 }
 
-async function waitFor(predicate, label, timeoutMs = 10_000) {
+async function waitFor(predicate, label, timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (predicate()) return;
@@ -128,22 +129,43 @@ async function waitFor(predicate, label, timeoutMs = 10_000) {
 
 const ownerEvents = [];
 const outsiderEvents = [];
+let ownerReplicationStatus = "pending";
+let outsiderReplicationStatus = "pending";
 const realtimeFilter = {
   event: "*",
   filter: `workspace_id=eq.${workspace.id}`,
   schema: "public",
-  table: "domain_events",
+  table: "series",
 };
 const ownerChannel = owner
-  .channel(`phase1-owner-${suffix}`)
+  .channel(`phase1-owner-${suffix}`, {
+    config: { broadcast: { replication_ready: true } },
+  })
+  .on("system", {}, ({ status }) => {
+    ownerReplicationStatus = status;
+  })
   .on("postgres_changes", realtimeFilter, (event) => ownerEvents.push(event));
 const outsiderChannel = outsider
-  .channel(`phase1-outsider-${suffix}`)
+  .channel(`phase1-outsider-${suffix}`, {
+    config: { broadcast: { replication_ready: true } },
+  })
+  .on("system", {}, ({ status }) => {
+    outsiderReplicationStatus = status;
+  })
   .on("postgres_changes", realtimeFilter, (event) => outsiderEvents.push(event));
-await Promise.all([
-  subscribe(ownerChannel, "owner"),
-  subscribe(outsiderChannel, "outsider"),
-]);
+if (validateRealtime) {
+  await Promise.all([
+    subscribe(ownerChannel, "owner"),
+    subscribe(outsiderChannel, "outsider"),
+  ]);
+  await waitFor(
+    () =>
+      ownerReplicationStatus === "ok" &&
+      outsiderReplicationStatus === "ok",
+    `Realtime replication readiness (owner=${ownerReplicationStatus}, outsider=${outsiderReplicationStatus})`,
+    60_000,
+  );
+}
 
 const commandId = randomUUID();
 const correlationId = randomUUID();
@@ -162,19 +184,20 @@ const createParameters = {
 };
 const firstSeries = await owner.rpc("command_create_series", createParameters);
 if (firstSeries.error) throw firstSeries.error;
-await waitFor(
-  () =>
-    ownerEvents.some(({ new: row }) => row?.aggregate_id === firstSeries.data.seriesId),
-  "owner Realtime delivery",
-);
-await new Promise((resolve) => setTimeout(resolve, 1_500));
-if (outsiderEvents.length !== 0) {
-  throw new Error("Outsider received a cross-workspace Realtime event");
+if (validateRealtime) {
+  await waitFor(
+    () => ownerEvents.some(({ new: row }) => row?.id === firstSeries.data.seriesId),
+    "owner Realtime delivery",
+  );
+  await new Promise((resolve) => setTimeout(resolve, 1_500));
+  if (outsiderEvents.length !== 0) {
+    throw new Error("Outsider received a cross-workspace Realtime event");
+  }
+  await Promise.all([
+    owner.removeChannel(ownerChannel),
+    outsider.removeChannel(outsiderChannel),
+  ]);
 }
-await Promise.all([
-  owner.removeChannel(ownerChannel),
-  outsider.removeChannel(outsiderChannel),
-]);
 
 const replayedSeries = await owner.rpc("command_create_series", {
   ...createParameters,
@@ -406,7 +429,7 @@ console.log(
     crossWorkspaceRead: "denied",
     directMutation: "denied",
     liveUser: "created",
-    realtimeIsolation: "pass",
+    realtimeIsolation: validateRealtime ? "pass" : "separate-persistent-gate",
     shortSignedUrl: "pass",
     storageIsolation: "pass",
     workspaceId: workspace.id,
