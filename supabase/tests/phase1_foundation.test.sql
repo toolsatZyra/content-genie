@@ -475,9 +475,9 @@ select is(
   2::bigint,
   'open work transfers to the replacement'
 );
+reset role;
 select ok((select count(*) from audit.events) >= 7, 'security and business actions are audited');
 
-reset role;
 select throws_ok(
   $command$
     update audit.events set outcome = 'failed'
