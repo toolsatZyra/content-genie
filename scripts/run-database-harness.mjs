@@ -144,6 +144,7 @@ if (dockerAvailable()) {
   try {
     run(pnpm, ["db:start:test"]);
     run(pnpm, ["db:reset:test"]);
+    process.env.GENIE_DATABASE_HARNESS_ACTIVE = "1";
     run(pnpm, ["test:rls"]);
     console.log("PASS local Docker Supabase database harness");
   } finally {

@@ -36,7 +36,7 @@
     "test:visual": "playwright test --project=chromium --grep @visual",
     "test:security": "node scripts/security-check.mjs && node scripts/test-secret-patterns.mjs && node scripts/check-gitleaks-ignore.mjs",
     "test:bundle": "node scripts/test-browser-bundle-scanner.mjs",
-    "test:rls": "node scripts/check-rls-baseline.mjs && node scripts/test-database-harness-policy.mjs",
+    "test:rls": "node scripts/check-rls-baseline.mjs && node scripts/test-rls-policy.mjs && node scripts/test-database-harness-policy.mjs && node scripts/run-live-database-tests.mjs",
     "test:secretless": "node scripts/check-secretless-environment.mjs",
     "test:secretless:assert": "node scripts/check-secretless-environment.mjs --assert-current",
     "test:acceptance:structure": "node scripts/generate-traceability-plan.mjs && node scripts/test-traceability-generator.mjs && node scripts/test-traceability-checkpoint.mjs && git diff --exit-code -- reference/acceptance/traceability-plan.v1.json",
@@ -49,6 +49,8 @@
     "all-gates": "pnpm precheckpoint-gates && pnpm test:acceptance"
   },
   "dependencies": {
+    "@supabase/ssr": "0.12.3",
+    "@supabase/supabase-js": "2.110.7",
     "next": "16.2.10",
     "react": "19.2.7",
     "react-dom": "19.2.7",
