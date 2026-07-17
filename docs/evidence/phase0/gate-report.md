@@ -1,8 +1,11 @@
 # Phase 0 Foundation Gate Report
 
-**Gate:** Phase 0 — foundations, secure runtime, and SDLC  
-**Candidate commit:** `5df30a69f59dd63726d0e85d38a4382a5a4b4020`  
-**Reviewed on:** 2026-07-17  
+**Gate:** Phase 0 — foundations, secure runtime, and SDLC
+
+**Candidate commit:** `5df30a69f59dd63726d0e85d38a4382a5a4b4020`
+
+**Reviewed on:** 2026-07-17
+
 **Disposition:** PASS
 
 ## Scope proved
