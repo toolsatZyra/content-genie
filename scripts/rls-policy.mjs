@@ -10,6 +10,7 @@ const expectedMigrationSuffixes = [
   "phase1_diagnostic_ingest.sql",
   "phase1_adversarial_corrections.sql",
   "phase1_realtime_event_publication.sql",
+  "phase1_authority_storage_hardening.sql",
 ];
 
 const collect = (pattern, value) =>
@@ -104,6 +105,12 @@ export function analyzePhase1Migrations(sources) {
     "memberships_deactivation_guard",
     "invitations_reject_active_member",
     "alter publication supabase_realtime add table public.domain_events",
+    "lock_workspace_authority",
+    "membership_session_authorizations",
+    "invitations_require_active_issuer_before_consumption",
+    "authorize_storage_sign",
+    "storage.allow_any_operation",
+    "owner_id = (select auth.uid()::text)",
   ]) {
     if (!normalized.includes(required)) {
       errors.push(`missing Phase 1 invariant: ${required}`);

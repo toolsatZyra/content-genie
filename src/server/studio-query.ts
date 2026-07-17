@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { User } from "@supabase/supabase-js";
+import type { PostgrestResponse, SupabaseClient, User } from "@supabase/supabase-js";
 
 import type {
   ActivitySummary,
@@ -12,6 +12,7 @@ import type {
   WorkspaceSummary,
   WorkSummary,
 } from "@/domain/studio";
+import { parseEpisodeWorkflowState } from "@/domain/studio";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 type UnknownRow = Record<string, unknown>;
@@ -36,6 +37,21 @@ function nestedRow(value: unknown): UnknownRow {
 
 function asRole(value: unknown): MembershipRole {
   return value === "admin" || value === "reviewer" ? value : "member";
+}
+
+export async function loadAssignedWorkProjectionRows(
+  client: SupabaseClient,
+  workspaceId: string,
+  userId: string,
+): Promise<PostgrestResponse<UnknownRow>> {
+  return await client
+    .from("work_items")
+    .select("id,kind,state,safe_summary,deep_link")
+    .eq("workspace_id", workspaceId)
+    .eq("assigned_user_id", userId)
+    .in("state", ["open", "claimed"])
+    .order("created_at", { ascending: false })
+    .limit(50);
 }
 
 export async function loadStudioProjection(
@@ -93,13 +109,7 @@ export async function loadStudioProjection(
         .is("archived_at", null)
         .order("updated_at", { ascending: false })
         .limit(200),
-      client
-        .from("work_items")
-        .select("id,kind,state,safe_summary,deep_link")
-        .eq("workspace_id", workspace.id)
-        .in("state", ["open", "claimed"])
-        .order("created_at", { ascending: false })
-        .limit(50),
+      loadAssignedWorkProjectionRows(client, workspace.id, user.id),
       client
         .from("notifications")
         .select("id,title,safe_summary,deep_link,read_at,created_at")
@@ -145,7 +155,7 @@ export async function loadStudioProjection(
       summary: text(row, "summary"),
       title: text(row, "title"),
       updatedAt: text(row, "updated_at"),
-      workflowState: text(row, "workflow_state", "draft"),
+      workflowState: parseEpisodeWorkflowState(row.workflow_state),
     })),
     notifications: ((notifications.data ?? []) as UnknownRow[]).map(
       (row): NotificationSummary => ({

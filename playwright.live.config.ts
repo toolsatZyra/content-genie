@@ -16,7 +16,7 @@ for (const name of required) {
 
 export default defineConfig({
   testDir: "./tests/live",
-  timeout: 60_000,
+  timeout: 120_000,
   workers: 1,
   reporter: [["list"]],
   use: {

@@ -7,6 +7,7 @@ import {
 } from "./database-harness-policy.mjs";
 
 const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+const node = process.execPath;
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -191,6 +192,15 @@ async function runManagedBranchHarness() {
       ],
       { failureMessage: "Migration replay left unapplied forward work." },
     );
+    run(node, [
+      "scripts/run-phase1-forward-rollback-drill.mjs",
+      "--db-url",
+      databaseUrl,
+      "--branch-ref",
+      branchId,
+      "--production-project-ref",
+      productionProjectRef,
+    ]);
     run(pnpm, ["test:rls"]);
     console.log(
       "PASS managed ephemeral Supabase branch fresh apply, reset, replay, pgTAP and lint",
@@ -223,6 +233,7 @@ if (dockerAvailable()) {
     run(pnpm, ["test:rls"]);
     run(pnpm, ["db:reset:test"]);
     run(pnpm, ["test:rls"]);
+    run(node, ["scripts/run-phase1-forward-rollback-drill.mjs", "--local"]);
     console.log("PASS local Docker Supabase fresh apply and replay database harness");
   } finally {
     run(pnpm, ["db:stop:test"]);

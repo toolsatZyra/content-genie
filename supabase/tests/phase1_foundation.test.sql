@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, auth, storage, private, audit, pg_catalog;
 
-select plan(77);
+select plan(95);
 
 insert into public.organizations (id, name, slug)
 values ('10000000-0000-0000-0000-000000000001', 'Zyra', 'zyra');
@@ -62,13 +62,23 @@ values
     statement_timestamp(),
     'authenticated',
     'authenticated'
+  ),
+  (
+    '20000000-0000-0000-0000-000000000005',
+    'reactivate@zyra.test',
+    statement_timestamp(),
+    statement_timestamp(),
+    statement_timestamp(),
+    'authenticated',
+    'authenticated'
   );
 
 insert into public.profiles (user_id, display_name)
 values
   ('20000000-0000-0000-0000-000000000001', 'Member One'),
   ('20000000-0000-0000-0000-000000000002', 'Member Two'),
-  ('20000000-0000-0000-0000-000000000003', 'Admin');
+  ('20000000-0000-0000-0000-000000000003', 'Admin'),
+  ('20000000-0000-0000-0000-000000000005', 'Reactivated Member');
 
 insert into public.memberships (
   workspace_id, user_id, role, status, activated_at
@@ -92,6 +102,13 @@ values
     '10000000-0000-0000-0000-000000000101',
     '20000000-0000-0000-0000-000000000003',
     'admin',
+    'active',
+    statement_timestamp()
+  ),
+  (
+    '10000000-0000-0000-0000-000000000101',
+    '20000000-0000-0000-0000-000000000005',
+    'member',
     'active',
     statement_timestamp()
   );
@@ -154,6 +171,14 @@ select ok(
   ),
   'authenticated can evaluate the RLS membership helper'
 );
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.authorize_storage_sign(text,text)',
+    'execute'
+  ),
+  'authenticated can request a bounded server-side Storage authorization decision'
+);
 select is(
   (
     select count(*)
@@ -173,8 +198,18 @@ select is(
     where n.nspname = 'public'
       and has_function_privilege('authenticated', p.oid, 'execute')
   ),
-  7::bigint,
-  'authenticated can execute only the seven command functions'
+  8::bigint,
+  'authenticated can execute only seven command functions and the Storage authorizer'
+);
+select ok(
+  (
+    select p.provolatile = 'v'
+      and pg_get_functiondef(p.oid) like '%lock_workspace_authority%'
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'private' and p.proname = 'assert_active_session'
+  ),
+  'every workspace command takes the volatile workspace authority lock'
 );
 select ok(
   not has_function_privilege(
@@ -224,6 +259,38 @@ select lives_ok(
   'active member creates a Series through the command boundary'
 );
 select is((select count(*) from public.series), 1::bigint, 'one Series was created');
+
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal1","email":"member.one@zyra.test"}',
+  true
+);
+select set_config(
+  'request.jwt.claim.sub',
+  '20000000-0000-0000-0000-000000000001',
+  true
+);
+set local role authenticated;
+select is(
+  (select count(*) from public.series),
+  0::bigint,
+  'an authenticated JWT without a session id fails closed'
+);
+
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal1","session_id":"30000000-0000-0000-0000-000000000001","email":"member.one@zyra.test"}',
+  true
+);
+select set_config(
+  'request.jwt.claim.sub',
+  '20000000-0000-0000-0000-000000000001',
+  true
+);
+set local role authenticated;
+
 select lives_ok(
   $command$
     select public.command_create_series(
@@ -580,6 +647,118 @@ select throws_ok(
 );
 
 reset role;
+insert into storage.objects (bucket_id, name, owner_id, metadata)
+values (
+  'workspace-private',
+  '10000000-0000-0000-0000-000000000101/source/storage-policy/v1/probe.txt',
+  '20000000-0000-0000-0000-000000000001',
+  '{}'::jsonb
+);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-0000-0000-000000000004","role":"authenticated","aal":"aal1","session_id":"30000000-0000-0000-0000-000000000004","email":"invitee@zyra.test"}',
+  true
+);
+select set_config(
+  'request.jwt.claim.sub',
+  '20000000-0000-0000-0000-000000000004',
+  true
+);
+select set_config('storage.operation', 'storage.object.upload_update', true);
+set local role authenticated;
+select lives_ok(
+  $storage$
+    do $block$
+    declare
+      affected integer;
+    begin
+      update storage.objects
+      set metadata = '{"forged":true}'::jsonb
+      where bucket_id = 'workspace-private'
+        and name =
+          '10000000-0000-0000-0000-000000000101/source/storage-policy/v1/probe.txt';
+      get diagnostics affected = row_count;
+      if affected <> 0 then
+        raise exception 'non-owner changed % Storage rows', affected;
+      end if;
+    end
+    $block$
+  $storage$,
+  'a same-workspace non-owner cannot overwrite another member Storage object'
+);
+select set_config('storage.operation', 'storage.object.get_authenticated', true);
+select is(
+  (
+    select count(*) from storage.objects
+    where bucket_id = 'workspace-private'
+      and name =
+        '10000000-0000-0000-0000-000000000101/source/storage-policy/v1/probe.txt'
+  ),
+  1::bigint,
+  'a same-workspace member can read shared authenticated media'
+);
+select set_config('storage.operation', 'storage.object.sign', true);
+select is(
+  (
+    select count(*) from storage.objects
+    where bucket_id = 'workspace-private'
+      and name =
+        '10000000-0000-0000-0000-000000000101/source/storage-policy/v1/probe.txt'
+  ),
+  0::bigint,
+  'an authenticated member cannot directly authorize a signed URL'
+);
+select set_config('storage.operation', 'storage.object.upload_signed', true);
+select throws_ok(
+  $storage$
+    insert into storage.objects (bucket_id, name, owner_id, metadata)
+    values (
+      'workspace-private',
+      '10000000-0000-0000-0000-000000000101/source/storage-policy/v1/signed.txt',
+      '20000000-0000-0000-0000-000000000004',
+      '{}'::jsonb
+    )
+  $storage$,
+  '42501',
+  null,
+  'an authenticated member cannot mint a long-lived signed upload path'
+);
+
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal1","session_id":"30000000-0000-0000-0000-000000000001","email":"member.one@zyra.test"}',
+  true
+);
+select set_config(
+  'request.jwt.claim.sub',
+  '20000000-0000-0000-0000-000000000001',
+  true
+);
+select set_config('storage.operation', 'storage.object.upload_update', true);
+set local role authenticated;
+select lives_ok(
+  $storage$
+    do $block$
+    declare
+      affected integer;
+    begin
+      update storage.objects
+      set metadata = '{"ownerUpdate":true}'::jsonb
+      where bucket_id = 'workspace-private'
+        and name =
+          '10000000-0000-0000-0000-000000000101/source/storage-policy/v1/probe.txt';
+      get diagnostics affected = row_count;
+      if affected <> 1 then
+        raise exception 'owner changed % Storage rows', affected;
+      end if;
+    end
+    $block$
+  $storage$,
+  'a Storage object owner retains the narrowly operation-scoped update path'
+);
+
+reset role;
 select set_config(
   'request.jwt.claims',
   '{"sub":"20000000-0000-0000-0000-000000000003","role":"authenticated","aal":"aal2","session_id":"30000000-0000-0000-0000-000000000003","email":"admin@zyra.test"}',
@@ -591,6 +770,119 @@ select set_config(
   true
 );
 set local role authenticated;
+
+select lives_ok(
+  $command$
+    select public.command_offboard_member(
+      '10000000-0000-0000-0000-000000000101',
+      '20000000-0000-0000-0000-000000000005',
+      '20000000-0000-0000-0000-000000000003',
+      1,
+      'session reactivation proof',
+      '40000000-0000-0000-0000-000000000120',
+      'member-offboard-reactivation',
+      repeat('1', 64),
+      '50000000-0000-0000-0000-000000000120'
+    )
+  $command$,
+  'admin offboards the session-reactivation proof member'
+);
+select lives_ok(
+  $command$
+    select public.command_create_invitation(
+      '10000000-0000-0000-0000-000000000101',
+      'reactivate@zyra.test',
+      repeat('6', 64),
+      'member',
+      statement_timestamp() + interval '1 hour',
+      '40000000-0000-0000-0000-000000000121',
+      'invite-create-reactivation',
+      repeat('2', 64),
+      '50000000-0000-0000-0000-000000000121'
+    )
+  $command$,
+  'admin creates a fresh invitation for the offboarded member'
+);
+
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-0000-0000-000000000005","role":"authenticated","aal":"aal1","session_id":"30000000-0000-0000-0000-000000000105","email":"reactivate@zyra.test"}',
+  true
+);
+select set_config(
+  'request.jwt.claim.sub',
+  '20000000-0000-0000-0000-000000000005',
+  true
+);
+set local role authenticated;
+select lives_ok(
+  $command$
+    select public.command_accept_invitation(
+      repeat('6', 64),
+      '40000000-0000-0000-0000-000000000122',
+      'invite-accept-reactivation',
+      repeat('3', 64),
+      '50000000-0000-0000-0000-000000000122'
+    )
+  $command$,
+  'the offboarded member accepts the new invitation in a fresh session'
+);
+select is(
+  (select count(*) from public.series),
+  1::bigint,
+  'the newly authorized session sees workspace data after reactivation'
+);
+
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-0000-0000-000000000005","role":"authenticated","aal":"aal1","session_id":"30000000-0000-0000-0000-000000000005","email":"reactivate@zyra.test"}',
+  true
+);
+select set_config(
+  'request.jwt.claim.sub',
+  '20000000-0000-0000-0000-000000000005',
+  true
+);
+set local role authenticated;
+select is(
+  (select count(*) from public.series),
+  0::bigint,
+  'the pre-offboarding session remains denied after membership reactivation'
+);
+select throws_ok(
+  $command$
+    select public.command_create_series(
+      '10000000-0000-0000-0000-000000000101',
+      'Forbidden old session',
+      '',
+      'forbidden-old-session',
+      '20000000-0000-0000-0000-000000000005',
+      '40000000-0000-0000-0000-000000000123',
+      'series-create-old-session',
+      repeat('4', 64),
+      '50000000-0000-0000-0000-000000000123'
+    )
+  $command$,
+  '42501',
+  'active workspace session required',
+  'the pre-offboarding session cannot execute commands after reactivation'
+);
+
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-0000-0000-000000000003","role":"authenticated","aal":"aal2","session_id":"30000000-0000-0000-0000-000000000003","email":"admin@zyra.test"}',
+  true
+);
+select set_config(
+  'request.jwt.claim.sub',
+  '20000000-0000-0000-0000-000000000003',
+  true
+);
+set local role authenticated;
+
 select throws_ok(
   $command$
     select public.command_offboard_member(
@@ -625,14 +917,23 @@ reset role;
 alter table public.invitations disable trigger invitations_reject_active_member;
 insert into public.invitations (
   workspace_id, invited_email, token_hash, maximum_role, issued_by, expires_at
-) values (
-  '10000000-0000-0000-0000-000000000101',
-  'member.one@zyra.test',
-  repeat('9', 64),
-  'member',
-  '20000000-0000-0000-0000-000000000003',
-  statement_timestamp() + interval '1 hour'
-);
+) values
+  (
+    '10000000-0000-0000-0000-000000000101',
+    'member.one@zyra.test',
+    repeat('9', 64),
+    'member',
+    '20000000-0000-0000-0000-000000000003',
+    statement_timestamp() + interval '1 hour'
+  ),
+  (
+    '10000000-0000-0000-0000-000000000101',
+    'issued-by-legacy@example.test',
+    repeat('8', 64),
+    'member',
+    '20000000-0000-0000-0000-000000000001',
+    statement_timestamp() + interval '1 hour'
+  );
 alter table public.invitations enable trigger invitations_reject_active_member;
 set local role authenticated;
 
@@ -720,6 +1021,24 @@ select is(
   ),
   'member offboarded',
   'offboarding revokes every legacy live invitation for the member email'
+);
+select is(
+  (
+    select revoke_reason from public.invitations
+    where token_hash = repeat('8', 64)
+  ),
+  'member offboarded',
+  'offboarding revokes every live invitation issued by the departed member'
+);
+select ok(
+  exists (
+    select 1
+    from pg_trigger
+    where tgrelid = 'public.invitations'::regclass
+      and tgname = 'invitations_require_active_issuer_before_consumption'
+      and not tgisinternal
+  ),
+  'invitation consumption is guarded by an active-issuer trigger'
 );
 reset role;
 select ok((select count(*) from audit.events) >= 7, 'security and business actions are audited');
@@ -919,6 +1238,11 @@ set local role authenticated;
 select is((select count(*) from public.series), 1::bigint, 'workspace admin reads its Series');
 
 reset role;
+-- Simulate a legacy or administrative record whose issuer was deactivated
+-- after creation; consumption must still fail atomically.
+update public.invitations
+set issued_by = '20000000-0000-0000-0000-000000000001'
+where token_hash = repeat('e', 64);
 select set_config(
   'request.jwt.claims',
   '{"sub":"20000000-0000-0000-0000-000000000002","role":"authenticated","aal":"aal1","session_id":"30000000-0000-0000-0000-000000000002","email":"member.two@zyra.test"}',
@@ -930,6 +1254,29 @@ select set_config(
   true
 );
 set local role authenticated;
+select throws_ok(
+  $command$
+    select public.command_accept_invitation(
+      repeat('e', 64),
+      '40000000-0000-0000-0000-000000000086',
+      'invite-accept-inactive-issuer',
+      repeat('2', 64),
+      '50000000-0000-0000-0000-000000000086'
+    )
+  $command$,
+  '42501',
+  'invitation is invalid, expired, replayed, or email-mismatched',
+  'an invitation from an inactive issuer cannot be accepted'
+);
+select is(
+  (
+    select count(*) from public.memberships
+    where workspace_id = '10000000-0000-0000-0000-000000000101'
+      and user_id = '20000000-0000-0000-0000-000000000002'
+  ),
+  0::bigint,
+  'rejected inactive-issuer acceptance creates no membership'
+);
 select is((select count(*) from public.series), 0::bigint, 'other workspace cannot enumerate Series');
 
 reset role;

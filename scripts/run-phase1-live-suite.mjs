@@ -56,6 +56,7 @@ function branchValue(details, name) {
 
 const branchName = `genie-live-${randomUUID().slice(0, 12)}`;
 let branchId = null;
+let forwardRollback = "not-run";
 let outcome = "failed";
 const startedAt = new Date().toISOString();
 
@@ -131,6 +132,20 @@ try {
     "--no-seed",
     "--yes",
   ]);
+  run(
+    node,
+    [
+      "scripts/run-phase1-forward-rollback-drill.mjs",
+      "--db-url",
+      databaseUrl,
+      "--branch-ref",
+      branchProjectRef,
+      "--production-project-ref",
+      productionProjectRef,
+    ],
+    { failureMessage: "Disposable branch forward-rollback drill failed." },
+  );
+  forwardRollback = "passed";
   const liveEnvironment = {
     ...process.env,
     // Newly reset Supabase preview branches do not attach the Realtime
@@ -191,6 +206,7 @@ try {
         branchName,
         cleanup,
         finishedAt: new Date().toISOString(),
+        forwardRollback,
         outcome,
         startedAt,
       },

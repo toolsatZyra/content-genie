@@ -10,35 +10,30 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 
-import type { EpisodeSummary, SeriesSummary, StudioProjection } from "@/domain/studio";
+import {
+  episodeStatePresentation,
+  type EpisodeSummary,
+  type SeriesSummary,
+  type StudioProjection,
+} from "@/domain/studio";
+import type { StudioSearchMatch } from "@/domain/studio-search";
 import { sendCommand } from "@/lib/commands/client";
 import { shouldReconcileRealtimeStatus } from "@/lib/realtime/reconciliation";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { AccountPanel } from "@/components/studio/account-panel";
+import { useStudioSearch } from "@/components/studio/use-studio-search";
 
 type StudioView = "atrium" | "series" | "library" | "monica";
 type ComposerMode = "episode" | "series";
 const subscribeToHydration = (): (() => void) => () => {};
 
-interface StatePresentation {
-  readonly label: string;
-  readonly tone: "attention" | "complete" | "draft" | "working";
-}
-
-function statePresentation(episode: EpisodeSummary): StatePresentation {
-  if (episode.workflowState === "approved" || episode.workflowState === "published") {
-    return { label: "Ready", tone: "complete" };
-  }
-  if (
-    episode.workflowState.includes("review") ||
-    episode.workflowState.includes("blocked")
-  ) {
-    return { label: "Needs you", tone: "attention" };
-  }
-  if (episode.workflowState === "draft" || episode.workflowState === "world_setup") {
-    return { label: "World design", tone: "draft" };
-  }
-  return { label: "Creating", tone: "working" };
+function mergeById<T extends Readonly<{ id: string }>>(
+  primary: readonly T[],
+  additions: readonly T[],
+): readonly T[] {
+  const merged = new Map(primary.map((item) => [item.id, item] as const));
+  for (const item of additions) merged.set(item.id, item);
+  return [...merged.values()];
 }
 
 function humanize(value: string): string {
@@ -148,6 +143,12 @@ export function AuthenticatedStudio({
   const [composerMode, setComposerMode] = useState<ComposerMode>("episode");
   const [commandStatus, setCommandStatus] = useState("");
   const [working, setWorking] = useState(false);
+  const [discoveredEpisodes, setDiscoveredEpisodes] = useState<
+    readonly EpisodeSummary[]
+  >([]);
+  const [discoveredSeries, setDiscoveredSeries] = useState<readonly SeriesSummary[]>(
+    [],
+  );
   const searchRef = useRef<HTMLDialogElement>(null);
   const activityRef = useRef<HTMLDialogElement>(null);
   const composerRef = useRef<HTMLDialogElement>(null);
@@ -155,43 +156,33 @@ export function AuthenticatedStudio({
 
   useRealtimeReconciliation(projection.workspace.id, realtimeEnabled);
 
+  const allSeries = useMemo(
+    () => mergeById(projection.series, discoveredSeries),
+    [discoveredSeries, projection.series],
+  );
+  const allEpisodes = useMemo(
+    () => mergeById(projection.episodes, discoveredEpisodes),
+    [discoveredEpisodes, projection.episodes],
+  );
   const seriesById = useMemo(
-    () => new Map(projection.series.map((series) => [series.id, series])),
-    [projection.series],
+    () => new Map(allSeries.map((series) => [series.id, series])),
+    [allSeries],
   );
   const selectedEpisode =
-    projection.episodes.find(({ id }) => id === selectedEpisodeId) ??
-    projection.episodes[0];
+    allEpisodes.find(({ id }) => id === selectedEpisodeId) ?? allEpisodes[0];
   const selectedSeries =
-    projection.series.find(({ id }) => id === selectedSeriesId) ?? projection.series[0];
+    allSeries.find(({ id }) => id === selectedSeriesId) ?? allSeries[0];
   const visibleEpisodes =
     view === "series" && selectedSeries
-      ? projection.episodes.filter(({ seriesId }) => seriesId === selectedSeries.id)
-      : projection.episodes;
-  const searchMatches = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return [];
-    return [
-      ...projection.series
-        .filter(({ description, title }) =>
-          `${title} ${description}`.toLowerCase().includes(needle),
-        )
-        .map((item) => ({ id: item.id, kind: "Series", label: item.title })),
-      ...projection.episodes
-        .filter(({ summary, title }) =>
-          `${title} ${summary}`.toLowerCase().includes(needle),
-        )
-        .map((item) => ({ id: item.id, kind: "Episode", label: item.title })),
-    ].slice(0, 12);
-  }, [projection.episodes, projection.series, query]);
+      ? allEpisodes.filter(({ seriesId }) => seriesId === selectedSeries.id)
+      : allEpisodes;
+  const search = useStudioSearch(query, projection.workspace.id);
 
   const counts = useMemo(() => {
     return projection.episodes.reduce(
       (result, episode) => {
-        const state = statePresentation(episode);
-        if (state.tone === "complete") result.ready += 1;
-        else if (state.tone === "attention") result.attention += 1;
-        else if (state.tone === "working") result.creating += 1;
+        const bucket = episodeStatePresentation(episode.workflowState).summaryBucket;
+        if (bucket) result[bucket] += 1;
         return result;
       },
       { attention: 0, creating: 0, ready: 0 },
@@ -206,12 +197,12 @@ export function AuthenticatedStudio({
       }
       if (event.key.toLowerCase() === "n" && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
-        openComposer(projection.series.length > 0 ? "episode" : "series");
+        openComposer(allSeries.length > 0 ? "episode" : "series");
       }
     };
     window.addEventListener("keydown", shortcut);
     return () => window.removeEventListener("keydown", shortcut);
-  }, [projection.series.length]);
+  }, [allSeries.length]);
 
   function openComposer(mode: ComposerMode): void {
     setComposerMode(mode);
@@ -219,15 +210,17 @@ export function AuthenticatedStudio({
     if (!composerRef.current?.open) composerRef.current?.showModal();
   }
 
-  function chooseSearchResult(kind: string, id: string): void {
+  function chooseSearchResult(match: StudioSearchMatch): void {
     searchRef.current?.close();
     setQuery("");
-    if (kind === "Episode") {
+    setDiscoveredSeries((current) => mergeById(current, [match.series]));
+    if (match.kind === "Episode") {
+      setDiscoveredEpisodes((current) => mergeById(current, [match.episode]));
       setView("atrium");
-      setSelectedEpisodeId(id);
+      setSelectedEpisodeId(match.id);
     } else {
       setView("series");
-      setSelectedSeriesId(id);
+      setSelectedSeriesId(match.id);
     }
   }
 
@@ -418,15 +411,13 @@ export function AuthenticatedStudio({
               className="create-button"
               onClick={() =>
                 openComposer(
-                  view === "series" || projection.series.length === 0
-                    ? "series"
-                    : "episode",
+                  view === "series" || allSeries.length === 0 ? "series" : "episode",
                 )
               }
               type="button"
             >
               <span aria-hidden="true">＋</span>
-              {view === "series" || projection.series.length === 0
+              {view === "series" || allSeries.length === 0
                 ? "Create Series"
                 : "Create Episode"}
             </button>
@@ -466,9 +457,7 @@ export function AuthenticatedStudio({
                 episodes={visibleEpisodes}
                 selectedId={selectedEpisode?.id ?? ""}
                 seriesById={seriesById}
-                onCreate={() =>
-                  openComposer(projection.series.length ? "episode" : "series")
-                }
+                onCreate={() => openComposer(allSeries.length ? "episode" : "series")}
                 onSelect={setSelectedEpisodeId}
               />
               <EpisodeFocus
@@ -483,12 +472,12 @@ export function AuthenticatedStudio({
 
         {view === "series" ? (
           <SeriesWorlds
-            episodes={projection.episodes}
+            episodes={allEpisodes}
             onArchive={archiveSeries}
             onCreate={() => openComposer("series")}
             onSelect={setSelectedSeriesId}
             selectedId={selectedSeries?.id ?? ""}
-            series={projection.series}
+            series={allSeries}
           />
         ) : null}
 
@@ -537,12 +526,9 @@ export function AuthenticatedStudio({
           </button>
         </div>
         <ul>
-          {searchMatches.map((match) => (
+          {search.matches.map((match) => (
             <li key={`${match.kind}:${match.id}`}>
-              <button
-                onClick={() => chooseSearchResult(match.kind, match.id)}
-                type="button"
-              >
+              <button onClick={() => chooseSearchResult(match)} type="button">
                 <span>{match.kind}</span>
                 <strong>{match.label}</strong>
                 <em>→</em>
@@ -550,7 +536,24 @@ export function AuthenticatedStudio({
             </li>
           ))}
         </ul>
-        {query && searchMatches.length === 0 ? <p>No authorized match found.</p> : null}
+        {search.nextCursor ? (
+          <button
+            className="quiet-button search-more"
+            disabled={search.loading}
+            onClick={() => void search.loadMore()}
+            type="button"
+          >
+            {search.loading ? "Searching…" : `Show more of ${search.total}`}
+          </button>
+        ) : null}
+        {search.error ? <p role="alert">{search.error}</p> : null}
+        {search.loading && search.matches.length === 0 ? (
+          <p role="status">Searching authorized studio…</p>
+        ) : null}
+        {query && !search.queryReady ? <p>Type at least two characters.</p> : null}
+        {search.queryReady && !search.loading && search.matches.length === 0 ? (
+          <p>No authorized match found.</p>
+        ) : null}
       </dialog>
 
       <dialog
@@ -590,7 +593,7 @@ export function AuthenticatedStudio({
             <label>
               Series
               <select name="seriesId" required>
-                {projection.series
+                {allSeries
                   .filter(({ state }) => state === "active")
                   .map((series) => (
                     <option key={series.id} value={series.id}>
@@ -699,7 +702,7 @@ function EpisodeGallery({
       </div>
       <div className="live-episode-grid">
         {episodes.map((episode, index) => {
-          const state = statePresentation(episode);
+          const state = episodeStatePresentation(episode.workflowState);
           return (
             <button
               aria-pressed={selectedId === episode.id}
@@ -740,7 +743,7 @@ function EpisodeFocus({
   series?: SeriesSummary | undefined;
 }>) {
   if (!episode) return null;
-  const state = statePresentation(episode);
+  const state = episodeStatePresentation(episode.workflowState);
   return (
     <aside className="live-focus" aria-label={`${episode.title} Episode details`}>
       <div className="focus-heading">

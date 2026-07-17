@@ -58,6 +58,9 @@ commands live in `docs/implementation-plan.md`. Generated status is not proof:
 an obligation becomes verified only when its fingerprinted, committed evidence
 passes the acceptance-ledger validator.
 
+Phase 1 disposable database/browser and persistent-preview Realtime gate
+invocations are documented in [`docs/phase1-verification.md`](docs/phase1-verification.md).
+
 ## External assets this project ports
 
 The 117-look gallery, prompt corpus, reference graph, and Character Studio

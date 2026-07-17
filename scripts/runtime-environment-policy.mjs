@@ -32,9 +32,8 @@ export function assertProductionRuntime(source) {
   for (const name of gates) {
     if (!["true", "false"].includes(source[name] ?? "")) issues.push(name);
   }
-  const consequential = gates.some((name) => source[name] === "true");
-  if (consequential && !present(source, "SUPABASE_SERVICE_ROLE_KEY")) {
-    issues.push("consequential runtime credential");
+  if (!present(source, "SUPABASE_SERVICE_ROLE_KEY")) {
+    issues.push("trusted Storage signer credential");
   }
   if (
     (source.GENIE_ENABLE_PROVIDER_SPEND === "true" ||

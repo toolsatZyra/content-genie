@@ -33,10 +33,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     getServerEnvironment().environment === "test" &&
     parameters.fixture === "phase1"
   ) {
+    const projection = deterministicStudioProjection();
     return (
       <div data-server-secret-boundary={canary}>
         <AuthenticatedStudio
-          projection={deterministicStudioProjection()}
+          key={projection.workspace.id}
+          projection={projection}
           realtimeEnabled={false}
         />
       </div>
@@ -80,7 +82,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   return (
     <div data-server-secret-boundary={canary}>
-      <AuthenticatedStudio projection={projection} />
+      <AuthenticatedStudio key={projection.workspace.id} projection={projection} />
     </div>
   );
 }

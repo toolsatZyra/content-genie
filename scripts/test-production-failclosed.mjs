@@ -13,11 +13,13 @@ const valid = {
   NEXT_PUBLIC_APP_URL: "https://genie.example",
   NEXT_PUBLIC_SUPABASE_ANON_KEY: "public-test-value",
   NEXT_PUBLIC_SUPABASE_URL: "https://test-project.invalid",
+  SUPABASE_SERVICE_ROLE_KEY: "server-authority",
 };
 assertProductionRuntime(valid);
 for (const mutation of [
   { ...valid, GENIE_ENABLE_RENDER: "sometimes" },
   { ...valid, NEXT_PUBLIC_APP_URL: "" },
+  { ...valid, SUPABASE_SERVICE_ROLE_KEY: "" },
   {
     ...valid,
     GENIE_ENABLE_PROVIDER_SPEND: "true",

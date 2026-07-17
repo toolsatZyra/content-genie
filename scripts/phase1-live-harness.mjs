@@ -127,43 +127,94 @@ async function waitFor(predicate, label, timeoutMs = 30_000) {
   throw new Error(`${label} timed out`);
 }
 
-const ownerEvents = [];
-const outsiderEvents = [];
-let ownerReplicationStatus = "pending";
-let outsiderReplicationStatus = "pending";
 const realtimeFilter = {
   event: "*",
   filter: `workspace_id=eq.${workspace.id}`,
   schema: "public",
   table: "domain_events",
 };
-const ownerChannel = owner
-  .channel(`phase1-owner-${suffix}`, {
-    config: { broadcast: { replication_ready: true } },
-  })
-  .on("system", {}, ({ status }) => {
-    ownerReplicationStatus = status;
-  })
-  .on("postgres_changes", realtimeFilter, (event) => ownerEvents.push(event));
-const outsiderChannel = outsider
-  .channel(`phase1-outsider-${suffix}`, {
-    config: { broadcast: { replication_ready: true } },
-  })
-  .on("system", {}, ({ status }) => {
-    outsiderReplicationStatus = status;
-  })
-  .on("postgres_changes", realtimeFilter, (event) => outsiderEvents.push(event));
-if (validateRealtime) {
+
+function realtimePair(cycle) {
+  const state = {
+    outsiderEvents: [],
+    outsiderReplicationStatus: "pending",
+    ownerEvents: [],
+    ownerReplicationStatus: "pending",
+  };
+  const ownerChannel = owner
+    .channel(`phase1-owner-${suffix}-${cycle}`, {
+      config: { broadcast: { replication_ready: true } },
+    })
+    .on("system", {}, ({ status }) => {
+      state.ownerReplicationStatus = status;
+    })
+    .on("postgres_changes", realtimeFilter, (event) => state.ownerEvents.push(event));
+  const outsiderChannel = outsider
+    .channel(`phase1-outsider-${suffix}-${cycle}`, {
+      config: { broadcast: { replication_ready: true } },
+    })
+    .on("system", {}, ({ status }) => {
+      state.outsiderReplicationStatus = status;
+    })
+    .on("postgres_changes", realtimeFilter, (event) =>
+      state.outsiderEvents.push(event),
+    );
+  return { outsiderChannel, ownerChannel, state };
+}
+
+async function connectRealtime(pair, label) {
   await Promise.all([
-    subscribe(ownerChannel, "owner"),
-    subscribe(outsiderChannel, "outsider"),
+    subscribe(pair.ownerChannel, `${label} owner`),
+    subscribe(pair.outsiderChannel, `${label} outsider`),
   ]);
   await waitFor(
-    () => ownerReplicationStatus === "ok" && outsiderReplicationStatus === "ok",
-    `Realtime replication readiness (owner=${ownerReplicationStatus}, outsider=${outsiderReplicationStatus})`,
+    () =>
+      pair.state.ownerReplicationStatus === "ok" &&
+      pair.state.outsiderReplicationStatus === "ok",
+    `${label} Realtime replication readiness`,
     60_000,
   );
 }
+
+async function disconnectRealtime(pair) {
+  await Promise.all([
+    owner.removeChannel(pair.ownerChannel),
+    outsider.removeChannel(pair.outsiderChannel),
+  ]);
+  owner.realtime.disconnect();
+  outsider.realtime.disconnect();
+}
+
+async function assertOutsiderReceivedNothing(pair, label) {
+  await new Promise((resolve) => setTimeout(resolve, 1_500));
+  if (pair.state.outsiderEvents.length !== 0) {
+    throw new Error(`${label}: outsider received a cross-workspace Realtime event`);
+  }
+}
+
+async function authoritativeSeriesIds() {
+  const result = await owner
+    .from("series")
+    .select("id")
+    .eq("workspace_id", workspace.id)
+    .order("created_at", { ascending: true });
+  if (result.error) throw result.error;
+  return result.data.map(({ id }) => id);
+}
+
+function assertAuthoritativeSeries(actual, expected, label) {
+  if (
+    actual.length !== expected.length ||
+    expected.some((seriesId) => !actual.includes(seriesId))
+  ) {
+    throw new Error(
+      `${label}: authoritative Series mismatch (expected ${expected.join(",")}, received ${actual.join(",")})`,
+    );
+  }
+}
+
+const initialRealtime = validateRealtime ? realtimePair("initial") : null;
+if (initialRealtime) await connectRealtime(initialRealtime, "initial");
 
 const commandId = randomUUID();
 const correlationId = randomUUID();
@@ -182,22 +233,73 @@ const createParameters = {
 };
 const firstSeries = await owner.rpc("command_create_series", createParameters);
 if (firstSeries.error) throw firstSeries.error;
-if (validateRealtime) {
+let realtimeReconciliation = validateRealtime ? "pending" : "separate-persistent-gate";
+if (initialRealtime) {
   await waitFor(
     () =>
-      ownerEvents.some(
+      initialRealtime.state.ownerEvents.some(
         ({ new: row }) => row?.aggregate_id === firstSeries.data.seriesId,
       ),
-    "owner Realtime delivery",
+    "initial owner Realtime delivery",
   );
-  await new Promise((resolve) => setTimeout(resolve, 1_500));
-  if (outsiderEvents.length !== 0) {
-    throw new Error("Outsider received a cross-workspace Realtime event");
-  }
-  await Promise.all([
-    owner.removeChannel(ownerChannel),
-    outsider.removeChannel(outsiderChannel),
-  ]);
+  await assertOutsiderReceivedNothing(initialRealtime, "initial delivery");
+  assertAuthoritativeSeries(
+    await authoritativeSeriesIds(),
+    [firstSeries.data.seriesId],
+    "initial authoritative projection",
+  );
+
+  await disconnectRealtime(initialRealtime);
+
+  const disconnectedSeries = await owner.rpc("command_create_series", {
+    ...createParameters,
+    p_command_id: randomUUID(),
+    p_correlation_id: randomUUID(),
+    p_idempotency_key: `live-series-disconnected-${suffix}`,
+    p_request_hash: "2".repeat(64),
+    p_slug: `live-series-disconnected-${suffix}`,
+    p_title: `Live Series Disconnected ${suffix}`,
+  });
+  if (disconnectedSeries.error) throw disconnectedSeries.error;
+
+  const reconciledSeriesIds = await authoritativeSeriesIds();
+  assertAuthoritativeSeries(
+    reconciledSeriesIds,
+    [firstSeries.data.seriesId, disconnectedSeries.data.seriesId],
+    "post-disconnect authoritative reconciliation",
+  );
+
+  const reconnectedRealtime = realtimePair("reconnected");
+  await connectRealtime(reconnectedRealtime, "reconnected");
+  const reconnectedSeries = await owner.rpc("command_create_series", {
+    ...createParameters,
+    p_command_id: randomUUID(),
+    p_correlation_id: randomUUID(),
+    p_idempotency_key: `live-series-reconnected-${suffix}`,
+    p_request_hash: "3".repeat(64),
+    p_slug: `live-series-reconnected-${suffix}`,
+    p_title: `Live Series Reconnected ${suffix}`,
+  });
+  if (reconnectedSeries.error) throw reconnectedSeries.error;
+  await waitFor(
+    () =>
+      reconnectedRealtime.state.ownerEvents.some(
+        ({ new: row }) => row?.aggregate_id === reconnectedSeries.data.seriesId,
+      ),
+    "reconnected owner Realtime delivery",
+  );
+  await assertOutsiderReceivedNothing(reconnectedRealtime, "reconnected delivery");
+  assertAuthoritativeSeries(
+    await authoritativeSeriesIds(),
+    [
+      firstSeries.data.seriesId,
+      disconnectedSeries.data.seriesId,
+      reconnectedSeries.data.seriesId,
+    ],
+    "post-reconnect no-stale-resurrection projection",
+  );
+  await disconnectRealtime(reconnectedRealtime);
+  realtimeReconciliation = "pass";
 }
 
 const replayedSeries = await owner.rpc("command_create_series", {
@@ -391,9 +493,16 @@ const outsiderUpload = await outsider.storage
 if (!outsiderUpload.error) throw new Error("Outsider wrote owner workspace media");
 const ownerSignedUrl = await owner.storage
   .from("workspace-private")
-  .createSignedUrl(objectPath, 60);
-if (ownerSignedUrl.error || !ownerSignedUrl.data?.signedUrl) {
-  throw ownerSignedUrl.error ?? new Error("Owner could not issue a short signed URL");
+  .createSignedUrl(objectPath, 3_600);
+if (!ownerSignedUrl.error) {
+  throw new Error("Owner bypassed the bounded server broker with a direct signed URL");
+}
+const signedUploadPath = `${workspace.id}/source/${randomUUID()}/v1/signed.txt`;
+const ownerSignedUpload = await owner.storage
+  .from("workspace-private")
+  .createSignedUploadUrl(signedUploadPath);
+if (!ownerSignedUpload.error) {
+  throw new Error("Owner minted a long-lived signed upload URL");
 }
 const outsiderSignedUrl = await outsider.storage
   .from("workspace-private")
@@ -429,9 +538,11 @@ console.log(
     crossWorkspaceCrud: "denied",
     crossWorkspaceRead: "denied",
     directMutation: "denied",
+    directSignedUpload: "denied",
     liveUser: "created",
-    realtimeIsolation: validateRealtime ? "pass" : "separate-persistent-gate",
-    shortSignedUrl: "pass",
+    realtimeIsolation: realtimeReconciliation,
+    realtimeReconnectReconciliation: realtimeReconciliation,
+    directSignedUrl: "denied",
     storageIsolation: "pass",
     workspaceId: workspace.id,
   }),

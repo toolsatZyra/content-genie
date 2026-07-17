@@ -1,6 +1,9 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 
+import type { StudioSearchMatch } from "../../src/domain/studio-search";
+import { deterministicStudioProjection } from "../../src/test/fakes/studio";
+
 const runtimeFailures = new WeakMap<Page, string[]>();
 
 test.beforeEach(async ({ page }) => {
@@ -28,6 +31,45 @@ test.afterEach(async ({ page }) => {
 async function openStudio(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#main-content")).toHaveAttribute("data-hydrated", "true");
+}
+
+async function mockPhase1Search(
+  page: Page,
+  additionalMatches: readonly StudioSearchMatch[] = [],
+): Promise<void> {
+  const projection = deterministicStudioProjection();
+  await page.route("**/api/studio/search?**", async (route) => {
+    const query =
+      new URL(route.request().url()).searchParams.get("q")?.toLowerCase() ?? "";
+    const matches: StudioSearchMatch[] = [
+      ...projection.series.map((series) => ({
+        id: series.id,
+        kind: "Series" as const,
+        label: series.title,
+        series,
+      })),
+      ...projection.episodes.flatMap((episode) => {
+        const series = projection.series.find(({ id }) => id === episode.seriesId);
+        return series
+          ? [
+              {
+                episode,
+                id: episode.id,
+                kind: "Episode" as const,
+                label: episode.title,
+                series,
+              },
+            ]
+          : [];
+      }),
+      ...additionalMatches,
+    ].filter((match) => match.label.toLowerCase().includes(query));
+    await route.fulfill({
+      body: JSON.stringify({ matches, nextCursor: null, total: matches.length }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
 }
 
 test("opens the truthful Living Cinema preview and switches Episodes", async ({
@@ -279,6 +321,7 @@ test("@visual preserves cinematic geometry, targets and mobile continuity", asyn
 test("Phase 1 fixture organizes concurrent Episodes, Series and Monica work", async ({
   page,
 }) => {
+  await mockPhase1Search(page);
   await page.goto("/?fixture=phase1", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#main-content")).toHaveAttribute("data-hydrated", "true");
   await expect(
@@ -358,12 +401,64 @@ test("Phase 1 fixture remains accessible and continuous at 390px", async ({ page
   await page.getByRole("button", { name: "Create Episode" }).click();
   await expect(page.getByRole("dialog", { name: "Create in Genie" })).toBeVisible();
   await expect(page.getByText(/script remains untouched/i)).toBeVisible();
+  const composerGeometry = await page.evaluate(() => {
+    const dialog = document.querySelector<HTMLDialogElement>(".composer-dialog")!;
+    const close = dialog.querySelector<HTMLElement>("[aria-label='Close composer']")!;
+    const closeBox = close.getBoundingClientRect();
+    return {
+      closeLeft: closeBox.left,
+      closeRight: closeBox.right,
+      dialogClientWidth: dialog.clientWidth,
+      dialogScrollWidth: dialog.scrollWidth,
+      viewportWidth: window.innerWidth,
+    };
+  });
+  expect(composerGeometry.dialogScrollWidth).toBeLessThanOrEqual(
+    composerGeometry.dialogClientWidth + 1,
+  );
+  expect(composerGeometry.closeLeft).toBeGreaterThanOrEqual(0);
+  expect(composerGeometry.closeRight).toBeLessThanOrEqual(
+    composerGeometry.viewportWidth,
+  );
   await page.screenshot({
     animations: "disabled",
     fullPage: false,
     path: ".tmp/artifacts/phase1-studio-mobile.png",
   });
   await page.getByRole("button", { name: "Close composer" }).click();
+});
+
+test("Phase 1 global search opens an authorized Episode beyond the initial projection", async ({
+  page,
+}) => {
+  const projection = deterministicStudioProjection();
+  const series = {
+    ...projection.series[0]!,
+    id: "10000000-0000-4000-8000-0000000000b0",
+    title: "Hidden Rivers",
+  };
+  const episode = {
+    ...projection.episodes[0]!,
+    id: "10000000-0000-4000-8000-0000000000b1",
+    seriesId: series.id,
+    title: "The River Beyond the Index",
+  };
+  await mockPhase1Search(page, [
+    { episode, id: episode.id, kind: "Episode", label: episode.title, series },
+  ]);
+  await page.goto("/?fixture=phase1", { waitUntil: "domcontentloaded" });
+  await expect(page.locator('main[data-hydrated="true"]')).toBeVisible();
+  await page.getByRole("button", { name: "Open global search" }).click();
+  await page.getByRole("searchbox").fill("Beyond the Index");
+  await page
+    .getByRole("button", { name: /Episode The River Beyond the Index/ })
+    .click();
+  await expect(
+    page.getByRole("complementary").getByRole("heading", {
+      name: "The River Beyond the Index",
+    }),
+  ).toBeVisible();
+  await expect(page.getByText("3 active")).toBeVisible();
 });
 
 test("Phase 1 shell renders persisted markup payloads only as inert text", async ({

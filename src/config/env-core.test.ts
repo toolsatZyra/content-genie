@@ -27,6 +27,17 @@ describe("environment contract", () => {
     ).toThrow("production/final approval requires");
   });
 
+  it("requires the trusted Storage signer in production", () => {
+    expect(() =>
+      parseServerEnvironment({
+        GENIE_ENVIRONMENT: "production",
+        NEXT_PUBLIC_APP_URL: "https://genie.example",
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "public-key",
+        NEXT_PUBLIC_SUPABASE_URL: "https://prod-ref.supabase.co",
+      }),
+    ).toThrow("production and consequential feature gates require");
+  });
+
   it("rejects a production-shaped project in preview", () => {
     expect(() =>
       parseServerEnvironment({

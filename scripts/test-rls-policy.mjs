@@ -14,6 +14,7 @@ const filenames = [
   "0009_phase1_diagnostic_ingest.sql",
   "0010_phase1_adversarial_corrections.sql",
   "0011_phase1_realtime_event_publication.sql",
+  "0012_phase1_authority_storage_hardening.sql",
 ];
 const fixture = `
 create table public.sample (id uuid);
@@ -43,6 +44,12 @@ select 'to service_role';
 select 'memberships_deactivation_guard';
 select 'invitations_reject_active_member';
 select 'alter publication supabase_realtime add table public.domain_events';
+select 'lock_workspace_authority';
+select 'membership_session_authorizations';
+select 'invitations_require_active_issuer_before_consumption';
+select 'authorize_storage_sign';
+select 'storage.allow_any_operation';
+select 'owner_id = (select auth.uid()::text)';
 `;
 const source = filenames.map((file, index) => ({
   file,

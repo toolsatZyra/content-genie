@@ -178,10 +178,16 @@ export function parseServerEnvironment(source: EnvironmentSource): ServerEnviron
   }
 
   if (
-    (enableExport || enableFinalApproval || enableProviderSpend || enableRender) &&
+    (environment === "production" ||
+      enableExport ||
+      enableFinalApproval ||
+      enableProviderSpend ||
+      enableRender) &&
     !supabaseServiceRoleKey
   ) {
-    issues.push("consequential feature gates require SUPABASE_SERVICE_ROLE_KEY");
+    issues.push(
+      "production and consequential feature gates require SUPABASE_SERVICE_ROLE_KEY",
+    );
   }
 
   if ((enableProviderSpend || enableRender) && !triggerSecretKey) {

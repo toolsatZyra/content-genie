@@ -16,6 +16,7 @@ export default defineConfig({
     env: safeTestEnvironment({
       GENIE_ENVIRONMENT: "production",
       NEXT_PUBLIC_APP_URL: "http://127.0.0.1:4174",
+      SUPABASE_SERVICE_ROLE_KEY: "production-test-server-authority",
     }),
     port: 4174,
     reuseExistingServer: false,

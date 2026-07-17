@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getServerEnvironment } from "@/config/server-env";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isTrustedMutationOrigin } from "@/security/origin";
 import {
@@ -55,7 +56,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (authenticationError || !user) {
       return response({ code: "AUTHENTICATION_REQUIRED", ok: false }, 401);
     }
-    const { data, error } = await client.storage
+    const { data: authorized, error: authorizationError } = await client.rpc(
+      "authorize_storage_sign",
+      {
+        p_bucket: input.bucket,
+        p_path: input.path,
+      },
+    );
+    if (authorizationError || authorized !== true) {
+      return response({ code: "STORAGE_ACCESS_DENIED", ok: false }, 403);
+    }
+
+    // Authenticated Storage policies deliberately deny direct sign operations.
+    // Only this broker can mint a bearer URL, after fresh session authorization,
+    // and parseSignedStorageRequest enforces the 30–120 second TTL.
+    const signer = createAdminSupabaseClient();
+    const { data, error } = await signer.storage
       .from(input.bucket)
       .createSignedUrl(input.path, input.expiresIn);
     if (error || !data?.signedUrl) {

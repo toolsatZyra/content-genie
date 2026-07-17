@@ -2611,6 +2611,22 @@ em.state-chip {
   width: 600px;
 }
 
+.composer-dialog form,
+.composer-dialog form > *,
+.composer-dialog header > div,
+.composer-dialog label,
+.composer-dialog input,
+.composer-dialog select,
+.composer-dialog textarea {
+  min-width: 0;
+}
+
+.composer-dialog input,
+.composer-dialog select,
+.composer-dialog textarea {
+  width: 100%;
+}
+
 .composer-dialog header,
 .activity-panel > header,
 .account-panel > header {
@@ -2643,6 +2659,11 @@ em.state-chip {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.55;
+}
+
+.search-more {
+  margin-top: 12px;
+  width: 100%;
 }
 
 .live-side-dialog {
@@ -2834,6 +2855,10 @@ em.state-chip {
 }
 
 @media (max-width: 760px) {
+  .composer-dialog {
+    padding: 24px 16px;
+  }
+
   .gateway-story {
     min-height: 520px;
     padding: 95px 24px 100px;
