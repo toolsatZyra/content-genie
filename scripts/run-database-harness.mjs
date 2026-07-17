@@ -18,6 +18,7 @@ function run(command, args, options = {}) {
   });
   if (result.error) throw result.error;
   if (result.status !== 0) {
+    if (options.allowFailure) return "";
     throw new Error(options.failureMessage ?? `${command} exited unsuccessfully.`);
   }
   return result.stdout ?? "";
@@ -112,26 +113,29 @@ async function runManagedBranchHarness() {
 
     let databaseUrl = null;
     for (let attempt = 0; attempt < 60 && !databaseUrl; attempt += 1) {
-      const details = parseJsonOutput(
-        run(
-          pnpm,
-          [
-            "exec",
-            "supabase",
-            "branches",
-            "get",
-            branchId,
-            "--project-ref",
-            productionProjectRef,
-            "--output",
-            "json",
-          ],
-          {
-            capture: true,
-            failureMessage: "Could not inspect Supabase preview branch.",
-          },
-        ),
+      const detailOutput = run(
+        pnpm,
+        [
+          "exec",
+          "supabase",
+          "branches",
+          "get",
+          branchId,
+          "--project-ref",
+          productionProjectRef,
+          "--output",
+          "json",
+        ],
+        {
+          allowFailure: true,
+          capture: true,
+        },
       );
+      if (!detailOutput.trim()) {
+        await new Promise((resolve) => setTimeout(resolve, 5_000));
+        continue;
+      }
+      const details = parseJsonOutput(detailOutput);
       databaseUrl = findString(
         details,
         new Set(["postgres_url_non_pooling", "postgres_url"]),

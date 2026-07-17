@@ -16,6 +16,17 @@ if (
   throw new Error("Forward-rollback steps are missing or reordered.");
 }
 const sql = steps.map(({ sql: statement }) => statement).join("\n");
+for (const required of [
+  /create table if not exists/i,
+  /add column if not exists candidate_marker/i,
+  /add column if not exists compensated_at/i,
+  /where not \('candidate' = any\(forward_history\)\)/i,
+  /where not \('compensating' = any\(forward_history\)\)/i,
+]) {
+  if (!required.test(sql)) {
+    throw new Error(`Forward-rollback retry idempotence is missing: ${required}`);
+  }
+}
 for (const forbidden of [
   /\bdb\s+reset\b/i,
   /\bmigration\s+down\b/i,

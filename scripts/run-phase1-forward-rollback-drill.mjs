@@ -21,7 +21,7 @@ export function buildForwardRollbackSteps(probeName) {
         do $drill$
         begin
           execute $statement$
-            create table ${table} (
+            create table if not exists ${table} (
               id boolean primary key default true check (id),
               contract_state text not null,
               stable_payload text not null,
@@ -32,6 +32,7 @@ export function buildForwardRollbackSteps(probeName) {
           execute $statement$
             insert into ${table} (contract_state, stable_payload)
             values ('baseline', 'stable')
+            on conflict (id) do nothing
           $statement$;
         end
         $drill$;
@@ -43,7 +44,7 @@ export function buildForwardRollbackSteps(probeName) {
         do $drill$
         begin
           execute $statement$
-            alter table ${table} add column candidate_marker text
+            alter table ${table} add column if not exists candidate_marker text
           $statement$;
           execute $statement$
             update ${table}
@@ -51,6 +52,7 @@ export function buildForwardRollbackSteps(probeName) {
                 stable_payload = 'candidate-value',
                 candidate_marker = 'candidate-applied',
                 forward_history = forward_history || 'candidate'::text
+            where not ('candidate' = any(forward_history))
           $statement$;
         end
         $drill$;
@@ -62,7 +64,7 @@ export function buildForwardRollbackSteps(probeName) {
         do $drill$
         begin
           execute $statement$
-            alter table ${table} add column compensated_at timestamptz
+            alter table ${table} add column if not exists compensated_at timestamptz
           $statement$;
           execute $statement$
             update ${table}
@@ -72,6 +74,7 @@ export function buildForwardRollbackSteps(probeName) {
                 compensation_version = 1,
                 compensated_at = statement_timestamp(),
                 forward_history = forward_history || 'compensating'::text
+            where not ('compensating' = any(forward_history))
           $statement$;
         end
         $drill$;
@@ -138,20 +141,25 @@ function parseArguments(argv) {
 function runQuery(target, step, sqlPath) {
   const targetArguments =
     target.mode === "local" ? ["--local"] : ["--db-url", target.databaseUrl];
-  const result = spawnSync(
-    pnpm,
-    ["exec", "supabase", "db", "query", ...targetArguments, "--file", sqlPath],
-    {
-      encoding: "utf8",
-      env: process.env,
-      shell: process.platform === "win32",
-      stdio: "inherit",
-    },
-  );
-  if (result.error) throw result.error;
-  if (result.status !== 0) {
-    throw new Error(`${step.label} failed.`);
+  const maximumAttempts = target.mode === "remote" ? 3 : 1;
+  for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
+    const result = spawnSync(
+      pnpm,
+      ["exec", "supabase", "db", "query", ...targetArguments, "--file", sqlPath],
+      {
+        encoding: "utf8",
+        env: process.env,
+        shell: process.platform === "win32",
+        stdio: "inherit",
+      },
+    );
+    if (result.error) throw result.error;
+    if (result.status === 0) return;
+    if (attempt < maximumAttempts) {
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2_000);
+    }
   }
+  throw new Error(`${step.label} failed after ${maximumAttempts} attempt(s).`);
 }
 
 export function runForwardRollbackDrill(target) {

@@ -454,6 +454,7 @@ export function AuthenticatedStudio({
             </section>
             <div className="live-episode-layout">
               <EpisodeGallery
+                createKind={allSeries.length ? "episode" : "series"}
                 episodes={visibleEpisodes}
                 selectedId={selectedEpisode?.id ?? ""}
                 seriesById={seriesById}
@@ -664,12 +665,14 @@ export function AuthenticatedStudio({
 }
 
 function EpisodeGallery({
+  createKind,
   episodes,
   onCreate,
   onSelect,
   selectedId,
   seriesById,
 }: Readonly<{
+  createKind: "episode" | "series";
   episodes: readonly EpisodeSummary[];
   onCreate: () => void;
   onSelect: (id: string) => void;
@@ -682,11 +685,12 @@ function EpisodeGallery({
         <span aria-hidden="true">✦</span>
         <h2>The first frame is yours.</h2>
         <p>
-          Create an Episode and Genie will preserve its exact script as the production
-          source of truth.
+          {createKind === "episode"
+            ? "Create an Episode and Genie will preserve its exact script as the production source of truth."
+            : "Create the first Series to establish the story world that its Episodes will inherit."}
         </p>
         <button className="primary-button" onClick={onCreate} type="button">
-          Create the first Episode
+          Create the first {createKind === "episode" ? "Episode" : "Series"}
         </button>
       </section>
     );
@@ -698,7 +702,9 @@ function EpisodeGallery({
           <span className="eyebrow">Concurrent productions</span>
           <h2 id="live-episodes-heading">Episodes</h2>
         </div>
-        <small>{episodes.length} active</small>
+        <small>
+          {episodes.length} {episodes.length === 1 ? "Episode" : "Episodes"} shown
+        </small>
       </div>
       <div className="live-episode-grid">
         {episodes.map((episode, index) => {

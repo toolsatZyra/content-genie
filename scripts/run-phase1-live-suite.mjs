@@ -18,6 +18,7 @@ function run(command, args, options = {}) {
   });
   if (result.error) throw result.error;
   if (result.status !== 0) {
+    if (options.allowFailure) return "";
     throw new Error(options.failureMessage ?? `${command} exited unsuccessfully.`);
   }
   return result.stdout ?? "";
@@ -54,8 +55,27 @@ function branchValue(details, name) {
   );
 }
 
+async function waitForSupabaseApi(supabaseUrl, anonKey) {
+  for (let attempt = 1; attempt <= 60; attempt += 1) {
+    try {
+      const response = await fetch(`${supabaseUrl}/auth/v1/health`, {
+        headers: { apikey: anonKey },
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (response.ok) return attempt;
+    } catch {
+      // A new preview hostname can exist in branch metadata before DNS and
+      // the Auth gateway are reachable. The bounded readiness loop owns that
+      // provisioning state instead of leaking it into product assertions.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5_000));
+  }
+  throw new Error("The live-suite Supabase Auth API did not become ready.");
+}
+
 const branchName = `genie-live-${randomUUID().slice(0, 12)}`;
 let branchId = null;
+let apiReadinessAttempts = 0;
 let forwardRollback = "not-run";
 let outcome = "failed";
 const startedAt = new Date().toISOString();
@@ -86,23 +106,27 @@ try {
 
   let details = null;
   for (let attempt = 0; attempt < 60; attempt += 1) {
-    details = parseJsonOutput(
-      run(
-        pnpm,
-        [
-          "exec",
-          "supabase",
-          "branches",
-          "get",
-          branchId,
-          "--project-ref",
-          productionProjectRef,
-          "--output",
-          "json",
-        ],
-        { capture: true },
-      ),
+    const detailOutput = run(
+      pnpm,
+      [
+        "exec",
+        "supabase",
+        "branches",
+        "get",
+        branchId,
+        "--project-ref",
+        productionProjectRef,
+        "--output",
+        "json",
+      ],
+      { allowFailure: true, capture: true },
     );
+    if (!detailOutput.trim()) {
+      details = null;
+      await new Promise((resolve) => setTimeout(resolve, 5_000));
+      continue;
+    }
+    details = parseJsonOutput(detailOutput);
     if (
       branchValue(details, "SUPABASE_URL") &&
       branchValue(details, "SUPABASE_ANON_KEY") &&
@@ -146,6 +170,10 @@ try {
     { failureMessage: "Disposable branch forward-rollback drill failed." },
   );
   forwardRollback = "passed";
+  apiReadinessAttempts = await waitForSupabaseApi(
+    supabaseUrl,
+    branchValue(details, "SUPABASE_ANON_KEY"),
+  );
   const liveEnvironment = {
     ...process.env,
     // Newly reset Supabase preview branches do not attach the Realtime
@@ -203,6 +231,7 @@ try {
     ".tmp/artifacts/phase1-live-suite.json",
     JSON.stringify(
       {
+        apiReadinessAttempts,
         branchName,
         cleanup,
         finishedAt: new Date().toISOString(),

@@ -15,6 +15,7 @@ for (const name of required) {
 }
 
 export default defineConfig({
+  expect: { timeout: 20_000 },
   testDir: "./tests/live",
   timeout: 120_000,
   workers: 1,
@@ -27,7 +28,7 @@ export default defineConfig({
     ...devices["Desktop Chrome"],
   },
   webServer: {
-    command: "pnpm exec next dev --webpack -H 127.0.0.1 -p 4176",
+    command: "node scripts/run-isolated-next-dev.mjs 4176",
     env: {
       ...process.env,
       GENIE_ENABLE_EXPORT: "false",

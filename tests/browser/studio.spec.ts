@@ -455,6 +455,9 @@ test("Phase 1 empty and complete state fixtures remain accessible at every targe
       await expect(
         page.getByRole("heading", { name: "The first frame is yours." }),
       ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Create the first Series" }),
+      ).toBeVisible();
       expect(
         await page.evaluate(
           () =>
@@ -522,7 +525,7 @@ test("Phase 1 global search opens an authorized Episode beyond the initial proje
       name: "The River Beyond the Index",
     }),
   ).toBeVisible();
-  await expect(page.getByText("3 active")).toBeVisible();
+  await expect(page.getByText("3 Episodes shown")).toBeVisible();
 });
 
 test("Phase 1 global search ignores stale pagination after the query changes", async ({
