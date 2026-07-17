@@ -180,11 +180,11 @@ jobs:
             --env GENIE_ENABLE_PROVIDER_SPEND=false \
             --env GENIE_ENABLE_RENDER=false \
             --env GENIE_ENVIRONMENT=production \
-          --env NEXT_PUBLIC_APP_URL=http://127.0.0.1:3000 \
-          --env NEXT_PUBLIC_SUPABASE_ANON_KEY=public-container-test \
-          --env NEXT_PUBLIC_SUPABASE_URL=https://container-test.invalid \
-          --env SUPABASE_SERVICE_ROLE_KEY=container-test-server-authority \
-          "genie-phase0:${GITHUB_SHA}"
+            --env NEXT_PUBLIC_APP_URL=http://127.0.0.1:3000 \
+            --env NEXT_PUBLIC_SUPABASE_ANON_KEY=public-container-test \
+            --env NEXT_PUBLIC_SUPABASE_URL=https://container-test.invalid \
+            --env SUPABASE_SERVICE_ROLE_KEY=container-test-server-authority \
+            "genie-phase0:${GITHUB_SHA}"
           ready=false
           for attempt in {1..30}; do
             if curl --fail --silent http://127.0.0.1:3000/ >/dev/null; then
