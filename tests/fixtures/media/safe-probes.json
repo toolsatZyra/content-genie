@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "media-probe-fixtures.v1",
+  "fixtures": [
+    {
+      "name": "one-pixel-transparent-png",
+      "contentType": "image/png",
+      "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL0WQAAAABJRU5ErkJggg==",
+      "expected": {
+        "height": 1,
+        "safe": true,
+        "width": 1
+      }
+    },
+    {
+      "name": "declared-image-with-text-payload",
+      "contentType": "image/png",
+      "base64": "bm90LWFuLWltYWdl",
+      "expected": {
+        "safe": false
+      }
+    }
+  ]
+}

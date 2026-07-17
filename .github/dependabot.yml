@@ -1,0 +1,15 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      production-runtime:
+        dependency-type: production
+      test-tooling:
+        patterns:
+          - "@playwright/*"
+          - "vitest"
+          - "eslint*"

@@ -22,3 +22,6 @@ Thumbs.db
 .superpowers/
 .playwright-mcp/
 supabase/.temp/
+
+# Generated security and evidence output
+bom.cdx.json

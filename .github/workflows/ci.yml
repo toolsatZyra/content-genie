@@ -1,0 +1,206 @@
+name: Genie CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: genie-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 11.9.0
+          run_install: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.23.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm test:acceptance
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test:unit
+      - run: pnpm test:coverage
+      - run: pnpm test:integration
+      - run: pnpm test:rls
+      - run: pnpm build:canary
+      - run: pnpm test:bundle
+      - run: pnpm test:security
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:production-env
+      - run: pnpm test:production
+      - run: pnpm scan:dependencies
+      - run: pnpm scan:licenses
+      - run: pnpm generate:sbom
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: genie-sbom
+          path: .tmp/artifacts/sbom.cdx.json
+
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 11.9.0
+          run_install: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.23.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:browser
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: playwright-failures
+          path: |
+            playwright-report/
+            test-results/
+
+  secretless-fork:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GENIE_ENABLE_EXPORT: "false"
+      GENIE_ENABLE_FINAL_APPROVAL: "false"
+      GENIE_ENABLE_PROVIDER_SPEND: "false"
+      GENIE_ENABLE_RENDER: "false"
+      GENIE_ENVIRONMENT: "test"
+      NEXT_PUBLIC_APP_URL: "http://127.0.0.1:4173"
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "public-secretless-test"
+      NEXT_PUBLIC_SUPABASE_URL: "https://secretless-test.invalid"
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 11.9.0
+          run_install: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.23.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:secretless:assert
+      - run: pnpm test:secretless
+      - run: pnpm build
+      - run: pnpm test:bundle
+
+  database-harness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 11.9.0
+          run_install: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.23.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:test:harness
+
+  security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 11.9.0
+          run_install: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.23.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:security
+      - name: Scan full Git history with pinned OSS gitleaks
+        shell: bash
+        run: |
+          curl --fail --location --silent --show-error \
+            --output /tmp/gitleaks.tar.gz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  /tmp/gitleaks.tar.gz" \
+            | sha256sum --check
+          tar --extract --gzip --file /tmp/gitleaks.tar.gz --directory /tmp gitleaks
+          /tmp/gitleaks git --redact --no-banner --verbose
+      - run: >
+          docker build
+          --build-arg GENIE_ENVIRONMENT=production
+          --build-arg NEXT_PUBLIC_APP_URL=http://127.0.0.1:3000
+          --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=public-container-test
+          --build-arg NEXT_PUBLIC_SUPABASE_URL=https://container-test.invalid
+          --tag genie-phase0:${{ github.sha }}
+          .
+      - name: Smoke-test the exact standalone container artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          container="genie-phase0-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          cleanup() {
+            docker logs "$container" || true
+            docker rm --force "$container" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          docker run --detach --name "$container" \
+            --publish 127.0.0.1:3000:3000 \
+            --env GENIE_ENABLE_EXPORT=false \
+            --env GENIE_ENABLE_FINAL_APPROVAL=false \
+            --env GENIE_ENABLE_PROVIDER_SPEND=false \
+            --env GENIE_ENABLE_RENDER=false \
+            --env GENIE_ENVIRONMENT=production \
+            --env NEXT_PUBLIC_APP_URL=http://127.0.0.1:3000 \
+            --env NEXT_PUBLIC_SUPABASE_ANON_KEY=public-container-test \
+            --env NEXT_PUBLIC_SUPABASE_URL=https://container-test.invalid \
+            "genie-phase0:${GITHUB_SHA}"
+          ready=false
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3000/ >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          test "$ready" = true
+          curl --fail --silent http://127.0.0.1:3000/api/health/runtime \
+            | grep --fixed-strings --quiet '"ok":true'
+          curl --head --silent http://127.0.0.1:3000/ \
+            | grep --ignore-case --extended-regexp --quiet '^x-request-id: request_'
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: genie-phase0:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: false

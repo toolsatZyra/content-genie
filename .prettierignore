@@ -1,0 +1,12 @@
+.next
+.tmp
+coverage
+docs
+node_modules
+playwright-report
+reference
+test-results
+DESIGN.md
+README.md
+scripts/generate-traceability-plan.mjs
+scripts/test-traceability-generator.mjs

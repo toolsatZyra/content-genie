@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "provider-webhook-fixtures.v1",
+  "cases": [
+    {
+      "name": "signed-success",
+      "deliveryId": "delivery_000001",
+      "providerRequestId": "provider_000001",
+      "state": "succeeded"
+    },
+    {
+      "name": "duplicate-delivery",
+      "deliveryId": "delivery_000001",
+      "providerRequestId": "provider_000001",
+      "state": "succeeded"
+    },
+    {
+      "name": "late-after-cancel",
+      "deliveryId": "delivery_000002",
+      "providerRequestId": "provider_000002",
+      "state": "succeeded"
+    },
+    {
+      "name": "invalid-signature",
+      "deliveryId": "delivery_000003",
+      "providerRequestId": "provider_000003",
+      "state": "failed_terminal"
+    }
+  ]
+}
