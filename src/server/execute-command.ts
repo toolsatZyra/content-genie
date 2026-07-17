@@ -3,12 +3,14 @@ import "server-only";
 import { createHash } from "node:crypto";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
+import { getServerEnvironment } from "@/config/server-env";
 import {
   boundedText,
+  CommandValidationError,
+  deriveInvitationToken,
   hashCommand,
   integerValue,
   newCommandIdentity,
-  newInvitationToken,
   type ParsedCommand,
   uuidValue,
 } from "@/security/command-envelope";
@@ -108,14 +110,25 @@ export async function executeCommand(
       if (maximumRole !== "member" && maximumRole !== "reviewer") {
         throw new Error("maximumRole is invalid.");
       }
-      const token = newInvitationToken();
+      const workspaceId = uuidValue(payload, "workspaceId");
+      const invitationSecret = getServerEnvironment().supabaseServiceRoleKey;
+      if (!invitationSecret) {
+        throw new CommandValidationError("Invitation service is unavailable.");
+      }
+      const token = deriveInvitationToken(invitationSecret, {
+        actorUserId: user.id,
+        idempotencyKey,
+        invitedEmail: email,
+        maximumRole,
+        workspaceId,
+      });
       const result = await rpc(client, "command_create_invitation", {
         ...base,
         p_expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         p_invited_email: email,
         p_maximum_role: maximumRole,
         p_token_hash: token.hash,
-        p_workspace_id: uuidValue(payload, "workspaceId"),
+        p_workspace_id: workspaceId,
       });
       return { inviteToken: token.token, result };
     }
@@ -128,7 +141,14 @@ export async function executeCommand(
         }),
       };
     }
-    case "membership.offboard":
+    case "membership.offboard": {
+      const targetUserId = uuidValue(payload, "targetUserId");
+      const replacementUserId = uuidValue(payload, "replacementUserId");
+      if (targetUserId === replacementUserId) {
+        throw new CommandValidationError(
+          "replacementUserId must identify a different active member.",
+        );
+      }
       return {
         result: await rpc(client, "command_offboard_member", {
           ...base,
@@ -139,10 +159,11 @@ export async function executeCommand(
             Number.MAX_SAFE_INTEGER,
           ),
           p_reason: boundedText(payload, "reason", 1000),
-          p_replacement_user_id: uuidValue(payload, "replacementUserId"),
-          p_target_user_id: uuidValue(payload, "targetUserId"),
+          p_replacement_user_id: replacementUserId,
+          p_target_user_id: targetUserId,
           p_workspace_id: uuidValue(payload, "workspaceId"),
         }),
       };
+    }
   }
 }

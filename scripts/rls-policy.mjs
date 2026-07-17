@@ -8,6 +8,8 @@ const expectedMigrationSuffixes = [
   "phase1_rls_grants_indexes.sql",
   "phase1_storage_policies.sql",
   "phase1_diagnostic_ingest.sql",
+  "phase1_adversarial_corrections.sql",
+  "phase1_realtime_event_publication.sql",
 ];
 
 const collect = (pattern, value) =>
@@ -99,6 +101,9 @@ export function analyzePhase1Migrations(sources) {
     "workspace-exports",
     "record_client_diagnostic",
     "to service_role",
+    "memberships_deactivation_guard",
+    "invitations_reject_active_member",
+    "alter publication supabase_realtime add table public.domain_events",
   ]) {
     if (!normalized.includes(required)) {
       errors.push(`missing Phase 1 invariant: ${required}`);

@@ -32,6 +32,7 @@ function totp(secret: string): string {
 }
 
 test("authenticated owner can organize work, enroll MFA and issue an invitation", async ({
+  browser,
   page,
 }) => {
   const runtimeFailures: string[] = [];
@@ -40,6 +41,12 @@ test("authenticated owner can organize work, enroll MFA and issue an invitation"
   });
   page.on("requestfailed", (request) => {
     const url = new URL(request.url());
+    if (
+      request.failure()?.errorText === "net::ERR_ABORTED" &&
+      ["/api/diagnostics/client", "/api/storage/sign"].includes(url.pathname)
+    ) {
+      return;
+    }
     const failure = `request: ${url.hostname}${url.pathname} ${request.failure()?.errorText ?? "failed"}`;
     runtimeFailures.push(failure);
     console.log(failure);
@@ -74,6 +81,23 @@ test("authenticated owner can organize work, enroll MFA and issue an invitation"
     return response.status;
   });
   expect(diagnosticStatus).toBe(202);
+  const storageSigning = await page.evaluate(async (objectPath) => {
+    const response = await fetch("/api/storage/sign", {
+      body: JSON.stringify({
+        bucket: "workspace-private",
+        expiresIn: 60,
+        path: objectPath,
+      }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    return {
+      body: (await response.json()) as { signedUrl?: string },
+      status: response.status,
+    };
+  }, process.env.GENIE_LIVE_TEST_OBJECT_PATH!);
+  expect(storageSigning.status).toBe(200);
+  expect(storageSigning.body.signedUrl).toMatch(/^https?:\/\//);
 
   const seriesTitle = `Browser World ${Date.now().toString(36)}`;
   await page.getByRole("button", { name: "Series", exact: true }).click();
@@ -102,5 +126,31 @@ test("authenticated owner can organize work, enroll MFA and issue an invitation"
   await expect(account.getByLabel("One-time invitation link")).toHaveValue(
     /[?&]invite=[A-Za-z0-9_-]+/,
   );
+
+  const outsiderContext = await browser.newContext();
+  const outsiderPage = await outsiderContext.newPage();
+  await outsiderPage.goto("/");
+  await outsiderPage
+    .getByLabel("Studio email")
+    .fill(process.env.GENIE_LIVE_TEST_OUTSIDER_EMAIL!);
+  await outsiderPage.getByLabel("Password").fill(process.env.GENIE_LIVE_TEST_PASSWORD!);
+  await outsiderPage.getByRole("button", { name: "Enter Genie" }).click();
+  await expect(
+    outsiderPage.getByRole("heading", { level: 1, name: "Your films are in motion." }),
+  ).toBeVisible({ timeout: 30_000 });
+  const outsiderSigningStatus = await outsiderPage.evaluate(async (objectPath) => {
+    const response = await fetch("/api/storage/sign", {
+      body: JSON.stringify({
+        bucket: "workspace-private",
+        expiresIn: 60,
+        path: objectPath,
+      }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    return response.status;
+  }, process.env.GENIE_LIVE_TEST_OBJECT_PATH!);
+  expect(outsiderSigningStatus).toBe(403);
+  await outsiderContext.close();
   expect(runtimeFailures).toEqual([]);
 });

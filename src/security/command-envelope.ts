@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 
 export const MAX_COMMAND_BYTES = 16_384;
 
@@ -47,11 +47,34 @@ export function newCommandIdentity(): {
   return { commandId: randomUUID(), correlationId: randomUUID() };
 }
 
-export function newInvitationToken(): {
+export function deriveInvitationToken(
+  secret: string,
+  input: Readonly<{
+    actorUserId: string;
+    idempotencyKey: string;
+    invitedEmail: string;
+    maximumRole: "member" | "reviewer";
+    workspaceId: string;
+  }>,
+): {
   readonly hash: string;
   readonly token: string;
 } {
-  const token = randomBytes(32).toString("base64url");
+  if (Buffer.byteLength(secret, "utf8") < 32) {
+    throw new CommandValidationError("Invitation service secret is invalid.");
+  }
+  const token = createHmac("sha256", secret)
+    .update(
+      canonicalJson({
+        actorUserId: input.actorUserId,
+        idempotencyKey: input.idempotencyKey,
+        invitedEmail: input.invitedEmail.toLowerCase(),
+        maximumRole: input.maximumRole,
+        purpose: "genie.invitation.v1",
+        workspaceId: input.workspaceId,
+      }),
+    )
+    .digest("base64url");
   return {
     hash: createHash("sha256").update(token).digest("hex"),
     token,

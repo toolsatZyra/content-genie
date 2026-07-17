@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 
 import type { EpisodeSummary, SeriesSummary, StudioProjection } from "@/domain/studio";
 import { sendCommand } from "@/lib/commands/client";
+import { shouldReconcileRealtimeStatus } from "@/lib/realtime/reconciliation";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { AccountPanel } from "@/components/studio/account-panel";
 
@@ -57,6 +58,19 @@ function relativeTime(value: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+function RelativeTime({ value }: Readonly<{ value: string }>) {
+  const hydrated = useSyncExternalStore(
+    subscribeToHydration,
+    () => true,
+    () => false,
+  );
+  return (
+    <time dateTime={value} suppressHydrationWarning>
+      {hydrated ? relativeTime(value) : "recently"}
+    </time>
+  );
+}
+
 function slugify(value: string): string {
   return value
     .toLowerCase()
@@ -97,7 +111,7 @@ function useRealtimeReconciliation(workspaceId: string, enabled: boolean): void 
       );
     }
     channel.subscribe((status) => {
-      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") reconcile();
+      if (shouldReconcileRealtimeStatus(status)) reconcile();
     });
     const onVisible = (): void => {
       if (document.visibilityState === "visible") reconcile();
@@ -707,7 +721,7 @@ function EpisodeGallery({
                 </em>
                 <span>
                   Episode {String(episode.episodeNumber).padStart(2, "0")} ·{" "}
-                  {relativeTime(episode.updatedAt)}
+                  <RelativeTime value={episode.updatedAt} />
                 </span>
               </span>
             </button>
@@ -950,7 +964,7 @@ function ActivityPanel({
             <div>
               <strong>{item.title}</strong>
               <p>
-                {item.safeSummary} · {relativeTime(item.createdAt)}
+                {item.safeSummary} · <RelativeTime value={item.createdAt} />
               </p>
             </div>
           </li>
@@ -961,7 +975,7 @@ function ActivityPanel({
             <div>
               <strong>{humanize(item.eventType)}</strong>
               <p>
-                {humanize(item.aggregateType)} · {relativeTime(item.createdAt)}
+                {humanize(item.aggregateType)} · <RelativeTime value={item.createdAt} />
               </p>
             </div>
           </li>

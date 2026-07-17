@@ -4,10 +4,10 @@ import {
   boundedText,
   canonicalJson,
   CommandValidationError,
+  deriveInvitationToken,
   hashCommand,
   integerValue,
   newCommandIdentity,
-  newInvitationToken,
   parseCommand,
   parseIdempotencyKey,
   uuidValue,
@@ -26,13 +26,31 @@ describe("command envelope", () => {
     ).toMatch(/^[a-f0-9]{64}$/);
   });
 
-  it("creates opaque command and invitation identities", () => {
+  it("creates opaque command identities and deterministic invitation retries", () => {
     const identity = newCommandIdentity();
     expect(identity.commandId).not.toBe(identity.correlationId);
     expect(uuidValue({ id: identity.commandId }, "id")).toBe(identity.commandId);
-    const invitation = newInvitationToken();
+    const input = {
+      actorUserId: "20000000-0000-0000-0000-000000000003",
+      idempotencyKey: "invite-create-0001",
+      invitedEmail: "Member@Zyra.test",
+      maximumRole: "member" as const,
+      workspaceId: "10000000-0000-0000-0000-000000000101",
+    };
+    const invitation = deriveInvitationToken("s".repeat(32), input);
+    expect(invitation).toEqual(deriveInvitationToken("s".repeat(32), input));
     expect(invitation.hash).toMatch(/^[a-f0-9]{64}$/);
     expect(invitation.token).not.toContain("=");
+    expect(deriveInvitationToken("t".repeat(32), input).token).not.toBe(
+      invitation.token,
+    );
+    expect(
+      deriveInvitationToken("s".repeat(32), {
+        ...input,
+        workspaceId: "10000000-0000-0000-0000-000000000102",
+      }).token,
+    ).not.toBe(invitation.token);
+    expect(() => deriveInvitationToken("short", input)).toThrow(CommandValidationError);
   });
 
   it("accepts only allowlisted commands and object payloads", () => {

@@ -12,6 +12,8 @@ const filenames = [
   "0007_phase1_rls_grants_indexes.sql",
   "0008_phase1_storage_policies.sql",
   "0009_phase1_diagnostic_ingest.sql",
+  "0010_phase1_adversarial_corrections.sql",
+  "0011_phase1_realtime_event_publication.sql",
 ];
 const fixture = `
 create table public.sample (id uuid);
@@ -38,6 +40,9 @@ select 'workspace-private';
 select 'workspace-exports';
 select 'record_client_diagnostic';
 select 'to service_role';
+select 'memberships_deactivation_guard';
+select 'invitations_reject_active_member';
+select 'alter publication supabase_realtime add table public.domain_events';
 `;
 const source = filenames.map((file, index) => ({
   file,

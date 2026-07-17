@@ -37,7 +37,24 @@ export async function POST(request: Request): Promise<NextResponse> {
       request.url,
       process.env.NEXT_PUBLIC_APP_URL,
     );
-    if (!limiter.consume("client-diagnostics")) {
+    if (!hasConfiguredSupabase()) {
+      return response(
+        { accepted: false, code: "DIAGNOSTIC_UNAVAILABLE", requestId },
+        503,
+      );
+    }
+    const client = await createServerSupabaseClient();
+    const {
+      data: { user },
+      error: authenticationError,
+    } = await client.auth.getUser();
+    if (authenticationError || !user) {
+      return response(
+        { accepted: false, code: "AUTHENTICATION_REQUIRED", requestId },
+        401,
+      );
+    }
+    if (!limiter.consume(user.id)) {
       throw new ClientDiagnosticIntakeError(
         "RATE_LIMITED",
         "Client diagnostic rate limit reached.",
@@ -60,19 +77,15 @@ export async function POST(request: Request): Promise<NextResponse> {
       requestId,
       severity: "error",
     });
-    let actorUserId: string | null = null;
-    if (hasConfiguredSupabase()) {
-      const client = await createServerSupabaseClient();
-      const {
-        data: { user },
-      } = await client.auth.getUser();
-      actorUserId = user?.id ?? null;
-    }
-    await persistDiagnosticEvent(event, actorUserId);
+    await persistDiagnosticEvent(event, user.id);
     return response({ accepted: true, requestId }, 202);
   } catch (error) {
     const status =
-      error instanceof ClientDiagnosticIntakeError && error.code === "RATE_LIMITED"
+      (error instanceof ClientDiagnosticIntakeError && error.code === "RATE_LIMITED") ||
+      (typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === "54000")
         ? 429
         : error instanceof DiagnosticValidationError ||
             error instanceof ClientDiagnosticIntakeError ||

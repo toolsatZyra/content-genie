@@ -42,6 +42,32 @@ function findString(value, acceptedKeys) {
   return null;
 }
 
+function remoteDatabaseProof(databaseUrl, pass) {
+  run(
+    pnpm,
+    ["exec", "supabase", "test", "db", "supabase/tests", "--db-url", databaseUrl],
+    { failureMessage: `Remote pgTAP ${pass} failed.` },
+  );
+  run(
+    pnpm,
+    [
+      "exec",
+      "supabase",
+      "db",
+      "lint",
+      "--db-url",
+      databaseUrl,
+      "--schema",
+      "public,private,audit",
+      "--level",
+      "error",
+      "--fail-on",
+      "error",
+    ],
+    { failureMessage: `Remote schema lint ${pass} failed.` },
+  );
+}
+
 async function runManagedBranchHarness() {
   const { productionProjectRef } = requireManagedBranchEnvironment(process.env);
   const branchName = `genie-ci-${randomUUID().slice(0, 12)}`;
@@ -118,8 +144,42 @@ async function runManagedBranchHarness() {
       ],
       { failureMessage: "Could not apply migrations to isolated Supabase branch." },
     );
+    remoteDatabaseProof(databaseUrl, "after fresh apply");
+
+    run(
+      pnpm,
+      [
+        "exec",
+        "supabase",
+        "db",
+        "reset",
+        "--db-url",
+        databaseUrl,
+        "--no-seed",
+        "--yes",
+      ],
+      { failureMessage: "Could not replay migrations on the isolated branch." },
+    );
+    remoteDatabaseProof(databaseUrl, "after reset and forward replay");
+
+    run(
+      pnpm,
+      [
+        "exec",
+        "supabase",
+        "db",
+        "push",
+        "--db-url",
+        databaseUrl,
+        "--include-all",
+        "--dry-run",
+      ],
+      { failureMessage: "Migration replay left unapplied forward work." },
+    );
     run(pnpm, ["test:rls"]);
-    console.log("PASS managed ephemeral Supabase branch database harness");
+    console.log(
+      "PASS managed ephemeral Supabase branch fresh apply, reset, replay, pgTAP and lint",
+    );
   } finally {
     if (branchId) {
       run(
@@ -146,7 +206,9 @@ if (dockerAvailable()) {
     run(pnpm, ["db:reset:test"]);
     process.env.GENIE_DATABASE_HARNESS_ACTIVE = "1";
     run(pnpm, ["test:rls"]);
-    console.log("PASS local Docker Supabase database harness");
+    run(pnpm, ["db:reset:test"]);
+    run(pnpm, ["test:rls"]);
+    console.log("PASS local Docker Supabase fresh apply and replay database harness");
   } finally {
     run(pnpm, ["db:stop:test"]);
   }

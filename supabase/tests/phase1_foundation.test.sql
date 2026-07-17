@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, auth, storage, private, audit, pg_catalog;
 
-select plan(50);
+select plan(77);
 
 insert into public.organizations (id, name, slug)
 values ('10000000-0000-0000-0000-000000000001', 'Zyra', 'zyra');
@@ -153,6 +153,44 @@ select ok(
     'execute'
   ),
   'authenticated can evaluate the RLS membership helper'
+);
+select is(
+  (
+    select count(*)
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and has_function_privilege('anon', p.oid, 'execute')
+  ),
+  0::bigint,
+  'anon cannot execute any public application function'
+);
+select is(
+  (
+    select count(*)
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and has_function_privilege('authenticated', p.oid, 'execute')
+  ),
+  7::bigint,
+  'authenticated can execute only the seven command functions'
+);
+select ok(
+  not has_function_privilege(
+    'authenticated',
+    'public.record_client_diagnostic(text,timestamptz,text,text,text,text,uuid)',
+    'execute'
+  ),
+  'authenticated cannot invoke the service diagnostic sink'
+);
+select ok(
+  has_function_privilege(
+    'service_role',
+    'public.record_client_diagnostic(text,timestamptz,text,text,text,text,uuid)',
+    'execute'
+  ),
+  'service role can invoke the bounded diagnostic sink'
 );
 
 select set_config(
@@ -366,6 +404,97 @@ select is(
   1::bigint,
   'one live invitation exists'
 );
+select lives_ok(
+  $command$
+    select public.command_create_invitation(
+      '10000000-0000-0000-0000-000000000101',
+      'invitee@zyra.test',
+      repeat('f', 64),
+      'member',
+      statement_timestamp() + interval '1 hour',
+      '40000000-0000-0000-0000-000000000096',
+      'invite-create-0002',
+      repeat('2', 64),
+      '50000000-0000-0000-0000-000000000096'
+    )
+  $command$,
+  'lost invitation-create response can be retried with the same key'
+);
+select is(
+  (select count(*) from public.invitations where consumed_at is null),
+  1::bigint,
+  'invitation-create replay creates no second token record'
+);
+select throws_ok(
+  $command$
+    select public.command_create_invitation(
+      '10000000-0000-0000-0000-000000000101',
+      'member.one@zyra.test',
+      repeat('d', 64),
+      'member',
+      statement_timestamp() + interval '1 hour',
+      '40000000-0000-0000-0000-000000000095',
+      'invite-create-active',
+      repeat('9', 64),
+      '50000000-0000-0000-0000-000000000095'
+    )
+  $command$,
+  '23505',
+  'invitation target is already an active member',
+  'an already-active member cannot retain a future reactivation token'
+);
+select throws_ok(
+  $command$
+    select public.command_create_invitation(
+      '10000000-0000-0000-0000-000000000101',
+      'new-admin@zyra.test',
+      repeat('c', 64),
+      'admin',
+      statement_timestamp() + interval '1 hour',
+      '40000000-0000-0000-0000-000000000094',
+      'invite-create-admin',
+      repeat('8', 64),
+      '50000000-0000-0000-0000-000000000094'
+    )
+  $command$,
+  '42501',
+  'invitations cannot grant admin',
+  'an invitation cannot escalate a user to admin'
+);
+select throws_ok(
+  $command$
+    select public.command_create_invitation(
+      '10000000-0000-0000-0000-000000000101',
+      'expired@zyra.test',
+      repeat('b', 64),
+      'member',
+      statement_timestamp() - interval '1 second',
+      '40000000-0000-0000-0000-000000000093',
+      'invite-create-expired',
+      repeat('7', 64),
+      '50000000-0000-0000-0000-000000000093'
+    )
+  $command$,
+  '22023',
+  'invitation expiry must be within 24 hours',
+  'an expired invitation cannot be created'
+);
+select lives_ok(
+  $command$
+    select public.command_create_invitation(
+      '10000000-0000-0000-0000-000000000101',
+      'member.two@zyra.test',
+      repeat('e', 64),
+      'reviewer',
+      statement_timestamp() + interval '1 hour',
+      '40000000-0000-0000-0000-000000000092',
+      'invite-create-mismatch',
+      repeat('6', 64),
+      '50000000-0000-0000-0000-000000000092'
+    )
+  $command$,
+  'a separate invitation is created for email-mismatch proof'
+);
 
 reset role;
 select set_config(
@@ -379,6 +508,20 @@ select set_config(
   true
 );
 set local role authenticated;
+select throws_ok(
+  $command$
+    select public.command_accept_invitation(
+      repeat('e', 64),
+      '40000000-0000-0000-0000-000000000091',
+      'invite-accept-mismatch',
+      repeat('5', 64),
+      '50000000-0000-0000-0000-000000000091'
+    )
+  $command$,
+  '42501',
+  'invitation is invalid, expired, replayed, or email-mismatched',
+  'a verified user cannot accept an invitation for another exact email'
+);
 select lives_ok(
   $command$
     select public.command_accept_invitation(
@@ -399,6 +542,27 @@ select is(
   ),
   'active',
   'invitation acceptance creates active membership'
+);
+select lives_ok(
+  $command$
+    select public.command_accept_invitation(
+      repeat('f', 64),
+      '40000000-0000-0000-0000-000000000090',
+      'invite-accept-0001',
+      repeat('3', 64),
+      '50000000-0000-0000-0000-000000000090'
+    )
+  $command$,
+  'lost invitation-accept response can be retried with the same key'
+);
+select is(
+  (
+    select count(*) from public.memberships
+    where workspace_id = '10000000-0000-0000-0000-000000000101'
+      and user_id = '20000000-0000-0000-0000-000000000004'
+  ),
+  1::bigint,
+  'invitation-accept replay creates no duplicate membership'
 );
 select throws_ok(
   $command$
@@ -427,6 +591,51 @@ select set_config(
   true
 );
 set local role authenticated;
+select throws_ok(
+  $command$
+    select public.command_offboard_member(
+      '10000000-0000-0000-0000-000000000101',
+      '20000000-0000-0000-0000-000000000001',
+      '20000000-0000-0000-0000-000000000001',
+      1,
+      'invalid self-replacement',
+      '40000000-0000-0000-0000-000000000089',
+      'member-offboard-invalid',
+      repeat('4', 64),
+      '50000000-0000-0000-0000-000000000089'
+    )
+  $command$,
+  '23514',
+  'deactivated member retains active ownership or work',
+  'offboarding cannot transfer work back to the deactivated member'
+);
+select is(
+  (
+    select status::text from public.memberships
+    where workspace_id = '10000000-0000-0000-0000-000000000101'
+      and user_id = '20000000-0000-0000-0000-000000000001'
+  ),
+  'active',
+  'rejected self-replacement rolls back the entire offboarding transaction'
+);
+
+-- Simulate an invitation that predates this corrective migration so the
+-- offboarding path proves it revokes legacy dangling tokens too.
+reset role;
+alter table public.invitations disable trigger invitations_reject_active_member;
+insert into public.invitations (
+  workspace_id, invited_email, token_hash, maximum_role, issued_by, expires_at
+) values (
+  '10000000-0000-0000-0000-000000000101',
+  'member.one@zyra.test',
+  repeat('9', 64),
+  'member',
+  '20000000-0000-0000-0000-000000000003',
+  statement_timestamp() + interval '1 hour'
+);
+alter table public.invitations enable trigger invitations_reject_active_member;
+set local role authenticated;
+
 select lives_ok(
   $command$
     select public.command_offboard_member(
@@ -475,6 +684,43 @@ select is(
   2::bigint,
   'open work transfers to the replacement'
 );
+select is(
+  (
+    select count(*) from (
+      select s.id
+      from public.series s
+      where s.workspace_id = '10000000-0000-0000-0000-000000000101'
+        and s.owner_user_id = '20000000-0000-0000-0000-000000000001'
+      union all
+      select e.id
+      from public.episodes e
+      where e.workspace_id = '10000000-0000-0000-0000-000000000101'
+        and e.owner_user_id = '20000000-0000-0000-0000-000000000001'
+      union all
+      select w.id
+      from public.work_items w
+      where w.workspace_id = '10000000-0000-0000-0000-000000000101'
+        and w.assigned_user_id = '20000000-0000-0000-0000-000000000001'
+        and w.state in ('open', 'claimed')
+      union all
+      select l.id
+      from public.work_leases l
+      where l.workspace_id = '10000000-0000-0000-0000-000000000101'
+        and l.holder_user_id = '20000000-0000-0000-0000-000000000001'
+        and l.lease_state = 'active'
+    ) assignments
+  ),
+  0::bigint,
+  'no active object or work assignment remains attached to an inactive member'
+);
+select is(
+  (
+    select revoke_reason from public.invitations
+    where token_hash = repeat('9', 64)
+  ),
+  'member offboarded',
+  'offboarding revokes every legacy live invitation for the member email'
+);
 reset role;
 select ok((select count(*) from audit.events) >= 7, 'security and business actions are audited');
 
@@ -485,6 +731,18 @@ select throws_ok(
   '55000',
   'immutable record cannot be updated or deleted',
   'audit events are immutable even to a database owner'
+);
+select ok(
+  not has_table_privilege('authenticated', 'audit.events', 'update'),
+  'application users cannot update audit events'
+);
+select ok(
+  not has_table_privilege('authenticated', 'audit.events', 'delete'),
+  'application users cannot delete audit events'
+);
+select ok(
+  not has_table_privilege('authenticated', 'audit.events', 'truncate'),
+  'application users cannot truncate audit events'
 );
 select is(
   private.storage_workspace_id(
@@ -536,6 +794,24 @@ select throws_ok(
   $command$
     select public.command_create_series(
       '10000000-0000-0000-0000-000000000101',
+      'Shiva Stories',
+      'Devotional stories of Shiva',
+      'shiva-stories',
+      '20000000-0000-0000-0000-000000000001',
+      '40000000-0000-0000-0000-000000000088',
+      'series-create-0001',
+      repeat('a', 64),
+      '50000000-0000-0000-0000-000000000088'
+    )
+  $command$,
+  '42501',
+  'active workspace session required',
+  'an exact pre-offboarding receipt replay is authorized again and denied'
+);
+select throws_ok(
+  $command$
+    select public.command_create_series(
+      '10000000-0000-0000-0000-000000000101',
       'Forbidden',
       '',
       'forbidden',
@@ -549,6 +825,20 @@ select throws_ok(
   '42501',
   'active workspace session required',
   'revoked member cannot use an open tab command'
+);
+select throws_ok(
+  $command$
+    select public.command_accept_invitation(
+      repeat('9', 64),
+      '40000000-0000-0000-0000-000000000087',
+      'invite-accept-dangling',
+      repeat('0', 64),
+      '50000000-0000-0000-0000-000000000087'
+    )
+  $command$,
+  '42501',
+  'invitation is invalid, expired, replayed, or email-mismatched',
+  'a retained pre-offboarding invitation cannot reactivate the member'
 );
 
 reset role;
@@ -568,6 +858,15 @@ select ok(
       and tablename = 'episodes'
   ),
   'Episode projection is explicitly published to Realtime'
+);
+select ok(
+  exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public'
+      and tablename = 'domain_events'
+  ),
+  'Domain-event reconciliation is explicitly published to Realtime'
 );
 select is(
   (
@@ -633,6 +932,88 @@ select set_config(
 set local role authenticated;
 select is((select count(*) from public.series), 0::bigint, 'other workspace cannot enumerate Series');
 
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-0000-0000-000000000003","role":"service_role"}',
+  true
+);
+set local role service_role;
+select lives_ok(
+  $diagnostic$
+    do $block$
+    begin
+      perform public.record_client_diagnostic(
+        'app.client_error',
+        statement_timestamp(),
+        'test',
+        'diagnostic-dedupe-proof',
+        'bounded safe diagnostic',
+        repeat('a', 64),
+        '20000000-0000-0000-0000-000000000003'
+      );
+      perform public.record_client_diagnostic(
+        'app.client_error',
+        statement_timestamp(),
+        'test',
+        'diagnostic-dedupe-proof',
+        'bounded safe diagnostic',
+        repeat('a', 64),
+        '20000000-0000-0000-0000-000000000003'
+      );
+    end
+    $block$
+  $diagnostic$,
+  'the service diagnostic boundary safely deduplicates a retry'
+);
+reset role;
+select is(
+  (
+    select count(*) from private.diagnostic_events
+    where dedupe_hash = repeat('a', 64)
+  ),
+  1::bigint,
+  'diagnostic deduplication stores exactly one immutable row'
+);
+set local role service_role;
+select lives_ok(
+  $diagnostic$
+    do $block$
+    declare
+      item integer;
+    begin
+      for item in 1..19 loop
+        perform public.record_client_diagnostic(
+          'app.client_error',
+          statement_timestamp(),
+          'test',
+          'diagnostic-rate-' || item::text,
+          'bounded safe diagnostic',
+          md5(item::text) || md5('genie-' || item::text),
+          '20000000-0000-0000-0000-000000000003'
+        );
+      end loop;
+    end
+    $block$
+  $diagnostic$,
+  'the database accepts the bounded per-user diagnostic allowance'
+);
+select throws_ok(
+  $diagnostic$
+    select public.record_client_diagnostic(
+      'app.client_error',
+      statement_timestamp(),
+      'test',
+      'diagnostic-rate-overflow',
+      'bounded safe diagnostic',
+      repeat('b', 64),
+      '20000000-0000-0000-0000-000000000003'
+    )
+  $diagnostic$,
+  '54000',
+  'diagnostic rate limit reached',
+  'the database rejects distributed diagnostic bursts beyond the allowance'
+);
 reset role;
 select * from finish();
 rollback;

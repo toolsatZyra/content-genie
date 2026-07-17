@@ -365,3 +365,20 @@ test("Phase 1 fixture remains accessible and continuous at 390px", async ({ page
   });
   await page.getByRole("button", { name: "Close composer" }).click();
 });
+
+test("Phase 1 shell renders persisted markup payloads only as inert text", async ({
+  page,
+}) => {
+  await page.goto("/?fixture=phase1", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#main-content")).toHaveAttribute("data-hydrated", "true");
+  await page.getByRole("button", { name: "Series", exact: true }).click();
+  await expect(
+    page.locator("strong").filter({ hasText: "<img src=x onerror=" }),
+  ).toBeVisible();
+  expect(await page.locator("img[src=x]").count()).toBe(0);
+  expect(
+    await page.evaluate(
+      () => (globalThis as typeof globalThis & { __genieXss?: number }).__genieXss,
+    ),
+  ).toBeUndefined();
+});
