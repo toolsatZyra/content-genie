@@ -28,6 +28,7 @@
     "test": "pnpm test:unit",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
+    "test:live:phase1": "playwright test --config=playwright.live.config.ts",
     "test:coverage": "vitest run --project unit --coverage",
     "test:browser": "playwright test --project=chromium",
     "test:production": "playwright test --config=playwright.production.config.ts",

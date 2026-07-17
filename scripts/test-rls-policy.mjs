@@ -11,6 +11,7 @@ const filenames = [
   "0006_phase1_diagnostics_audit.sql",
   "0007_phase1_rls_grants_indexes.sql",
   "0008_phase1_storage_policies.sql",
+  "0009_phase1_diagnostic_ingest.sql",
 ];
 const fixture = `
 create table public.sample (id uuid);
@@ -35,6 +36,8 @@ select 'audit_events_immutable';
 select 'workspace_private_member_select';
 select 'workspace-private';
 select 'workspace-exports';
+select 'record_client_diagnostic';
+select 'to service_role';
 `;
 const source = filenames.map((file, index) => ({
   file,

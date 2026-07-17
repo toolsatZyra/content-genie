@@ -7,6 +7,7 @@ const expectedMigrationSuffixes = [
   "phase1_diagnostics_audit.sql",
   "phase1_rls_grants_indexes.sql",
   "phase1_storage_policies.sql",
+  "phase1_diagnostic_ingest.sql",
 ];
 
 const collect = (pattern, value) =>
@@ -96,6 +97,8 @@ export function analyzePhase1Migrations(sources) {
     "workspace_private_member_select",
     "workspace-private",
     "workspace-exports",
+    "record_client_diagnostic",
+    "to service_role",
   ]) {
     if (!normalized.includes(required)) {
       errors.push(`missing Phase 1 invariant: ${required}`);

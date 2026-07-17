@@ -275,3 +275,93 @@ test("@visual preserves cinematic geometry, targets and mobile continuity", asyn
   await expect(page.locator(".episode-focus")).toBeFocused();
   await expect(page.locator(".episode-focus")).not.toHaveCSS("outline-style", "none");
 });
+
+test("Phase 1 fixture organizes concurrent Episodes, Series and Monica work", async ({
+  page,
+}) => {
+  await page.goto("/?fixture=phase1", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#main-content")).toHaveAttribute("data-hydrated", "true");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Your films are in motion." }),
+  ).toBeVisible();
+  await expect(page.getByText("1 need you")).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    ),
+  ).toBeLessThanOrEqual(1);
+
+  await page.getByRole("button", { name: "Open global search" }).click();
+  const search = page.getByRole("searchbox");
+  await expect(search).toBeFocused();
+  await search.fill("Fire Beyond");
+  await page.getByRole("button", { name: /Episode The Fire Beyond Sight/ }).click();
+  await expect(
+    page.getByRole("complementary").getByRole("heading", {
+      name: "The Fire Beyond Sight",
+    }),
+  ).toBeVisible();
+  await page.screenshot({
+    animations: "disabled",
+    fullPage: false,
+    path: ".tmp/artifacts/phase1-studio-desktop.png",
+  });
+
+  await page.getByRole("button", { name: "Series", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Every story has a world." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Series · active Shiva: The/ }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: /Monica/ }).click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Monica is watching." }),
+  ).toBeVisible();
+  await expect(page.getByText(/theological framing/i)).toBeVisible();
+
+  await page.getByRole("button", { name: "Library" }).click();
+  await expect(page.getByText(/intentionally disabled/i)).toBeVisible();
+});
+
+test("Phase 1 fixture remains accessible and continuous at 390px", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?fixture=phase1", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#main-content")).toHaveAttribute("data-hydrated", "true");
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(
+    results.violations.filter(
+      ({ impact }) => impact === "critical" || impact === "serious",
+    ),
+  ).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    ),
+  ).toBeLessThanOrEqual(1);
+  const undersizedTargets = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>("main button:not([disabled])")]
+      .filter((element) => element.getClientRects().length > 0)
+      .map((element) => {
+        const box = element.getBoundingClientRect();
+        return {
+          height: Math.round(box.height),
+          label: element.getAttribute("aria-label") ?? element.textContent,
+          width: Math.round(box.width),
+        };
+      })
+      .filter(({ height, width }) => height < 44 || width < 44),
+  );
+  expect(undersizedTargets).toEqual([]);
+
+  await page.getByRole("button", { name: "Create Episode" }).click();
+  await expect(page.getByRole("dialog", { name: "Create in Genie" })).toBeVisible();
+  await expect(page.getByText(/script remains untouched/i)).toBeVisible();
+  await page.screenshot({
+    animations: "disabled",
+    fullPage: false,
+    path: ".tmp/artifacts/phase1-studio-mobile.png",
+  });
+  await page.getByRole("button", { name: "Close composer" }).click();
+});

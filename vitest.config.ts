@@ -15,10 +15,13 @@ export default defineConfig({
       enabled: false,
       include: [
         "src/config/env-core.ts",
+        "src/domain/studio.ts",
         "src/observability/client-intake.ts",
         "src/observability/correlation.ts",
         "src/observability/redaction.ts",
         "src/observability/schema.ts",
+        "src/security/command-envelope.ts",
+        "src/security/origin.ts",
         "src/test/fakes/*.ts",
       ],
       reporter: ["text", "json-summary"],

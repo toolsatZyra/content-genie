@@ -3,14 +3,17 @@ import { NextResponse, type NextRequest } from "next/server";
 import { parseServerEnvironment } from "@/config/env-core";
 import { createCorrelationId, readCorrelationId } from "@/observability/correlation";
 
-export function proxy(request: NextRequest): NextResponse {
+import { refreshSupabaseSession } from "@/lib/supabase/proxy";
+
+export async function proxy(request: NextRequest): Promise<NextResponse> {
   const requestId =
     readCorrelationId(request.headers) ?? createCorrelationId("request");
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-request-id", requestId);
 
+  let environment;
   try {
-    parseServerEnvironment(process.env);
+    environment = parseServerEnvironment(process.env);
   } catch {
     const denied = NextResponse.json(
       { code: "RUNTIME_CONFIGURATION_INVALID", ok: false, requestId },
@@ -21,9 +24,13 @@ export function proxy(request: NextRequest): NextResponse {
     return denied;
   }
 
-  const response = NextResponse.next({
-    request: { headers: requestHeaders },
-  });
+  const response =
+    environment.environment === "test" ||
+    new URL(
+      environment.public.supabaseUrl ?? "https://unconfigured.invalid",
+    ).hostname.endsWith(".invalid")
+      ? NextResponse.next({ request: { headers: requestHeaders } })
+      : await refreshSupabaseSession(request, requestHeaders, environment.public);
   response.headers.set("x-request-id", requestId);
   return response;
 }

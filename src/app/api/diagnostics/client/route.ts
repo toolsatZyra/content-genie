@@ -3,6 +3,11 @@ import { NextResponse } from "next/server";
 import { readCorrelationId, createCorrelationId } from "@/observability/correlation";
 import { writeDiagnostic } from "@/observability/logger";
 import { DiagnosticValidationError } from "@/observability/schema";
+import { persistDiagnosticEvent } from "@/observability/supabase-sink";
+import {
+  createServerSupabaseClient,
+  hasConfiguredSupabase,
+} from "@/lib/supabase/server";
 import {
   ClientDiagnosticIntakeError,
   DiagnosticRateLimiter,
@@ -25,13 +30,6 @@ function response(
 export async function POST(request: Request): Promise<NextResponse> {
   const requestId =
     readCorrelationId(request.headers) ?? createCorrelationId("request");
-
-  if (
-    process.env.NODE_ENV === "production" ||
-    process.env.GENIE_ENVIRONMENT === "production"
-  ) {
-    return response({ accepted: false, code: "NOT_FOUND", requestId }, 404);
-  }
 
   try {
     validateClientDiagnosticHeaders(
@@ -56,12 +54,21 @@ export async function POST(request: Request): Promise<NextResponse> {
         "Client intake accepts only app.client_error.",
       );
     }
-    await writeDiagnostic({
+    const event = await writeDiagnostic({
       ...body,
       event: "app.client_error",
       requestId,
       severity: "error",
     });
+    let actorUserId: string | null = null;
+    if (hasConfiguredSupabase()) {
+      const client = await createServerSupabaseClient();
+      const {
+        data: { user },
+      } = await client.auth.getUser();
+      actorUserId = user?.id ?? null;
+    }
+    await persistDiagnosticEvent(event, actorUserId);
     return response({ accepted: true, requestId }, 202);
   } catch (error) {
     const status =
