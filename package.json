@@ -16,7 +16,7 @@
     "start:test:failclosed": "next start -H 127.0.0.1 -p 4175",
     "build": "next build",
     "build:canary": "node scripts/build-with-secret-canary.mjs",
-    "db:start:test": "supabase start -x analytics,edge-runtime,functions,imgproxy,inbucket,kong,meta,realtime,rest,storage,studio,vector",
+    "db:start:test": "supabase start -x edge-runtime,imgproxy,logflare,mailpit,postgres-meta,realtime,storage-api,studio,supavisor,vector",
     "db:reset:test": "supabase db reset --local --no-seed",
     "db:stop:test": "supabase stop --no-backup",
     "db:test:harness": "node scripts/run-database-harness.mjs",
