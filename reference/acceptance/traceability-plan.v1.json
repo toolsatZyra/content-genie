@@ -580,10 +580,15 @@
           "plannedCodeOrSchemaOwner": "src/domain/series; migration 0003",
           "automatedProof": "series/Episode identity and concurrent-number tests",
           "manualProof": "none",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase1/final-closure.md",
+              "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+            }
+          ],
+          "commit": "70119839059ea51427e97cb48d675569197484b1",
+          "verifiedAt": "2026-07-17T06:05:13.9246768Z"
         },
         {
           "obligationId": "GEN-PROD-017@phase2",
@@ -637,10 +642,15 @@
           "plannedCodeOrSchemaOwner": "src/domain/work; migrations 0004,0005",
           "automatedProof": "lease/fence/realtime/multi-user concurrency suite",
           "manualProof": "multi-user workspace review",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase1/final-closure.md",
+              "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+            }
+          ],
+          "commit": "70119839059ea51427e97cb48d675569197484b1",
+          "verifiedAt": "2026-07-17T06:05:13.9246768Z"
         },
         {
           "obligationId": "GEN-PROD-018@phase4",
@@ -677,10 +687,15 @@
           "plannedCodeOrSchemaOwner": "src/domain/library; migration 0003",
           "automatedProof": "workspace-scoped Series/Episode retrieval tests",
           "manualProof": "library journey",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase1/final-closure.md",
+              "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+            }
+          ],
+          "commit": "70119839059ea51427e97cb48d675569197484b1",
+          "verifiedAt": "2026-07-17T06:05:13.9246768Z"
         },
         {
           "obligationId": "GEN-PROD-019@phase4",
@@ -943,10 +958,15 @@
           "plannedCodeOrSchemaOwner": "src/app/(studio); src/components/studio-shell",
           "automatedProof": "workspace shell browser/axe/responsive/state matrix",
           "manualProof": "Living Cinema shell review",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase1/final-closure.md",
+              "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+            }
+          ],
+          "commit": "70119839059ea51427e97cb48d675569197484b1",
+          "verifiedAt": "2026-07-17T06:05:13.9246768Z"
         },
         {
           "obligationId": "GEN-PROD-025@phase2",
@@ -2125,13 +2145,18 @@
           "plannedCodeOrSchemaOwner": "RLS/query; 0002..0007",
           "automatedProof": "TM-01 phase1 - outsider API/table enumeration",
           "manualProof": "policy review",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase1/final-closure.md",
+              "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+            }
+          ],
+          "commit": "70119839059ea51427e97cb48d675569197484b1",
+          "verifiedAt": "2026-07-17T06:05:13.9246768Z"
         }
       ],
-      "parentStatus": "unimplemented",
+      "parentStatus": "verified",
       "parentStatusRule": "verified only when every required obligation is verified; failed dominates; deferred_external is milestone-scoped"
     },
     {
@@ -2151,13 +2176,18 @@
           "plannedCodeOrSchemaOwner": "RLS; 0007",
           "automatedProof": "TM-02 phase1 - outsider CRUD matrix",
           "manualProof": "policy review",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase1/final-closure.md",
+              "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+            }
+          ],
+          "commit": "70119839059ea51427e97cb48d675569197484b1",
+          "verifiedAt": "2026-07-17T06:05:13.9246768Z"
         }
       ],
-      "parentStatus": "unimplemented",
+      "parentStatus": "verified",
       "parentStatusRule": "verified only when every required obligation is verified; failed dominates; deferred_external is milestone-scoped"
     },
     {
@@ -2176,13 +2206,18 @@
           "plannedCodeOrSchemaOwner": "command/RLS; 0007",
           "automatedProof": "TM-03 phase1 - direct REST mutation corpus",
           "manualProof": "grant review",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase1/final-closure.md",
+              "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+            }
+          ],
+          "commit": "70119839059ea51427e97cb48d675569197484b1",
+          "verifiedAt": "2026-07-17T06:05:13.9246768Z"
         }
       ],
-      "parentStatus": "unimplemented",
+      "parentStatus": "verified",
       "parentStatusRule": "verified only when every required obligation is verified; failed dominates; deferred_external is milestone-scoped"
     },
     {
@@ -2231,13 +2266,18 @@
           "plannedCodeOrSchemaOwner": "auth/commands",
           "automatedProof": "TM-05 phase1 - live downgrade/open-tab test",
           "manualProof": "session review",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase1/final-closure.md",
+              "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+            }
+          ],
+          "commit": "70119839059ea51427e97cb48d675569197484b1",
+          "verifiedAt": "2026-07-17T06:05:13.9246768Z"
         }
       ],
-      "parentStatus": "unimplemented",
+      "parentStatus": "verified",
       "parentStatusRule": "verified only when every required obligation is verified; failed dominates; deferred_external is milestone-scoped"
     },
     {
@@ -2256,13 +2296,18 @@
           "plannedCodeOrSchemaOwner": "auth/commands",
           "automatedProof": "TM-06 phase1 - replay after revoke",
           "manualProof": "audit review",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase1/final-closure.md",
+              "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+            }
+          ],
+          "commit": "70119839059ea51427e97cb48d675569197484b1",
+          "verifiedAt": "2026-07-17T06:05:13.9246768Z"
         }
       ],
-      "parentStatus": "unimplemented",
+      "parentStatus": "verified",
       "parentStatusRule": "verified only when every required obligation is verified; failed dominates; deferred_external is milestone-scoped"
     },
     {
@@ -2281,13 +2326,18 @@
           "plannedCodeOrSchemaOwner": "invitations; 0002",
           "automatedProof": "TM-07 phase1 - replay/email/role/expiry tests",
           "manualProof": "invite UX review",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase1/final-closure.md",
+              "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+            }
+          ],
+          "commit": "70119839059ea51427e97cb48d675569197484b1",
+          "verifiedAt": "2026-07-17T06:05:13.9246768Z"
         }
       ],
-      "parentStatus": "unimplemented",
+      "parentStatus": "verified",
       "parentStatusRule": "verified only when every required obligation is verified; failed dominates; deferred_external is milestone-scoped"
     },
     {
@@ -2306,13 +2356,18 @@
           "plannedCodeOrSchemaOwner": "auth/RLS/commands",
           "automatedProof": "TM-08 phase1 - direct aal1 endpoint tests",
           "manualProof": "enrollment/recovery review",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase1/final-closure.md",
+              "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+            }
+          ],
+          "commit": "70119839059ea51427e97cb48d675569197484b1",
+          "verifiedAt": "2026-07-17T06:05:13.9246768Z"
         }
       ],
-      "parentStatus": "unimplemented",
+      "parentStatus": "verified",
       "parentStatusRule": "verified only when every required obligation is verified; failed dominates; deferred_external is milestone-scoped"
     },
     {
@@ -2331,13 +2386,18 @@
           "plannedCodeOrSchemaOwner": "migrations; 0007",
           "automatedProof": "TM-09 phase1 - anon/auth function/view inventory",
           "manualProof": "advisor review",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase1/final-closure.md",
+              "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+            }
+          ],
+          "commit": "70119839059ea51427e97cb48d675569197484b1",
+          "verifiedAt": "2026-07-17T06:05:13.9246768Z"
         }
       ],
-      "parentStatus": "unimplemented",
+      "parentStatus": "verified",
       "parentStatusRule": "verified only when every required obligation is verified; failed dominates; deferred_external is milestone-scoped"
     },
     {
@@ -2356,10 +2416,15 @@
           "plannedCodeOrSchemaOwner": "supabase/migrations/0008_storage.sql",
           "automatedProof": "cross-workspace/encoded Storage path RLS tests",
           "manualProof": "none",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase1/final-closure.md",
+              "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+            }
+          ],
+          "commit": "70119839059ea51427e97cb48d675569197484b1",
+          "verifiedAt": "2026-07-17T06:05:13.9246768Z"
         },
         {
           "obligationId": "TM-10@phase2",
@@ -2887,10 +2952,15 @@
           "plannedCodeOrSchemaOwner": "src/domain/realtime; migration 0009",
           "automatedProof": "Realtime/diagnostic schema,size,rate,dedupe burst tests",
           "manualProof": "none",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase1/final-closure.md",
+              "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+            }
+          ],
+          "commit": "70119839059ea51427e97cb48d675569197484b1",
+          "verifiedAt": "2026-07-17T06:05:13.9246768Z"
         },
         {
           "obligationId": "TM-26@phase3",
@@ -2927,13 +2997,18 @@
           "plannedCodeOrSchemaOwner": "Realtime/RLS",
           "automatedProof": "TM-27 phase1 - outsider subscription/guessed topic",
           "manualProof": "presence review",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase1/final-closure.md",
+              "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+            }
+          ],
+          "commit": "70119839059ea51427e97cb48d675569197484b1",
+          "verifiedAt": "2026-07-17T06:05:13.9246768Z"
         }
       ],
-      "parentStatus": "unimplemented",
+      "parentStatus": "verified",
       "parentStatusRule": "verified only when every required obligation is verified; failed dominates; deferred_external is milestone-scoped"
     },
     {
@@ -3068,10 +3143,15 @@
           "plannedCodeOrSchemaOwner": "src/domain/storage/signed-access.ts",
           "automatedProof": "membership revocation and short-TTL issuance tests",
           "manualProof": "none",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase1/final-closure.md",
+              "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+            }
+          ],
+          "commit": "70119839059ea51427e97cb48d675569197484b1",
+          "verifiedAt": "2026-07-17T06:05:13.9246768Z"
         },
         {
           "obligationId": "TM-32@phase4",
@@ -3285,13 +3365,18 @@
           "plannedCodeOrSchemaOwner": "offboarding; 0002, 0005",
           "automatedProof": "TM-37 phase1 - owner/lease/run transfer test",
           "manualProof": "admin workflow review",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase1/final-closure.md",
+              "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+            }
+          ],
+          "commit": "70119839059ea51427e97cb48d675569197484b1",
+          "verifiedAt": "2026-07-17T06:05:13.9246768Z"
         }
       ],
-      "parentStatus": "unimplemented",
+      "parentStatus": "verified",
       "parentStatusRule": "verified only when every required obligation is verified; failed dominates; deferred_external is milestone-scoped"
     },
     {
@@ -3311,10 +3396,15 @@
           "plannedCodeOrSchemaOwner": "supabase/migrations/0006_audit.sql",
           "automatedProof": "application-role audit update/delete/truncate tests",
           "manualProof": "none",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase1/final-closure.md",
+              "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+            }
+          ],
+          "commit": "70119839059ea51427e97cb48d675569197484b1",
+          "verifiedAt": "2026-07-17T06:05:13.9246768Z"
         },
         {
           "obligationId": "TM-38@deployment",
@@ -3376,10 +3466,15 @@
           "plannedCodeOrSchemaOwner": "src/components/studio-shell",
           "automatedProof": "stored-XSS corpus across Series/Episode shell",
           "manualProof": "shell CSP/render review",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase1/final-closure.md",
+              "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+            }
+          ],
+          "commit": "70119839059ea51427e97cb48d675569197484b1",
+          "verifiedAt": "2026-07-17T06:05:13.9246768Z"
         },
         {
           "obligationId": "TM-40@phase2",
@@ -3446,13 +3541,18 @@
           "plannedCodeOrSchemaOwner": "command HTTP",
           "automatedProof": "TM-41 phase1 - cross-origin/replay tests",
           "manualProof": "cookie/header review",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase1/final-closure.md",
+              "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+            }
+          ],
+          "commit": "70119839059ea51427e97cb48d675569197484b1",
+          "verifiedAt": "2026-07-17T06:05:13.9246768Z"
         }
       ],
-      "parentStatus": "unimplemented",
+      "parentStatus": "verified",
       "parentStatusRule": "verified only when every required obligation is verified; failed dominates; deferred_external is milestone-scoped"
     },
     {

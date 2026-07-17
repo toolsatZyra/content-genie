@@ -43,7 +43,7 @@
     "test:secretless": "node scripts/check-secretless-environment.mjs",
     "test:secretless:assert": "node scripts/check-secretless-environment.mjs --assert-current",
     "test:acceptance:structure": "node scripts/generate-traceability-plan.mjs && node scripts/test-traceability-generator.mjs && node scripts/test-traceability-checkpoint.mjs && git diff --exit-code -- reference/acceptance/traceability-plan.v1.json",
-    "test:acceptance": "pnpm test:acceptance:structure && node scripts/assert-traceability-checkpoint.mjs phase0",
+    "test:acceptance": "pnpm test:acceptance:structure && node scripts/assert-traceability-checkpoint.mjs phase0 && node scripts/assert-traceability-checkpoint.mjs phase1",
     "test:phase0": "pnpm lint && pnpm typecheck && pnpm test:unit && pnpm test:coverage && pnpm test:integration && pnpm test:rls && pnpm build:canary && pnpm test:bundle && pnpm test:security && pnpm test:production-env && pnpm test:production && pnpm test:browser",
     "generate:sbom": "node scripts/generate-sbom.mjs",
     "scan:dependencies": "pnpm audit --audit-level high",

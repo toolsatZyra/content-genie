@@ -78,6 +78,266 @@
       "status": "verified",
       "verifiedAt": "2026-07-17T00:50:26.3682771Z",
       "workPackages": ["P0-02", "P0-03"]
+    },
+    "GEN-PROD-017@phase1": {
+      "commit": "70119839059ea51427e97cb48d675569197484b1",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase1/final-closure.md",
+          "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+        }
+      ],
+      "obligationDefinitionHash": "673dc58f6f44177d7e609538f1375b9fe3cb75dcd113d6031c9b1dbef4ebdc2c",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T06:05:13.9246768Z",
+      "workPackages": ["P1-04"]
+    },
+    "GEN-PROD-018@phase1": {
+      "commit": "70119839059ea51427e97cb48d675569197484b1",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase1/final-closure.md",
+          "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+        }
+      ],
+      "obligationDefinitionHash": "db6db84e776dbdcd82adfe68bf524d02fd273b5c2b2d1fc504d9aefd823f220a",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T06:05:13.9246768Z",
+      "workPackages": ["P1-03", "P1-04", "P1-05"]
+    },
+    "GEN-PROD-019@phase1": {
+      "commit": "70119839059ea51427e97cb48d675569197484b1",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase1/final-closure.md",
+          "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+        }
+      ],
+      "obligationDefinitionHash": "9bc1bd68ad27b0f6dd9ae6c3c8e70a5f4f9d41c3cd7d8d5007b96799016447ea",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T06:05:13.9246768Z",
+      "workPackages": ["P1-04"]
+    },
+    "GEN-PROD-025@phase1": {
+      "commit": "70119839059ea51427e97cb48d675569197484b1",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase1/final-closure.md",
+          "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+        }
+      ],
+      "obligationDefinitionHash": "3e70b0d789fedaa1ee9a16827e3a82fd35fd084aad34f2914454128632e29aa6",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T06:05:13.9246768Z",
+      "workPackages": ["P1-03"]
+    },
+    "TM-01@phase1": {
+      "commit": "70119839059ea51427e97cb48d675569197484b1",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase1/final-closure.md",
+          "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+        }
+      ],
+      "obligationDefinitionHash": "4052b49dfdddfe4e07e13d8947fd7e3cc9db83d402329e0776ae0aeb50e69d56",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T06:05:13.9246768Z",
+      "workPackages": ["P1-01", "P1-04"]
+    },
+    "TM-02@phase1": {
+      "commit": "70119839059ea51427e97cb48d675569197484b1",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase1/final-closure.md",
+          "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+        }
+      ],
+      "obligationDefinitionHash": "d1441f3cb0347dd4703e173096824eaa25b5c8f9a37e26cf87b5b902d1e01b08",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T06:05:13.9246768Z",
+      "workPackages": ["P1-01", "P1-02"]
+    },
+    "TM-03@phase1": {
+      "commit": "70119839059ea51427e97cb48d675569197484b1",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase1/final-closure.md",
+          "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+        }
+      ],
+      "obligationDefinitionHash": "641282fd804744de2857bcbc2d0e5e5b3aeb5cfba76e4a947dd647aa16e5260b",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T06:05:13.9246768Z",
+      "workPackages": ["P1-02"]
+    },
+    "TM-05@phase1": {
+      "commit": "70119839059ea51427e97cb48d675569197484b1",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase1/final-closure.md",
+          "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+        }
+      ],
+      "obligationDefinitionHash": "98ab53d74c6b7ec7a7fa2acac807403e392317deebb73ed761c734a3209f26e6",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T06:05:13.9246768Z",
+      "workPackages": ["P1-01"]
+    },
+    "TM-06@phase1": {
+      "commit": "70119839059ea51427e97cb48d675569197484b1",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase1/final-closure.md",
+          "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+        }
+      ],
+      "obligationDefinitionHash": "a29886b256d23487c25af639e36ed4cbf2d603d602de5b3fe83b53ce23bf31d7",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T06:05:13.9246768Z",
+      "workPackages": ["P1-01"]
+    },
+    "TM-07@phase1": {
+      "commit": "70119839059ea51427e97cb48d675569197484b1",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase1/final-closure.md",
+          "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+        }
+      ],
+      "obligationDefinitionHash": "1f476da9ce96ff3f0aefc39e96a5af6561ee489492700e948034b206380bb117",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T06:05:13.9246768Z",
+      "workPackages": ["P1-01"]
+    },
+    "TM-08@phase1": {
+      "commit": "70119839059ea51427e97cb48d675569197484b1",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase1/final-closure.md",
+          "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+        }
+      ],
+      "obligationDefinitionHash": "8b6b325317150d4c1ddaad6fb540be3b0aa4cd2c1ebd018bd219a1b5d8db18ce",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T06:05:13.9246768Z",
+      "workPackages": ["P1-01"]
+    },
+    "TM-09@phase1": {
+      "commit": "70119839059ea51427e97cb48d675569197484b1",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase1/final-closure.md",
+          "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+        }
+      ],
+      "obligationDefinitionHash": "62d65fab2c3c6bde60c41d25a994a14cf9b690603c57ec9aaac5d035ce65a490",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T06:05:13.9246768Z",
+      "workPackages": ["P1-02"]
+    },
+    "TM-10@phase1": {
+      "commit": "70119839059ea51427e97cb48d675569197484b1",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase1/final-closure.md",
+          "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+        }
+      ],
+      "obligationDefinitionHash": "66d8325945fe86a4620f581dafce21512c636e4cb6429b493139f0af39a9c39b",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T06:05:13.9246768Z",
+      "workPackages": ["P1-01"]
+    },
+    "TM-26@phase1": {
+      "commit": "70119839059ea51427e97cb48d675569197484b1",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase1/final-closure.md",
+          "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+        }
+      ],
+      "obligationDefinitionHash": "610bb1f99a04b3caca442f9d7a1fbcc63157d0ea6b4c7e577910c1c0f331e65d",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T06:05:13.9246768Z",
+      "workPackages": ["P1-05"]
+    },
+    "TM-27@phase1": {
+      "commit": "70119839059ea51427e97cb48d675569197484b1",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase1/final-closure.md",
+          "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+        }
+      ],
+      "obligationDefinitionHash": "a1b2ccf3d6254b34999c31d380fe9e161b3f65058f35424ce954715c89fd0c05",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T06:05:13.9246768Z",
+      "workPackages": ["P1-05"]
+    },
+    "TM-32@phase1": {
+      "commit": "70119839059ea51427e97cb48d675569197484b1",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase1/final-closure.md",
+          "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+        }
+      ],
+      "obligationDefinitionHash": "6a859a0ca75c6ea1f9d135278828d862b786ef5d143ad5c4859626d62ec02d36",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T06:05:13.9246768Z",
+      "workPackages": ["P1-01"]
+    },
+    "TM-37@phase1": {
+      "commit": "70119839059ea51427e97cb48d675569197484b1",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase1/final-closure.md",
+          "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+        }
+      ],
+      "obligationDefinitionHash": "63c7c4c0d0a7e4af9cdbc57351d5e87e2eb25f68688050aa9d6aca07d9b6936f",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T06:05:13.9246768Z",
+      "workPackages": ["P1-01"]
+    },
+    "TM-38@phase1": {
+      "commit": "70119839059ea51427e97cb48d675569197484b1",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase1/final-closure.md",
+          "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+        }
+      ],
+      "obligationDefinitionHash": "f6e108b77bfd8a30b8f11f7d9dd33bbd4914116ccfba6ea9e96d5a854bc4aeb7",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T06:05:13.9246768Z",
+      "workPackages": ["P1-02", "P1-05"]
+    },
+    "TM-40@phase1": {
+      "commit": "70119839059ea51427e97cb48d675569197484b1",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase1/final-closure.md",
+          "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+        }
+      ],
+      "obligationDefinitionHash": "7679718cd319064a045949cf601a808db364e9067fda4e132109f1bea719eeb4",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T06:05:13.9246768Z",
+      "workPackages": ["P1-03"]
+    },
+    "TM-41@phase1": {
+      "commit": "70119839059ea51427e97cb48d675569197484b1",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase1/final-closure.md",
+          "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
+        }
+      ],
+      "obligationDefinitionHash": "fbe91dc820c7309820ce80ecc968a0d5e09f68de2908f70283af6bb74137297b",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T06:05:13.9246768Z",
+      "workPackages": ["P1-02"]
     }
   }
 }

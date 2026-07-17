@@ -37,7 +37,8 @@ current worktree before relying on any status below.
   provider billing may still include failed/refused calls and is recorded.
 - Supabase stores application data, media, diagnostics, QC, cost, and audit.
   Sentry is excluded.
-- Vercel will build from GitHub after the owner creates/links the project.
+- Vercel project `content-genie` is linked to GitHub `main`; the canonical URL
+  is `https://content-genie-three.vercel.app/`.
 - The first 10–20 sample scripts/Episodes are a post-build pilot/tuning set, not
   a software-implementation prerequisite or sufficient calibration proof.
 - Product-calibrated status requires at least 30 calibration plus 20 untouched
@@ -48,8 +49,10 @@ current worktree before relying on any status below.
 - Workspace: `C:\Work\Code\zyrastudio`
 - GitHub: `https://github.com/toolsatZyra/content-genie.git`
 - Branch: `main`
-- Last pushed checkpoint at time of this update:
-  `2b1db34 design: finalize end-to-end Genie architecture`
+- Final Phase 1 code candidate:
+  `7706117bf2ee1b17d115faf14f46a498d1d3c9b0`
+- Phase 1 closure evidence anchor:
+  `70119839059ea51427e97cb48d675569197484b1`
 - The repository intentionally has no persistent `origin`.
 - Push with the explicit URL, for example:
 
@@ -84,9 +87,10 @@ Known environment gaps/state:
   database work.
 - Local Docker is unavailable, so database verification must use isolated
   remote/test paths rather than assuming a local Supabase stack.
-- Vercel CLI/project link is not authenticated. Create/link it only if
-  non-interactive credentials become available; otherwise the owner will do so
-  when the repository is ready.
+- Vercel project ID: `prj_aSnq2s4OL3hw3e8NX29dLPXDFe3g`; team:
+  `team_pwTpdWGJnbaaUJHUGUtCMxVG`. The Git-linked deployment exists, but
+  production runtime variables and the canonical deployment smoke are still
+  pending.
 
 ## 4. Current design artifacts
 
@@ -112,7 +116,7 @@ Known environment gaps/state:
 - `reference/acceptance/traceability-plan.v1.json` — reproducibly generated
   machine acceptance plan.
 - `reference/acceptance/traceability-evidence.v1.json` — durable evidence
-  source; currently empty until implementation checkpoints are committed.
+  source; Phase 0 and Phase 1 checkpoints are verified.
 - `docs/implementation-plan-adversarial-review.md` — independent plan-gate
   report.
 - `reference/rubric-config/` — research rubric inputs, not sufficient alone as
@@ -157,18 +161,25 @@ Completed gates:
 - implementation plan: two independent frozen retests PASS with no P0/P1;
 - generated acceptance ledger: 207 requirements, 280 checkpoint obligations,
   49 valid work packages, exact verification/checkpoint matching, and
-  adversarial rejection of stale or fabricated proof.
+  adversarial rejection of stale or fabricated proof;
+- Phase 0 foundation: exact-SHA CI and three independent adversarial reviews
+  passed; six Phase 0 obligations are evidence-verified;
+- Phase 1 identity/data/Studio: 13 migrations, 104 pgTAP assertions, disposable
+  and persistent-preview live gates, 10 browser journeys, and exact-SHA
+  security/test/visual reviews passed; 20 Phase 1 obligations are
+  evidence-verified.
 
 Immediate next sequence:
 
-1. Commit and push the implementation-plan checkpoint.
-2. Build Phase 0 foundation: pinned Next.js/React workspace, typed environment
-   boundary, test harnesses, diagnostics, and Living Cinema application shell.
-3. Commit evidence, run independent review and adversarial runtime checks, then
-   push the Phase 0 checkpoint.
-4. Implement Phases 1–4 in order, repeating the same evidence/review/push gate.
-5. Ship the deployment runbook and Vercel-ready repository; link Vercel if
-   authenticated access becomes available.
+1. Regenerate and close the Phase 1 evidence checkpoint.
+2. Promote the reviewed Phase 1 migration branch to the production Supabase
+   project and verify schema, RLS, lint, and security advisors.
+3. Configure the linked Vercel project with production-safe Phase 1 variables
+   and all future-feature gates disabled; smoke the canonical deployment.
+4. Implement Phase 2 immutable script ingestion, 117-look registry, world
+   anchors, provider preflight, and atomic World Lock.
+5. Continue Phases 3–4 with the same exact-SHA evidence and independent
+   adversarial gates, then complete launch and film-quality calibration.
 
 ## 7. Verification standard
 
