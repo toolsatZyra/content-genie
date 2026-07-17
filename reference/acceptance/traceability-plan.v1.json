@@ -901,12 +901,12 @@
           "status": "verified",
           "evidence": [
             {
-              "path": "docs/evidence/phase0/gate-report.md",
-              "sha256": "67442f06fc29ad2da8cc4899ff51f8f6aa8a21aaf6e0f9d3e62937a821bbb04b"
+              "path": "docs/evidence/phase0/final-closure.md",
+              "sha256": "8846b013a1a87d78ddacc0a2f6be3039504f8d68e74760efce4b91c0061b3ab7"
             }
           ],
-          "commit": "e5ff4fda1481eb9a8e39f5bb9e5b9c0de37d914b",
-          "verifiedAt": "2026-07-17T00:24:59.7606950Z"
+          "commit": "230913aea1aebcea1a6715db7c3715af1d6b239c",
+          "verifiedAt": "2026-07-17T00:50:26.3682771Z"
         },
         {
           "obligationId": "GEN-PROD-024@phase4",
@@ -2204,12 +2204,12 @@
           "status": "verified",
           "evidence": [
             {
-              "path": "docs/evidence/phase0/gate-report.md",
-              "sha256": "67442f06fc29ad2da8cc4899ff51f8f6aa8a21aaf6e0f9d3e62937a821bbb04b"
+              "path": "docs/evidence/phase0/final-closure.md",
+              "sha256": "8846b013a1a87d78ddacc0a2f6be3039504f8d68e74760efce4b91c0061b3ab7"
             }
           ],
-          "commit": "e5ff4fda1481eb9a8e39f5bb9e5b9c0de37d914b",
-          "verifiedAt": "2026-07-17T00:24:59.7606950Z"
+          "commit": "230913aea1aebcea1a6715db7c3715af1d6b239c",
+          "verifiedAt": "2026-07-17T00:50:26.3682771Z"
         }
       ],
       "parentStatus": "verified",
@@ -2845,12 +2845,12 @@
           "status": "verified",
           "evidence": [
             {
-              "path": "docs/evidence/phase0/gate-report.md",
-              "sha256": "67442f06fc29ad2da8cc4899ff51f8f6aa8a21aaf6e0f9d3e62937a821bbb04b"
+              "path": "docs/evidence/phase0/final-closure.md",
+              "sha256": "8846b013a1a87d78ddacc0a2f6be3039504f8d68e74760efce4b91c0061b3ab7"
             }
           ],
-          "commit": "e5ff4fda1481eb9a8e39f5bb9e5b9c0de37d914b",
-          "verifiedAt": "2026-07-17T00:24:59.7606950Z"
+          "commit": "230913aea1aebcea1a6715db7c3715af1d6b239c",
+          "verifiedAt": "2026-07-17T00:50:26.3682771Z"
         },
         {
           "obligationId": "TM-25@phase3",
@@ -3111,12 +3111,12 @@
           "status": "verified",
           "evidence": [
             {
-              "path": "docs/evidence/phase0/gate-report.md",
-              "sha256": "67442f06fc29ad2da8cc4899ff51f8f6aa8a21aaf6e0f9d3e62937a821bbb04b"
+              "path": "docs/evidence/phase0/final-closure.md",
+              "sha256": "8846b013a1a87d78ddacc0a2f6be3039504f8d68e74760efce4b91c0061b3ab7"
             }
           ],
-          "commit": "e5ff4fda1481eb9a8e39f5bb9e5b9c0de37d914b",
-          "verifiedAt": "2026-07-17T00:24:59.7606950Z"
+          "commit": "230913aea1aebcea1a6715db7c3715af1d6b239c",
+          "verifiedAt": "2026-07-17T00:50:26.3682771Z"
         },
         {
           "obligationId": "TM-33@phase4",
@@ -3156,12 +3156,12 @@
           "status": "verified",
           "evidence": [
             {
-              "path": "docs/evidence/phase0/gate-report.md",
-              "sha256": "67442f06fc29ad2da8cc4899ff51f8f6aa8a21aaf6e0f9d3e62937a821bbb04b"
+              "path": "docs/evidence/phase0/final-closure.md",
+              "sha256": "8846b013a1a87d78ddacc0a2f6be3039504f8d68e74760efce4b91c0061b3ab7"
             }
           ],
-          "commit": "e5ff4fda1481eb9a8e39f5bb9e5b9c0de37d914b",
-          "verifiedAt": "2026-07-17T00:24:59.7606950Z"
+          "commit": "230913aea1aebcea1a6715db7c3715af1d6b239c",
+          "verifiedAt": "2026-07-17T00:50:26.3682771Z"
         }
       ],
       "parentStatus": "verified",
@@ -3187,12 +3187,12 @@
           "status": "verified",
           "evidence": [
             {
-              "path": "docs/evidence/phase0/gate-report.md",
-              "sha256": "67442f06fc29ad2da8cc4899ff51f8f6aa8a21aaf6e0f9d3e62937a821bbb04b"
+              "path": "docs/evidence/phase0/final-closure.md",
+              "sha256": "8846b013a1a87d78ddacc0a2f6be3039504f8d68e74760efce4b91c0061b3ab7"
             }
           ],
-          "commit": "e5ff4fda1481eb9a8e39f5bb9e5b9c0de37d914b",
-          "verifiedAt": "2026-07-17T00:24:59.7606950Z"
+          "commit": "230913aea1aebcea1a6715db7c3715af1d6b239c",
+          "verifiedAt": "2026-07-17T00:50:26.3682771Z"
         },
         {
           "obligationId": "TM-35@phase2",
