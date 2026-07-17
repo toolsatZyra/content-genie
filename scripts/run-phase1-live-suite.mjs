@@ -195,7 +195,7 @@ try {
   const credentials = JSON.parse(
     await readFile(".tmp/phase1-live-credentials.json", "utf8"),
   );
-  run(pnpm, ["exec", "playwright", "test", "--config=playwright.live.config.ts"], {
+  run(node, ["scripts/run-isolated-next-dev.mjs", "4176"], {
     env: {
       ...liveEnvironment,
       GENIE_LIVE_TEST_EMAIL: credentials.email,

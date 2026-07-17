@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join, resolve, sep } from "node:path";
@@ -13,6 +13,20 @@ const temporaryRoot = resolve(root, ".tmp", "isolated-next");
 const runtimeDirectory = resolve(temporaryRoot, String(process.pid));
 if (!runtimeDirectory.startsWith(`${temporaryRoot}${sep}`)) {
   throw new Error("The isolated Next runtime escaped the temporary root.");
+}
+
+const required = [
+  "GENIE_LIVE_SUPABASE_URL",
+  "GENIE_LIVE_SUPABASE_ANON_KEY",
+  "GENIE_LIVE_SUPABASE_SERVICE_ROLE_KEY",
+  "GENIE_LIVE_TEST_EMAIL",
+  "GENIE_LIVE_TEST_OBJECT_PATH",
+  "GENIE_LIVE_TEST_OUTSIDER_EMAIL",
+  "GENIE_LIVE_TEST_PASSWORD",
+  "GENIE_LIVE_TEST_PROJECT_REF",
+];
+for (const name of required) {
+  if (!process.env[name]) throw new Error(`${name} is required for live validation`);
 }
 
 rmSync(runtimeDirectory, { force: true, recursive: true });
@@ -37,49 +51,114 @@ for (const file of [
 }
 const require = createRequire(import.meta.url);
 const nextExecutable = require.resolve("next/dist/bin/next");
+const playwrightExecutable = require.resolve("@playwright/test/cli");
+
 function cleanup() {
-  try {
-    rmSync(runtimeDirectory, {
-      force: true,
-      maxRetries: 5,
-      recursive: true,
-      retryDelay: 100,
-    });
-  } catch {
-    // The runtime is already contained in .tmp; a transient Windows file lock
-    // may defer deletion without polluting or changing the source tree.
+  rmSync(runtimeDirectory, {
+    force: true,
+    maxRetries: 10,
+    recursive: true,
+    retryDelay: 200,
+  });
+  if (existsSync(runtimeDirectory)) {
+    throw new Error("The isolated Next runtime was not removed.");
   }
 }
 
-const child = spawn(
+const baseUrl = `http://127.0.0.1:${port}`;
+const server = spawn(
   process.execPath,
   [nextExecutable, "dev", "--webpack", "-H", "127.0.0.1", "-p", port],
   {
     cwd: runtimeDirectory,
-    env: process.env,
+    env: {
+      ...process.env,
+      GENIE_ENABLE_EXPORT: "false",
+      GENIE_ENABLE_FINAL_APPROVAL: "false",
+      GENIE_ENABLE_PROVIDER_SPEND: "false",
+      GENIE_ENABLE_RENDER: "false",
+      GENIE_ENVIRONMENT: "preview",
+      NEXT_PUBLIC_APP_URL: baseUrl,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.GENIE_LIVE_SUPABASE_ANON_KEY,
+      NEXT_PUBLIC_SUPABASE_URL: process.env.GENIE_LIVE_SUPABASE_URL,
+      SUPABASE_PROJECT_REF: "",
+      SUPABASE_SERVICE_ROLE_KEY: process.env.GENIE_LIVE_SUPABASE_SERVICE_ROLE_KEY,
+      SUPABASE_TEST_PROJECT_REF: process.env.GENIE_LIVE_TEST_PROJECT_REF,
+    },
     shell: false,
     stdio: "inherit",
   },
 );
-
-let stopping = false;
-function stop(signal) {
-  if (stopping) return;
-  stopping = true;
-  child.kill(signal);
-}
-process.once("SIGINT", () => stop("SIGINT"));
-process.once("SIGTERM", () => stop("SIGTERM"));
-
-child.once("error", (error) => {
-  cleanup();
-  throw error;
+let serverError = null;
+server.once("error", (error) => {
+  serverError = error;
 });
-child.once("exit", (code, signal) => {
-  cleanup();
-  if (signal) {
-    process.exit(0);
-    return;
+
+async function waitForServer() {
+  for (let attempt = 1; attempt <= 120; attempt += 1) {
+    if (serverError) throw serverError;
+    if (server.exitCode !== null || server.signalCode !== null) {
+      throw new Error("The isolated Next server exited before it became ready.");
+    }
+    try {
+      const response = await fetch(baseUrl, {
+        signal: AbortSignal.timeout(2_000),
+      });
+      if (response.ok) return;
+    } catch {
+      // A cold isolated Next compile can take tens of seconds on Windows.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
   }
-  process.exitCode = code ?? 1;
-});
+  throw new Error("The isolated Next server did not become ready.");
+}
+
+function stopServer() {
+  if (server.exitCode !== null || server.signalCode !== null || !server.pid) return;
+  if (process.platform === "win32") {
+    spawnSync("taskkill.exe", ["/PID", String(server.pid), "/T", "/F"], {
+      shell: false,
+      stdio: "ignore",
+    });
+  } else {
+    server.kill("SIGTERM");
+  }
+}
+
+function runPlaywright() {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const child = spawn(
+      process.execPath,
+      [playwrightExecutable, "test", "--config=playwright.live.config.ts"],
+      {
+        cwd: root,
+        env: {
+          ...process.env,
+          GENIE_LIVE_BASE_URL: baseUrl,
+        },
+        shell: false,
+        stdio: "inherit",
+      },
+    );
+    child.once("error", rejectPromise);
+    child.once("exit", (code, signal) => {
+      if (code === 0) {
+        resolvePromise();
+        return;
+      }
+      rejectPromise(
+        new Error(
+          `Live Playwright exited unsuccessfully (${signal ?? `code ${code ?? 1}`}).`,
+        ),
+      );
+    });
+  });
+}
+
+try {
+  await waitForServer();
+  await runPlaywright();
+} finally {
+  stopServer();
+  cleanup();
+}
