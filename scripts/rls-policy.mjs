@@ -11,6 +11,7 @@ const expectedMigrationSuffixes = [
   "phase1_adversarial_corrections.sql",
   "phase1_realtime_event_publication.sql",
   "phase1_authority_storage_hardening.sql",
+  "phase1_lease_reconciler_visibility.sql",
 ];
 
 const collect = (pattern, value) =>
@@ -111,6 +112,8 @@ export function analyzePhase1Migrations(sources) {
     "authorize_storage_sign",
     "storage.allow_any_operation",
     "owner_id = (select auth.uid()::text)",
+    "reconcile_expired_work_leases",
+    "live.id not in (select id from changed)",
   ]) {
     if (!normalized.includes(required)) {
       errors.push(`missing Phase 1 invariant: ${required}`);

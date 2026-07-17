@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type {
   StudioSearchCursor,
@@ -51,8 +51,11 @@ export function useStudioSearch(query: string, workspaceId: string) {
   const normalizedQuery = query.trim();
   const searchKey = `${workspaceId}:${normalizedQuery}`;
   const [state, setState] = useState<SearchState>(idleState);
+  const paginationController = useRef<AbortController | null>(null);
 
   useEffect(() => {
+    paginationController.current?.abort();
+    paginationController.current = null;
     if (normalizedQuery.length < 2) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
@@ -83,6 +86,8 @@ export function useStudioSearch(query: string, workspaceId: string) {
     return () => {
       window.clearTimeout(timer);
       controller.abort();
+      paginationController.current?.abort();
+      paginationController.current = null;
     };
   }, [normalizedQuery, searchKey, workspaceId]);
 
@@ -94,27 +99,50 @@ export function useStudioSearch(query: string, workspaceId: string) {
 
   async function loadMore(): Promise<void> {
     if (!visibleState.nextCursor || visibleState.loading) return;
-    setState((current) => ({ ...current, loading: true }));
+    const initiatingSearchKey = searchKey;
+    const controller = new AbortController();
+    paginationController.current?.abort();
+    paginationController.current = controller;
+    setState((current) =>
+      current.searchKey === initiatingSearchKey
+        ? { ...current, loading: true }
+        : current,
+    );
     try {
       const page = await requestSearchPage(
         workspaceId,
         normalizedQuery,
         visibleState.nextCursor,
+        controller.signal,
       );
-      setState((current) => ({
-        error: "",
-        loading: false,
-        matches: [...current.matches, ...page.matches],
-        nextCursor: page.nextCursor,
-        searchKey,
-        total: page.total,
-      }));
+      setState((current) =>
+        current.searchKey === initiatingSearchKey
+          ? {
+              error: "",
+              loading: false,
+              matches: [...current.matches, ...page.matches],
+              nextCursor: page.nextCursor,
+              searchKey: initiatingSearchKey,
+              total: page.total,
+            }
+          : current,
+      );
     } catch {
-      setState((current) => ({
-        ...current,
-        error: "More results could not be loaded.",
-        loading: false,
-      }));
+      if (!controller.signal.aborted) {
+        setState((current) =>
+          current.searchKey === initiatingSearchKey
+            ? {
+                ...current,
+                error: "More results could not be loaded.",
+                loading: false,
+              }
+            : current,
+        );
+      }
+    } finally {
+      if (paginationController.current === controller) {
+        paginationController.current = null;
+      }
     }
   }
 

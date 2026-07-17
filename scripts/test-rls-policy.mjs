@@ -15,6 +15,7 @@ const filenames = [
   "0010_phase1_adversarial_corrections.sql",
   "0011_phase1_realtime_event_publication.sql",
   "0012_phase1_authority_storage_hardening.sql",
+  "0013_phase1_lease_reconciler_visibility.sql",
 ];
 const fixture = `
 create table public.sample (id uuid);
@@ -50,6 +51,8 @@ select 'invitations_require_active_issuer_before_consumption';
 select 'authorize_storage_sign';
 select 'storage.allow_any_operation';
 select 'owner_id = (select auth.uid()::text)';
+select 'reconcile_expired_work_leases';
+select 'live.id not in (select id from changed)';
 `;
 const source = filenames.map((file, index) => ({
   file,

@@ -1,6 +1,10 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 
+import {
+  episodeStatePresentation,
+  episodeWorkflowStates,
+} from "../../src/domain/studio";
 import type { StudioSearchMatch } from "../../src/domain/studio-search";
 import { deterministicStudioProjection } from "../../src/test/fakes/studio";
 
@@ -428,6 +432,66 @@ test("Phase 1 fixture remains accessible and continuous at 390px", async ({ page
   await page.getByRole("button", { name: "Close composer" }).click();
 });
 
+test("Phase 1 empty and complete state fixtures remain accessible at every target width", async ({
+  page,
+}) => {
+  const viewports = [
+    { height: 900, name: "desktop", width: 1440 },
+    { height: 1024, name: "tablet", width: 820 },
+    { height: 844, name: "mobile", width: 390 },
+  ] as const;
+  const expectedLabels = episodeWorkflowStates.map(
+    (state) => episodeStatePresentation(state).label,
+  );
+
+  for (const viewport of viewports) {
+    await test.step(`${viewport.name} empty state`, async () => {
+      await page.setViewportSize(viewport);
+      await page.goto("/?fixture=phase1-empty", { waitUntil: "domcontentloaded" });
+      await expect(page.locator("#main-content")).toHaveAttribute(
+        "data-hydrated",
+        "true",
+      );
+      await expect(
+        page.getByRole("heading", { name: "The first frame is yours." }),
+      ).toBeVisible();
+      expect(
+        await page.evaluate(
+          () =>
+            document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(1);
+    });
+
+    await test.step(`${viewport.name} mixed workflow states`, async () => {
+      await page.goto("/?fixture=phase1-states", { waitUntil: "domcontentloaded" });
+      await expect(page.locator("#main-content")).toHaveAttribute(
+        "data-hydrated",
+        "true",
+      );
+      const cards = page.locator(".live-episode-card");
+      await expect(cards).toHaveCount(episodeWorkflowStates.length);
+      await expect(cards.locator(".state-chip")).toHaveText(expectedLabels);
+      await expect(page.getByText("Resumed production", { exact: true })).toBeVisible();
+      await expect(
+        page.getByText("Happy path approved", { exact: true }),
+      ).toBeVisible();
+      expect(
+        await page.evaluate(
+          () =>
+            document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(1);
+      const results = await new AxeBuilder({ page }).analyze();
+      expect(
+        results.violations.filter(
+          ({ impact }) => impact === "critical" || impact === "serious",
+        ),
+      ).toEqual([]);
+    });
+  }
+});
+
 test("Phase 1 global search opens an authorized Episode beyond the initial projection", async ({
   page,
 }) => {
@@ -459,6 +523,107 @@ test("Phase 1 global search opens an authorized Episode beyond the initial proje
     }),
   ).toBeVisible();
   await expect(page.getByText("3 active")).toBeVisible();
+});
+
+test("Phase 1 global search ignores stale pagination after the query changes", async ({
+  page,
+}) => {
+  const projection = deterministicStudioProjection();
+  const alphaFirst = {
+    id: projection.series[0]!.id,
+    kind: "Series" as const,
+    label: "Alpha First",
+    series: { ...projection.series[0]!, title: "Alpha First" },
+  };
+  const alphaLater = {
+    id: projection.series[1]!.id,
+    kind: "Series" as const,
+    label: "Alpha Later",
+    series: { ...projection.series[1]!, title: "Alpha Later" },
+  };
+  const betaCurrent = {
+    id: projection.episodes[0]!.id,
+    kind: "Episode" as const,
+    label: "Beta Current",
+    episode: { ...projection.episodes[0]!, title: "Beta Current" },
+    series: projection.series[0]!,
+  };
+  let markAlphaLaterSettled: (() => void) | undefined;
+  let markAlphaLaterStarted: (() => void) | undefined;
+  let releaseAlphaLater: (() => void) | undefined;
+  const alphaLaterStarted = new Promise<void>((resolve) => {
+    markAlphaLaterStarted = resolve;
+  });
+  const alphaLaterGate = new Promise<void>((resolve) => {
+    releaseAlphaLater = resolve;
+  });
+  const alphaLaterSettled = new Promise<void>((resolve) => {
+    markAlphaLaterSettled = resolve;
+  });
+
+  await page.route("**/api/studio/search?**", async (route) => {
+    const parameters = new URL(route.request().url()).searchParams;
+    const query = parameters.get("q");
+    const seriesOffset = Number(parameters.get("seriesOffset") ?? 0);
+    if (query === "Alpha" && seriesOffset === 0) {
+      await route.fulfill({
+        body: JSON.stringify({
+          matches: [alphaFirst],
+          nextCursor: { episodeOffset: 0, seriesOffset: 1 },
+          total: 2,
+        }),
+        contentType: "application/json",
+        status: 200,
+      });
+      return;
+    }
+    if (query === "Alpha" && seriesOffset === 1) {
+      markAlphaLaterStarted?.();
+      await alphaLaterGate;
+      try {
+        await route.fulfill({
+          body: JSON.stringify({
+            matches: [alphaLater],
+            nextCursor: null,
+            total: 2,
+          }),
+          contentType: "application/json",
+          status: 200,
+        });
+      } catch {
+        // Query changes intentionally abort an in-flight stale page.
+      } finally {
+        markAlphaLaterSettled?.();
+      }
+      return;
+    }
+    await route.fulfill({
+      body: JSON.stringify({
+        matches: query === "Beta" ? [betaCurrent] : [],
+        nextCursor: null,
+        total: query === "Beta" ? 1 : 0,
+      }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
+
+  await page.goto("/?fixture=phase1", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#main-content")).toHaveAttribute("data-hydrated", "true");
+  await page.getByRole("button", { name: "Open global search" }).click();
+  const search = page.getByRole("searchbox");
+  await search.fill("Alpha");
+  await expect(page.getByText("Alpha First", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Show more of 2" }).click();
+  await alphaLaterStarted;
+  await search.fill("Beta");
+  await expect(page.getByText("Beta Current", { exact: true })).toBeVisible();
+
+  releaseAlphaLater?.();
+  await alphaLaterSettled;
+  await expect(page.getByText("Beta Current", { exact: true })).toBeVisible();
+  await expect(page.getByText("Searching authorized studio…")).toBeHidden();
+  await expect(page.getByText("Alpha Later", { exact: true })).toBeHidden();
 });
 
 test("Phase 1 shell renders persisted markup payloads only as inert text", async ({

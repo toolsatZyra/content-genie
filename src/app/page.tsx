@@ -9,7 +9,11 @@ import {
   hasConfiguredSupabase,
 } from "@/lib/supabase/server";
 import { loadStudioProjection } from "@/server/studio-query";
-import { deterministicStudioProjection } from "@/test/fakes/studio";
+import {
+  deterministicEmptyStudioProjection,
+  deterministicStateMatrixProjection,
+  deterministicStudioProjection,
+} from "@/test/fakes/studio";
 
 interface HomePageProps {
   readonly searchParams: Promise<{
@@ -29,16 +33,22 @@ function authNotice(code: string | undefined): string | undefined {
 export default async function HomePage({ searchParams }: HomePageProps) {
   const canary = consumeBuildSecretCanary();
   const parameters = await searchParams;
-  if (
-    getServerEnvironment().environment === "test" &&
-    parameters.fixture === "phase1"
-  ) {
-    const projection = deterministicStudioProjection();
+  const fixtureProjection =
+    getServerEnvironment().environment === "test"
+      ? parameters.fixture === "phase1"
+        ? deterministicStudioProjection()
+        : parameters.fixture === "phase1-states"
+          ? deterministicStateMatrixProjection()
+          : parameters.fixture === "phase1-empty"
+            ? deterministicEmptyStudioProjection()
+            : undefined
+      : undefined;
+  if (fixtureProjection) {
     return (
       <div data-server-secret-boundary={canary}>
         <AuthenticatedStudio
-          key={projection.workspace.id}
-          projection={projection}
+          key={fixtureProjection.workspace.id}
+          projection={fixtureProjection}
           realtimeEnabled={false}
         />
       </div>

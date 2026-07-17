@@ -98,6 +98,7 @@ const outsiderSignIn = await outsider.auth.signInWithPassword({
 });
 if (outsiderSignIn.error) throw outsiderSignIn.error;
 const validateRealtime = process.env.GENIE_LIVE_SKIP_REALTIME !== "1";
+const realtimeReadinessAttempts = [];
 
 function subscribe(channel, label) {
   return new Promise((resolve, reject) => {
@@ -174,6 +175,31 @@ async function connectRealtime(pair, label) {
     `${label} Realtime replication readiness`,
     60_000,
   );
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const probe = await insert("domain_events", {
+      actor_kind: "system",
+      actor_principal: "phase1-live-harness",
+      aggregate_id: randomUUID(),
+      aggregate_sequence: 1,
+      aggregate_type: "workspace",
+      correlation_id: randomUUID(),
+      event_type: "phase1.realtime.ready.v1",
+      safe_payload: { attempt, label, probe: true },
+      workspace_id: workspace.id,
+    });
+    try {
+      await waitFor(
+        () => pair.state.ownerEvents.some(({ new: row }) => row?.id === probe.id),
+        `${label} Realtime readiness probe ${attempt}`,
+        10_000,
+      );
+      realtimeReadinessAttempts.push({ attempt, label, status: "received" });
+      return;
+    } catch (error) {
+      realtimeReadinessAttempts.push({ attempt, label, status: "missed" });
+      if (attempt === 3) throw error;
+    }
+  }
 }
 
 async function disconnectRealtime(pair) {
@@ -541,6 +567,7 @@ console.log(
     directSignedUpload: "denied",
     liveUser: "created",
     realtimeIsolation: realtimeReconciliation,
+    realtimeReadinessAttempts,
     realtimeReconnectReconciliation: realtimeReconciliation,
     directSignedUrl: "denied",
     storageIsolation: "pass",

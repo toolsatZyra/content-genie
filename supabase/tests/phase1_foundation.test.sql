@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, auth, storage, private, audit, pg_catalog;
 
-select plan(95);
+select plan(104);
 
 insert into public.organizations (id, name, slug)
 values ('10000000-0000-0000-0000-000000000001', 'Zyra', 'zyra');
@@ -388,6 +388,47 @@ select is(
 
 select lives_ok(
   $command$
+    select public.command_archive_series(
+      '10000000-0000-0000-0000-000000000101',
+      (select id from public.series where slug = 'shiva-stories'),
+      1,
+      '40000000-0000-0000-0000-000000000014',
+      'series-archive-0001',
+      repeat('6', 64),
+      '50000000-0000-0000-0000-000000000014'
+    )
+  $command$,
+  'the owner archives a Series through its compare-and-swap command'
+);
+select is(
+  (select state::text from public.series where slug = 'shiva-stories'),
+  'archived',
+  'the Series is archived reversibly'
+);
+select is(
+  (select aggregate_version from public.series where slug = 'shiva-stories'),
+  2::bigint,
+  'the successful archive advances the Series aggregate version'
+);
+select throws_ok(
+  $command$
+    select public.command_archive_series(
+      '10000000-0000-0000-0000-000000000101',
+      (select id from public.series where slug = 'shiva-stories'),
+      1,
+      '40000000-0000-0000-0000-000000000015',
+      'series-archive-stale-0001',
+      repeat('7', 64),
+      '50000000-0000-0000-0000-000000000015'
+    )
+  $command$,
+  '40001',
+  'Series conflict or authorization failure',
+  'a stale Series archive version loses deterministically'
+);
+
+select lives_ok(
+  $command$
     select public.command_claim_work_item(
       '10000000-0000-0000-0000-000000000101',
       (select id from public.work_items order by created_at limit 1),
@@ -409,6 +450,53 @@ select is(
   (select max(fencing_token) from public.work_leases),
   1::bigint,
   'the initial lease receives fence one'
+);
+
+reset role;
+update public.work_leases
+set acquired_at = statement_timestamp() - interval '2 minutes',
+    heartbeat_at = statement_timestamp() - interval '2 minutes',
+    expires_at = statement_timestamp() - interval '1 second'
+where fencing_token = 1;
+select is(
+  private.reconcile_expired_work_leases(100),
+  1,
+  'the lease reconciler reopens exactly one item after expiry'
+);
+select is(
+  (
+    select w.state::text
+    from public.work_items w
+    join public.work_leases l on l.work_item_id = w.id
+    where l.fencing_token = 1
+  ),
+  'open',
+  'expired work becomes claimable again'
+);
+set local role authenticated;
+select lives_ok(
+  $command$
+    select public.command_claim_work_item(
+      '10000000-0000-0000-0000-000000000101',
+      (select work_item_id from public.work_leases where fencing_token = 1),
+      300,
+      '40000000-0000-0000-0000-000000000016',
+      'work-claim-takeover-0001',
+      repeat('8', 64),
+      '50000000-0000-0000-0000-000000000016'
+    )
+  $command$,
+  'eligible member takes over work after the prior lease expires'
+);
+select is(
+  (select max(fencing_token) from public.work_leases where lease_state = 'active'),
+  2::bigint,
+  'the takeover receives the higher active fencing token'
+);
+select is(
+  (select count(*) from public.work_leases where lease_state = 'active'),
+  1::bigint,
+  'only the highest-fenced lease remains active'
 );
 
 reset role;

@@ -1,4 +1,8 @@
-import type { StudioProjection } from "@/domain/studio";
+import {
+  episodeWorkflowStates,
+  type EpisodeWorkflowState,
+  type StudioProjection,
+} from "@/domain/studio";
 
 const workspaceId = "10000000-0000-4000-8000-000000000001";
 const userId = "10000000-0000-4000-8000-000000000002";
@@ -102,5 +106,47 @@ export function deterministicStudioProjection(): StudioProjection {
         slug: "zyra-internal",
       },
     ],
+  };
+}
+
+const scenarioTitles: Partial<Record<EpisodeWorkflowState, string>> = {
+  approved: "Happy path approved",
+  producing: "Resumed production",
+};
+
+export function deterministicStateMatrixProjection(): StudioProjection {
+  const projection = deterministicStudioProjection();
+  const template = projection.episodes[0]!;
+  return {
+    ...projection,
+    episodes: episodeWorkflowStates.map((workflowState, index) => ({
+      ...template,
+      aggregateVersion: index + 1,
+      costEstimateMinor: index % 3 === 0 ? null : 2500 + index * 100,
+      episodeNumber: index + 1,
+      id: `10000000-0000-4000-8000-0000000000${(32 + index)
+        .toString(16)
+        .padStart(2, "0")}`,
+      progressPercent: Math.round((index / (episodeWorkflowStates.length - 1)) * 100),
+      summary: `Deterministic ${workflowState} acceptance fixture.`,
+      title:
+        scenarioTitles[workflowState] ?? `State: ${workflowState.replaceAll("_", " ")}`,
+      updatedAt: new Date(Date.UTC(2026, 6, 17, index)).toISOString(),
+      workflowState,
+    })),
+    notifications: [],
+    work: [],
+  };
+}
+
+export function deterministicEmptyStudioProjection(): StudioProjection {
+  const projection = deterministicStudioProjection();
+  return {
+    ...projection,
+    activities: [],
+    episodes: [],
+    notifications: [],
+    series: [],
+    work: [],
   };
 }
