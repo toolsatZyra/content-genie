@@ -898,10 +898,15 @@
           "plannedCodeOrSchemaOwner": "src/observability; src/config",
           "automatedProof": "diagnostic schema/redaction/no-Sentry tests",
           "manualProof": "none",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase0/gate-report.md",
+              "sha256": "67442f06fc29ad2da8cc4899ff51f8f6aa8a21aaf6e0f9d3e62937a821bbb04b"
+            }
+          ],
+          "commit": "e5ff4fda1481eb9a8e39f5bb9e5b9c0de37d914b",
+          "verifiedAt": "2026-07-17T00:24:59.7606950Z"
         },
         {
           "obligationId": "GEN-PROD-024@phase4",
@@ -2196,13 +2201,18 @@
           "plannedCodeOrSchemaOwner": "env/build",
           "automatedProof": "TM-04 phase0 - seeded bundle/source-map scan",
           "manualProof": "build artifact review",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase0/gate-report.md",
+              "sha256": "67442f06fc29ad2da8cc4899ff51f8f6aa8a21aaf6e0f9d3e62937a821bbb04b"
+            }
+          ],
+          "commit": "e5ff4fda1481eb9a8e39f5bb9e5b9c0de37d914b",
+          "verifiedAt": "2026-07-17T00:24:59.7606950Z"
         }
       ],
-      "parentStatus": "unimplemented",
+      "parentStatus": "verified",
       "parentStatusRule": "verified only when every required obligation is verified; failed dominates; deferred_external is milestone-scoped"
     },
     {
@@ -2832,10 +2842,15 @@
           "plannedCodeOrSchemaOwner": "src/observability/redaction.ts",
           "automatedProof": "seeded canary across logs/errors/client/build surfaces",
           "manualProof": "Phase-0 restricted log review",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase0/gate-report.md",
+              "sha256": "67442f06fc29ad2da8cc4899ff51f8f6aa8a21aaf6e0f9d3e62937a821bbb04b"
+            }
+          ],
+          "commit": "e5ff4fda1481eb9a8e39f5bb9e5b9c0de37d914b",
+          "verifiedAt": "2026-07-17T00:24:59.7606950Z"
         },
         {
           "obligationId": "TM-25@phase3",
@@ -3093,10 +3108,15 @@
           "plannedCodeOrSchemaOwner": "src/config/server-env.ts",
           "automatedProof": "publishing adapter absent/disabled in secretless build",
           "manualProof": "none",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase0/gate-report.md",
+              "sha256": "67442f06fc29ad2da8cc4899ff51f8f6aa8a21aaf6e0f9d3e62937a821bbb04b"
+            }
+          ],
+          "commit": "e5ff4fda1481eb9a8e39f5bb9e5b9c0de37d914b",
+          "verifiedAt": "2026-07-17T00:24:59.7606950Z"
         },
         {
           "obligationId": "TM-33@phase4",
@@ -3133,13 +3153,18 @@
           "plannedCodeOrSchemaOwner": "CI/dependencies",
           "automatedProof": "TM-34 phase0 - lock/SBOM/scan/secretless fork",
           "manualProof": "dependency review",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase0/gate-report.md",
+              "sha256": "67442f06fc29ad2da8cc4899ff51f8f6aa8a21aaf6e0f9d3e62937a821bbb04b"
+            }
+          ],
+          "commit": "e5ff4fda1481eb9a8e39f5bb9e5b9c0de37d914b",
+          "verifiedAt": "2026-07-17T00:24:59.7606950Z"
         }
       ],
-      "parentStatus": "unimplemented",
+      "parentStatus": "verified",
       "parentStatusRule": "verified only when every required obligation is verified; failed dominates; deferred_external is milestone-scoped"
     },
     {
@@ -3159,10 +3184,15 @@
           "plannedCodeOrSchemaOwner": "src/config; CI secretless fork",
           "automatedProof": "production-shaped project/key denial in preview config",
           "manualProof": "none",
-          "status": "unimplemented",
-          "evidence": [],
-          "commit": null,
-          "verifiedAt": null
+          "status": "verified",
+          "evidence": [
+            {
+              "path": "docs/evidence/phase0/gate-report.md",
+              "sha256": "67442f06fc29ad2da8cc4899ff51f8f6aa8a21aaf6e0f9d3e62937a821bbb04b"
+            }
+          ],
+          "commit": "e5ff4fda1481eb9a8e39f5bb9e5b9c0de37d914b",
+          "verifiedAt": "2026-07-17T00:24:59.7606950Z"
         },
         {
           "obligationId": "TM-35@phase2",

@@ -1,4 +1,83 @@
 {
   "schemaVersion": "traceability-evidence.v1",
-  "entries": {}
+  "entries": {
+    "GEN-PROD-024@phase0": {
+      "commit": "e5ff4fda1481eb9a8e39f5bb9e5b9c0de37d914b",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase0/gate-report.md",
+          "sha256": "67442f06fc29ad2da8cc4899ff51f8f6aa8a21aaf6e0f9d3e62937a821bbb04b"
+        }
+      ],
+      "obligationDefinitionHash": "ce85bee98cd672c4354bbf5e2348829369aead38d7480d5b47615c3ddfef88a1",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T00:24:59.7606950Z",
+      "workPackages": ["P0-04"]
+    },
+    "TM-04@phase0": {
+      "commit": "e5ff4fda1481eb9a8e39f5bb9e5b9c0de37d914b",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase0/gate-report.md",
+          "sha256": "67442f06fc29ad2da8cc4899ff51f8f6aa8a21aaf6e0f9d3e62937a821bbb04b"
+        }
+      ],
+      "obligationDefinitionHash": "6509b04b46f8b4de1ca4417fb1fdf57ccad8494802d68e0884f15f06dfd10108",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T00:24:59.7606950Z",
+      "workPackages": ["P0-02"]
+    },
+    "TM-25@phase0": {
+      "commit": "e5ff4fda1481eb9a8e39f5bb9e5b9c0de37d914b",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase0/gate-report.md",
+          "sha256": "67442f06fc29ad2da8cc4899ff51f8f6aa8a21aaf6e0f9d3e62937a821bbb04b"
+        }
+      ],
+      "obligationDefinitionHash": "b4acdbd8c20fa2ada8d818c54519bb00b9de958bf5b2ff0b54f1c45169835509",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T00:24:59.7606950Z",
+      "workPackages": ["P0-02", "P0-04"]
+    },
+    "TM-33@phase0": {
+      "commit": "e5ff4fda1481eb9a8e39f5bb9e5b9c0de37d914b",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase0/gate-report.md",
+          "sha256": "67442f06fc29ad2da8cc4899ff51f8f6aa8a21aaf6e0f9d3e62937a821bbb04b"
+        }
+      ],
+      "obligationDefinitionHash": "ea6182a2328905a4494e4c4c5e44c5a2ff00d2f3a28395e806568fc88fbcbc42",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T00:24:59.7606950Z",
+      "workPackages": ["P0-02"]
+    },
+    "TM-34@phase0": {
+      "commit": "e5ff4fda1481eb9a8e39f5bb9e5b9c0de37d914b",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase0/gate-report.md",
+          "sha256": "67442f06fc29ad2da8cc4899ff51f8f6aa8a21aaf6e0f9d3e62937a821bbb04b"
+        }
+      ],
+      "obligationDefinitionHash": "0441bef58a949f58fc3db44fba9df6c8a32e3d9aed868e85575035c670b3925b",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T00:24:59.7606950Z",
+      "workPackages": ["P0-01"]
+    },
+    "TM-35@phase0": {
+      "commit": "e5ff4fda1481eb9a8e39f5bb9e5b9c0de37d914b",
+      "evidence": [
+        {
+          "path": "docs/evidence/phase0/gate-report.md",
+          "sha256": "67442f06fc29ad2da8cc4899ff51f8f6aa8a21aaf6e0f9d3e62937a821bbb04b"
+        }
+      ],
+      "obligationDefinitionHash": "9d277fd18a4601a2874c6d698deced7dcecf2e1bfe5869558874e0881968abc7",
+      "status": "verified",
+      "verifiedAt": "2026-07-17T00:24:59.7606950Z",
+      "workPackages": ["P0-02", "P0-03"]
+    }
+  }
 }
