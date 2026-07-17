@@ -135,7 +135,7 @@ const realtimeFilter = {
   event: "*",
   filter: `workspace_id=eq.${workspace.id}`,
   schema: "public",
-  table: "series",
+  table: "domain_events",
 };
 const ownerChannel = owner
   .channel(`phase1-owner-${suffix}`, {
@@ -186,7 +186,10 @@ const firstSeries = await owner.rpc("command_create_series", createParameters);
 if (firstSeries.error) throw firstSeries.error;
 if (validateRealtime) {
   await waitFor(
-    () => ownerEvents.some(({ new: row }) => row?.id === firstSeries.data.seriesId),
+    () =>
+      ownerEvents.some(
+        ({ new: row }) => row?.aggregate_id === firstSeries.data.seriesId,
+      ),
     "owner Realtime delivery",
   );
   await new Promise((resolve) => setTimeout(resolve, 1_500));
