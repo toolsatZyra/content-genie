@@ -1,13 +1,46 @@
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { assertEphemeralBranchDatabase } from "./database-harness-policy.mjs";
+import { isTransientDatabaseFailureOutput } from "./transient-failure-policy.mjs";
 
-const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+const node = process.execPath;
+const supabaseCli = resolve("node_modules", "supabase", "dist", "supabase.js");
+
+const inheritedRuntimeEnvironment = new Set([
+  "APPDATA",
+  "CI",
+  "COMSPEC",
+  "HOME",
+  "HOMEDRIVE",
+  "HOMEPATH",
+  "LANG",
+  "LC_ALL",
+  "LOCALAPPDATA",
+  "NODE_EXTRA_CA_CERTS",
+  "OS",
+  "PATH",
+  "PATHEXT",
+  "SYSTEMDRIVE",
+  "SYSTEMROOT",
+  "TEMP",
+  "TMP",
+  "TMPDIR",
+  "USERPROFILE",
+  "WINDIR",
+]);
+
+export function operatingSystemEnvironment(source) {
+  return Object.fromEntries(
+    Object.entries(source).filter(
+      ([name, value]) =>
+        value !== undefined && inheritedRuntimeEnvironment.has(name.toUpperCase()),
+    ),
+  );
+}
 
 export function buildForwardRollbackSteps(probeName) {
   if (!/^[a-z][a-z0-9_]+$/.test(probeName)) {
@@ -113,15 +146,38 @@ export function validateForwardRollbackTarget(target, environment = process.env)
     }
     return;
   }
-  if (!target.databaseUrl || !target.branchRef || !target.productionProjectRef) {
+  if (!target.branchRef || !target.productionProjectRef) {
     throw new Error(
-      "Remote forward-rollback drill requires db URL, branch ref, and production ref.",
+      "Remote forward-rollback drill requires branch and production refs.",
     );
   }
   if (target.branchRef === target.productionProjectRef) {
     throw new Error("Forward-rollback drill refuses a production-equal project ref.");
   }
-  assertEphemeralBranchDatabase(target.databaseUrl, environment.SUPABASE_DB_URL);
+  if (environment.GENIE_EPHEMERAL_DB_IDENTITY_VERIFIED !== target.branchRef) {
+    throw new Error("Forward-rollback drill requires the parent identity proof.");
+  }
+  if (!environment.PGPASSFILE || !existsSync(environment.PGPASSFILE)) {
+    throw new Error(
+      "Forward-rollback drill requires an isolated PostgreSQL password file.",
+    );
+  }
+  const databaseTarget = new URL(environment.GENIE_EPHEMERAL_DB_TARGET ?? "");
+  if (
+    (databaseTarget.protocol !== "postgres:" &&
+      databaseTarget.protocol !== "postgresql:") ||
+    !databaseTarget.username ||
+    databaseTarget.password ||
+    !databaseTarget.hostname ||
+    databaseTarget.pathname === "/" ||
+    !["require", "verify-ca", "verify-full"].includes(
+      databaseTarget.searchParams.get("sslmode"),
+    ) ||
+    [...databaseTarget.searchParams.keys()].some((key) => key !== "sslmode") ||
+    !environment.GENIE_EPHEMERAL_DB_TARGET.includes(target.branchRef)
+  ) {
+    throw new Error("Forward-rollback drill requires a passwordless branch target.");
+  }
 }
 
 function parseArguments(argv) {
@@ -132,34 +188,63 @@ function parseArguments(argv) {
   };
   return {
     branchRef: value("--branch-ref"),
-    databaseUrl: value("--db-url"),
     mode: "remote",
     productionProjectRef: value("--production-project-ref"),
   };
 }
 
-function runQuery(target, step, sqlPath) {
+export function runForwardRollbackQuery(
+  target,
+  step,
+  sqlPath,
+  {
+    emit = (result) => {
+      if (result.stdout) process.stdout.write(result.stdout);
+      if (result.stderr) process.stderr.write(result.stderr);
+    },
+    pause = (milliseconds) =>
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds),
+    environment = process.env,
+    spawn = spawnSync,
+  } = {},
+) {
   const targetArguments =
-    target.mode === "local" ? ["--local"] : ["--db-url", target.databaseUrl];
+    target.mode === "local"
+      ? ["--local"]
+      : ["--db-url", environment.GENIE_EPHEMERAL_DB_TARGET];
   const maximumAttempts = target.mode === "remote" ? 3 : 1;
   for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
-    const result = spawnSync(
-      pnpm,
-      ["exec", "supabase", "db", "query", ...targetArguments, "--file", sqlPath],
+    const result = spawn(
+      node,
+      [supabaseCli, "db", "query", ...targetArguments, "--file", sqlPath],
       {
         encoding: "utf8",
-        env: process.env,
-        shell: process.platform === "win32",
-        stdio: "inherit",
+        env:
+          target.mode === "local"
+            ? operatingSystemEnvironment(environment)
+            : {
+                ...operatingSystemEnvironment(environment),
+                PGPASSFILE: environment.PGPASSFILE,
+              },
+        shell: false,
+        stdio: "pipe",
       },
     );
     if (result.error) throw result.error;
-    if (result.status === 0) return;
-    if (attempt < maximumAttempts) {
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2_000);
+    const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+    if (result.status === 0) {
+      emit(result);
+      return;
     }
+    const transient = isTransientDatabaseFailureOutput(output);
+    if (!transient || attempt === maximumAttempts) {
+      emit(result);
+      throw new Error(
+        `${step.label} failed after ${attempt} attempt(s) (${transient ? "transient retry budget exhausted" : "non-transient database failure"}).`,
+      );
+    }
+    pause(2_000);
   }
-  throw new Error(`${step.label} failed after ${maximumAttempts} attempt(s).`);
 }
 
 export function runForwardRollbackDrill(target) {
@@ -170,7 +255,7 @@ export function runForwardRollbackDrill(target) {
     for (const [index, step] of buildForwardRollbackSteps(probeName).entries()) {
       const sqlPath = join(tempDirectory, `${index + 1}.sql`);
       writeFileSync(sqlPath, step.sql, { encoding: "utf8", mode: 0o600 });
-      runQuery(target, step, sqlPath);
+      runForwardRollbackQuery(target, step, sqlPath);
     }
   } finally {
     rmSync(tempDirectory, { force: true, recursive: true });

@@ -4,6 +4,8 @@ export const MAX_COMMAND_BYTES = 16_384;
 
 export type CommandType =
   | "episode.create"
+  | "episode.look.select"
+  | "episode.voice.select"
   | "invitation.accept"
   | "invitation.create"
   | "membership.offboard"
@@ -25,7 +27,7 @@ function stableValue(value: unknown): unknown {
   if (value && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
         .map(([key, entry]) => [key, stableValue(entry)]),
     );
   }
@@ -100,6 +102,8 @@ export function parseCommand(value: unknown): ParsedCommand {
   const body = value as Record<string, unknown>;
   const supported: readonly CommandType[] = [
     "episode.create",
+    "episode.look.select",
+    "episode.voice.select",
     "invitation.accept",
     "invitation.create",
     "membership.offboard",
@@ -121,6 +125,22 @@ export function parseCommand(value: unknown): ParsedCommand {
     commandType: body.commandType as CommandType,
     payload: body.payload as Record<string, unknown>,
   };
+}
+
+export function assertExactPayloadKeys(
+  payload: Record<string, unknown>,
+  expectedKeys: readonly string[],
+): void {
+  const actual = Object.keys(payload).sort();
+  const expected = [...expectedKeys].sort();
+  if (
+    actual.length !== expected.length ||
+    actual.some((key, index) => key !== expected[index])
+  ) {
+    throw new CommandValidationError(
+      `Command payload keys must be exactly: ${expected.join(", ")}.`,
+    );
+  }
 }
 
 export function boundedText(

@@ -3,12 +3,11 @@ import { defineConfig, devices } from "@playwright/test";
 const required = [
   "GENIE_LIVE_SUPABASE_URL",
   "GENIE_LIVE_SUPABASE_ANON_KEY",
-  "GENIE_LIVE_SUPABASE_SERVICE_ROLE_KEY",
   "GENIE_LIVE_TEST_EMAIL",
+  "GENIE_LIVE_TEST_EPISODE_ID",
   "GENIE_LIVE_TEST_OBJECT_PATH",
   "GENIE_LIVE_TEST_OUTSIDER_EMAIL",
   "GENIE_LIVE_TEST_PASSWORD",
-  "GENIE_LIVE_TEST_PROJECT_REF",
 ] as const;
 for (const name of required) {
   if (!process.env[name]) throw new Error(`${name} is required for live validation`);
@@ -16,6 +15,7 @@ for (const name of required) {
 
 export default defineConfig({
   expect: { timeout: 20_000 },
+  outputDir: ".tmp/playwright-results",
   testDir: "./tests/live",
   timeout: 120_000,
   workers: 1,

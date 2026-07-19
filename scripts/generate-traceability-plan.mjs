@@ -3,11 +3,14 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
 
+import { assertPhase2PromotionInputs } from "./phase2-implementation-evidence-policy.mjs";
+
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const readJson = (file) => JSON.parse(read(file));
 
 const markdown = read("docs/traceability.md");
+const design = read("docs/design.md");
 const plan = read("docs/implementation-plan.md");
 const qcContract = read("docs/qc-release-contract.md");
 const threatContract = read("docs/threat-model.md");
@@ -37,6 +40,7 @@ const canonicalDefinitionHash = ({
   rationale,
   designContract,
   obligation,
+  definitionBindings,
 }) =>
   sha256(
     JSON.stringify({
@@ -49,6 +53,7 @@ const canonicalDefinitionHash = ({
       plannedCodeOrSchemaOwner: obligation.plannedCodeOrSchemaOwner,
       automatedProof: obligation.automatedProof,
       manualProof: obligation.manualProof,
+      definitionBindings,
     }),
   );
 
@@ -106,7 +111,7 @@ const productDescriptions = {
   "GEN-PROD-021":
     "Route simple motion to Kling 2.5, camera-led motion to Kling 3.0, and other clips to Seedance.",
   "GEN-PROD-022":
-    "Optimize for quality, then cost, then speed, with the stated Episode cost policy.",
+    "Optimize for quality, then reliability, then cost, then speed, with the stated Episode cost policy.",
   "GEN-PROD-023": "Support the launch target of five Episodes per day.",
   "GEN-PROD-024":
     "Persist diagnostics in Supabase without Sentry and permit internal downloads.",
@@ -148,6 +153,26 @@ if (taskIdSet.size !== taskIds.length) {
   throw new Error("Implementation work-package IDs must be unique");
 }
 
+const workPackageBodies = new Map();
+for (const match of plan.matchAll(
+  /^#{3,4} `((?:P[0-4]|D|C)-\d{2})`[^\n]*\n([\s\S]*?)(?=^#{3,4} `(?:P[0-4]|D|C)-\d{2}`|\s*$)/gm,
+)) {
+  workPackageBodies.set(match[1], match[0].trim());
+}
+if (
+  workPackageBodies.size !== taskIdSet.size ||
+  [...taskIdSet].some((id) => !workPackageBodies.has(id))
+) {
+  throw new Error("Every work package must have one hashable definition body");
+}
+
+const authoritativeDocumentHashes = {
+  "docs/design.md": sha256(design),
+  "docs/implementation-plan.md": sha256(plan),
+  "docs/qc-release-contract.md": sha256(qcContract),
+  "docs/threat-model.md": sha256(threatContract),
+};
+
 const checkpointForTask = (task) => {
   if (task.startsWith("D-")) return "deployment";
   if (task.startsWith("C-")) return "product_calibrated";
@@ -178,6 +203,14 @@ const sourceFor = (id) => {
     source: "docs/qc-release-contract.md - Normative operational rule",
     rationale: normativeDescriptions[id],
   };
+};
+
+const sourceDocumentFor = (id) => {
+  if (id.startsWith("AC-QC-") || id.startsWith("GQC-") || id.startsWith("CAL-")) {
+    return "docs/qc-release-contract.md";
+  }
+  if (id.startsWith("TM-")) return "docs/threat-model.md";
+  return "docs/design.md";
 };
 
 const proof = (plannedCodeOrSchemaOwner, automatedProof, manualProof = "none") => ({
@@ -240,6 +273,34 @@ const checkpointProofOverrides = {
       "Hindi/Sanskrit voice canary review",
     ),
   },
+  "GEN-PROD-006": {
+    phase2: proof(
+      "src/domain/look/look-registry.ts; migrations 0011",
+      "V-P2-006 exact 117-ID/default/no-Recommended/manifest parity suite",
+      "look-vault and prompt-tail review",
+    ),
+  },
+  "GEN-PROD-007": {
+    phase2: proof(
+      "src/domain/world; src/domain/ingest; migrations 0012,0018",
+      "V-P2-007 immutable prompt-edit/regenerate/accept/upload version suite",
+      "character/location studio review",
+    ),
+  },
+  "GEN-PROD-009": {
+    phase2: proof(
+      "src/domain/world/temple-evidence.ts; migrations 0013,0018",
+      "V-P2-009 named-temple provenance and World Lock fail-closed suite",
+      "qualified temple-reference review",
+    ),
+  },
+  "GEN-PROD-010": {
+    phase2: proof(
+      "src/domain/world-lock; migrations 0019,0021",
+      "V-P2-023, V-P2-024, V-P2-025, V-P2-030 atomic fault/concurrency/stale-authority/offboarding suite",
+      "exact World Lock summary review",
+    ),
+  },
   "GEN-PROD-011": {
     phase2: proof(
       "src/domain/preflight; migration 0015",
@@ -255,7 +316,7 @@ const checkpointProofOverrides = {
   "GEN-PROD-012": {
     phase2: proof(
       "src/domain/sound/policy.ts; migration 0014",
-      "pronunciation/score/sound identity and plan-policy fixtures",
+      "V-P2-019 pronunciation/score/sound identity and release-component fixtures",
       "sound-policy inspection",
     ),
     phase3: proof(
@@ -346,17 +407,17 @@ const checkpointProofOverrides = {
   },
   "GEN-PROD-022": {
     phase2: proof(
-      "src/domain/cost/preflight.ts; migrations 0017,0019",
-      "micro/exact quote/slot/reservation concurrency suite",
+      "src/domain/cost/preflight.ts; src/domain/providers/reconcile.ts; migrations 0017,0019",
+      "micro/exact quote/slot/reservation plus callback/retry/reconciliation reliability suite",
     ),
     phase3: proof(
-      "src/domain/cost/settlement.ts; migration 0031",
-      "retry/cancel/late/unknown/refund settlement tests",
+      "src/domain/cost/settlement.ts; src/domain/workflow/recovery.ts; migration 0031",
+      "retry/cancel/late/unknown/refund settlement and crash/recovery tests",
     ),
     deployment: proof(
-      "tests/deployment/cost-qualification.ts",
-      "V-D-008/V-D-009 predeclared cost qualification",
-      "cost program review",
+      "tests/deployment/provider-reliability-and-cost-qualification.ts",
+      "V-D-008/V-D-009 predeclared reliability, recovery, and cost qualification",
+      "reliability and cost program review",
     ),
   },
   "GEN-PROD-023": {
@@ -406,7 +467,7 @@ const checkpointProofOverrides = {
   "AC-QC-001": {
     phase2: proof(
       "src/domain/qc/config.ts",
-      "Phase-2 corrupt schema/ID/version/SHA fixtures",
+      "V-P2-029 Phase-2 corrupt schema/ID/version/SHA/math/applicability/plan-evidence fixtures",
     ),
     phase3: proof(
       "src/domain/qc/config.ts",
@@ -494,12 +555,19 @@ const checkpointProofOverrides = {
   "TM-13": {
     phase2: proof(
       "src/domain/ingest/sanitize.ts",
-      "GPS/comment/attachment stripping fixtures",
+      "V-P2-012 GPS/comment/attachment stripping and re-encode fixtures",
     ),
     phase4: proof(
       "src/domain/export/scanner.ts",
       "export metadata reintroduction scan",
       "exported file inspection",
+    ),
+  },
+  "TM-14": {
+    phase2: proof(
+      "src/domain/ingest/remote-fetch.ts; migration 0018",
+      "V-P2-010 IPv4/IPv6/private/encoded/redirect/DNS-rebinding SSRF suite",
+      "egress and exact-host allowlist review",
     ),
   },
   "TM-15": {
@@ -517,17 +585,35 @@ const checkpointProofOverrides = {
   "TM-16": {
     phase2: proof(
       "src/domain/planning/graph.ts; src/domain/agents/read-only-broker.ts",
-      "fabricated ID/stale version/cycle/fan-out/depth fuzz",
+      "V-P2-021 fabricated ID/stale version/cycle/later-shot/cap/fan-out/depth fuzz",
     ),
     phase3: proof(
       "src/domain/agents/tool-broker.ts",
       "production task graph/ID/version fuzz",
     ),
   },
+  "TM-18": {
+    phase2: proof(
+      "src/domain/providers/callback.ts; migration 0017",
+      "V-P2-013 forged/replayed/late callback and lost-submit-response state-machine suite",
+    ),
+  },
+  "TM-19": {
+    phase2: proof(
+      "src/domain/providers/state.ts; migration 0017",
+      "V-P2-013 stale/late completion appends evidence without terminal overwrite",
+    ),
+  },
+  "TM-21": {
+    phase2: proof(
+      "src/domain/providers/reconcile.ts; migration 0017",
+      "V-P2-013 and V-P2-014 lost-response reconciliation and retry-as-new-row suite",
+    ),
+  },
   "TM-22": {
     phase2: proof(
       "src/domain/preflight; src/domain/cost; migrations 0015,0019",
-      "V-P2-015, V-P2-016, V-P2-017, V-P2-032, V-P2-033, V-P2-034 micro scope/reservation/retry races",
+      "V-P2-015, V-P2-016, V-P2-017, V-P2-022, V-P2-032, V-P2-033, V-P2-034 micro scope/reservation/retry/upstream-failure races",
       "micro-spend policy review",
     ),
     phase3: proof(
@@ -572,7 +658,7 @@ const checkpointProofOverrides = {
   "TM-28": {
     phase2: proof(
       "src/domain/culture/source-review.ts; migration 0013",
-      "source decision hash/workspace/version swap tests",
+      "V-P2-018 source reviewer competency/expiry/recusal and decision hash/workspace/version swap tests",
       "qualified source review",
     ),
     phase4: proof(
@@ -616,6 +702,18 @@ const checkpointProofOverrides = {
       "infrastructure/environment-assertions",
       "V-D-001/V-D-003 remote environment/project isolation",
       "remote environment inventory",
+    ),
+  },
+  "TM-37": {
+    phase1: proof(
+      "offboarding; 0002, 0005",
+      "TM-37 phase1 - owner/lease/run transfer test",
+      "admin workflow review",
+    ),
+    phase2: proof(
+      "src/domain/world-lock/offboarding.ts; migration 0021",
+      "V-P2-030 offboard owner after run-envelope creation and safe reassign/pause suite",
+      "active-run offboarding review",
     ),
   },
   "TM-36": {
@@ -1087,6 +1185,810 @@ const validateEvidenceArtifact = (artifact, commit, obligationId) => {
   if (commit) assertCommitContainsArtifact(commit, artifact);
 };
 
+const exactKeys = (value, keys) =>
+  value &&
+  typeof value === "object" &&
+  !Array.isArray(value) &&
+  JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
+
+const checkpointEvidenceContracts = new Map([
+  [
+    "phase2",
+    {
+      authenticatedProvenance: false,
+      commands: [
+        "pnpm precheckpoint-gates",
+        "node --env-file=.env.local scripts/run-phase1-live-suite.mjs",
+      ],
+      reviewScopes: ["acceptance", "security", "ui-ux"],
+    },
+  ],
+]);
+
+const readEvidenceJson = (
+  artifact,
+  evidenceCommit,
+  obligationId,
+  expectedSchemaVersion,
+) => {
+  validateEvidenceArtifact(artifact, evidenceCommit, obligationId);
+  let value;
+  try {
+    value = JSON.parse(
+      fs.readFileSync(path.resolve(root, ...artifact.path.split("/")), "utf8"),
+    );
+  } catch {
+    throw new Error(`${obligationId} has an unreadable JSON evidence artifact`);
+  }
+  if (value?.schemaVersion !== expectedSchemaVersion) {
+    throw new Error(
+      `${obligationId} evidence artifact has the wrong schema: ${artifact.path}`,
+    );
+  }
+  return value;
+};
+
+const gitResult = (args, obligationId, label, encoding = "utf8") => {
+  const result = spawnSync("git", args, {
+    cwd: root,
+    encoding,
+    maxBuffer: 32 * 1024 * 1024,
+  });
+  if (result.status !== 0) {
+    throw new Error(`${obligationId} cannot prove ${label}`);
+  }
+  return result.stdout;
+};
+
+const committedPathSha256 = (commit, artifactPath, obligationId) => {
+  const bytes = gitResult(
+    ["show", `${commit}:${artifactPath}`],
+    obligationId,
+    `committed path ${artifactPath}`,
+    null,
+  );
+  return sha256(bytes);
+};
+
+const validateImplementationEvidenceManifest = (
+  artifact,
+  implementationCommit,
+  obligationId,
+  checkpoint,
+  recordedAt,
+) => {
+  if (!artifact.path.endsWith(".implementation.json")) {
+    throw new Error(
+      `${obligationId} implementation evidence requires a typed .implementation.json manifest`,
+    );
+  }
+  if (!/^[a-f0-9]{40}$/.test(implementationCommit ?? "")) {
+    throw new Error(`${obligationId} requires a full implementation commit identity`);
+  }
+  const manifest = readEvidenceJson(
+    artifact,
+    null,
+    obligationId,
+    "genie-implementation-evidence.v2",
+  );
+  if (
+    !exactKeys(manifest, [
+      "boundFiles",
+      "candidate",
+      "checkpoint",
+      "disposition",
+      "generatedAt",
+      "localGates",
+      "obligationIds",
+      "remoteLiveSuite",
+      "reviews",
+      "schemaVersion",
+      "workPackages",
+    ]) ||
+    manifest.checkpoint !== checkpoint ||
+    manifest.disposition !== "implemented_unverified" ||
+    manifest.generatedAt !== recordedAt ||
+    !Array.isArray(manifest.obligationIds) ||
+    manifest.obligationIds.length < 1 ||
+    new Set(manifest.obligationIds).size !== manifest.obligationIds.length ||
+    !manifest.obligationIds.includes(obligationId) ||
+    JSON.stringify([...manifest.obligationIds].sort()) !==
+      JSON.stringify(manifest.obligationIds) ||
+    JSON.stringify(manifest.workPackages) !==
+      JSON.stringify(["P2-01", "P2-02", "P2-03"]) ||
+    typeof manifest.generatedAt !== "string" ||
+    Number.isNaN(Date.parse(manifest.generatedAt)) ||
+    Date.parse(manifest.generatedAt) > Date.now()
+  ) {
+    throw new Error(`${obligationId} has invalid implementation evidence`);
+  }
+  if (
+    !exactKeys(manifest.candidate, ["commit", "tree"]) ||
+    manifest.candidate.commit !== implementationCommit ||
+    !/^[a-f0-9]{40}$/.test(manifest.candidate.tree)
+  ) {
+    throw new Error(`${obligationId} has invalid implementation candidate identity`);
+  }
+  const candidateTree = gitResult(
+    ["rev-parse", `${implementationCommit}^{tree}`],
+    obligationId,
+    "implementation candidate tree",
+  ).trim();
+  if (candidateTree !== manifest.candidate.tree) {
+    throw new Error(`${obligationId} implementation tree is not authentic`);
+  }
+  gitResult(
+    ["merge-base", "--is-ancestor", implementationCommit, "HEAD"],
+    obligationId,
+    "implementation ancestry",
+  );
+  const candidateCommittedAt = Date.parse(
+    gitResult(
+      ["show", "-s", "--format=%cI", implementationCommit],
+      obligationId,
+      "implementation commit timestamp",
+    ).trim(),
+  );
+  if (
+    Number.isNaN(candidateCommittedAt) ||
+    Date.parse(manifest.generatedAt) < candidateCommittedAt
+  ) {
+    throw new Error(`${obligationId} implementation evidence predates its candidate`);
+  }
+  if (
+    !exactKeys(manifest.localGates, ["artifact", "command", "tree"]) ||
+    manifest.localGates.tree !== manifest.candidate.tree ||
+    JSON.stringify(manifest.localGates.command) !==
+      JSON.stringify(["pnpm", "precheckpoint-gates"])
+  ) {
+    throw new Error(`${obligationId} has invalid local implementation gates`);
+  }
+  const gateReport = readEvidenceJson(
+    manifest.localGates.artifact,
+    null,
+    obligationId,
+    "genie-precheckpoint-gate.v1",
+  );
+  let candidatePackage;
+  try {
+    candidatePackage = JSON.parse(
+      gitResult(
+        ["show", `${implementationCommit}:package.json`],
+        obligationId,
+        "implementation package definition",
+      ),
+    );
+  } catch {
+    throw new Error(`${obligationId} has an unreadable candidate package definition`);
+  }
+  if (
+    !exactKeys(gateReport, [
+      "candidate",
+      "completedAt",
+      "definition",
+      "durationMs",
+      "exitCode",
+      "log",
+      "outcome",
+      "schemaVersion",
+      "startedAt",
+    ]) ||
+    !exactKeys(gateReport.candidate, ["commit", "tree"]) ||
+    gateReport.candidate.commit !== implementationCommit ||
+    gateReport.candidate.tree !== manifest.candidate.tree ||
+    !exactKeys(gateReport.definition, [
+      "command",
+      "packageJsonSha256",
+      "packageScript",
+      "runnerPath",
+      "runnerSha256",
+    ]) ||
+    JSON.stringify(gateReport.definition.command) !==
+      JSON.stringify(["pnpm", "precheckpoint-gates:raw"]) ||
+    gateReport.definition.packageScript !== "precheckpoint-gates:raw" ||
+    candidatePackage.scripts?.["precheckpoint-gates"] !==
+      "node scripts/run-precheckpoint-gates.mjs" ||
+    typeof candidatePackage.scripts?.["precheckpoint-gates:raw"] !== "string" ||
+    candidatePackage.scripts["precheckpoint-gates:raw"].trim().length === 0 ||
+    gateReport.definition.runnerPath !== "scripts/run-precheckpoint-gates.mjs" ||
+    gateReport.definition.runnerSha256 !==
+      committedPathSha256(
+        implementationCommit,
+        "scripts/run-precheckpoint-gates.mjs",
+        obligationId,
+      ) ||
+    gateReport.definition.packageJsonSha256 !==
+      committedPathSha256(implementationCommit, "package.json", obligationId) ||
+    !exactKeys(gateReport.log, [
+      "path",
+      "sha256",
+      "stderrSha256",
+      "stdoutSha256",
+    ]) ||
+    gateReport.log.path !== ".tmp/artifacts/precheckpoint-gate.v1.log" ||
+    ![gateReport.log.sha256, gateReport.log.stderrSha256, gateReport.log.stdoutSha256]
+      .every((digest) => /^[a-f0-9]{64}$/.test(digest ?? "")) ||
+    gateReport.exitCode !== 0 ||
+    gateReport.outcome !== "passed" ||
+    !Number.isInteger(gateReport.durationMs) ||
+    gateReport.durationMs < 0 ||
+    Number.isNaN(Date.parse(gateReport.startedAt)) ||
+    Number.isNaN(Date.parse(gateReport.completedAt)) ||
+    Date.parse(gateReport.completedAt) < Date.parse(gateReport.startedAt) ||
+    Date.parse(manifest.generatedAt) < Date.parse(gateReport.completedAt)
+  ) {
+    throw new Error(`${obligationId} has an invalid tree-bound gate report`);
+  }
+  if (
+    !exactKeys(manifest.remoteLiveSuite, ["artifact", "completedAt"]) ||
+    manifest.remoteLiveSuite.completedAt === undefined
+  ) {
+    throw new Error(`${obligationId} lacks typed remote live-suite evidence`);
+  }
+  const remoteLiveSuite = readEvidenceJson(
+    manifest.remoteLiveSuite.artifact,
+    null,
+    obligationId,
+    "genie-live-suite-evidence.v3",
+  );
+  if (manifest.remoteLiveSuite.completedAt !== remoteLiveSuite.finishedAt) {
+    throw new Error(`${obligationId} has mismatched remote live-suite evidence`);
+  }
+  if (!Array.isArray(manifest.reviews)) {
+    throw new Error(`${obligationId} lacks typed cold-review evidence`);
+  }
+  const reviewReports = manifest.reviews.map((review) => {
+    if (
+      !exactKeys(review, [
+        "artifact",
+        "reviewedAt",
+        "reviewerId",
+        "scope",
+      ])
+    ) {
+      throw new Error(`${obligationId} has malformed cold-review evidence`);
+    }
+    const report = readEvidenceJson(
+      review.artifact,
+      null,
+      obligationId,
+      "genie-cold-review.v1",
+    );
+    if (
+      review.reviewedAt !== report.reviewedAt ||
+      review.reviewerId !== report.reviewerId ||
+      review.scope !== report.scope
+    ) {
+      throw new Error(`${obligationId} has mismatched cold-review evidence`);
+    }
+    return report;
+  });
+  assertPhase2PromotionInputs({
+    candidateCommit: implementationCommit,
+    candidateCommittedAt,
+    candidateTree: manifest.candidate.tree,
+    localGate: gateReport,
+    now: Date.parse(manifest.generatedAt),
+    remoteLiveSuite,
+    reviews: reviewReports,
+  });
+  if (
+    !Array.isArray(manifest.boundFiles) ||
+    manifest.boundFiles.length < 10 ||
+    new Set(manifest.boundFiles.map(({ path: filePath }) => filePath)).size !==
+      manifest.boundFiles.length ||
+    JSON.stringify(
+      manifest.boundFiles.map(({ path: filePath }) => filePath).sort(),
+    ) !== JSON.stringify(manifest.boundFiles.map(({ path: filePath }) => filePath))
+  ) {
+    throw new Error(`${obligationId} has invalid bound implementation files`);
+  }
+  const requiredBindings = [
+    "public/looks/",
+    "src/components/creation/creation-studio.tsx",
+    "src/domain/look/look-pack.v1.json",
+    "src/domain/look/look-registry.ts",
+    "src/domain/profile/launch-profile.ts",
+    "src/domain/script/integrity.ts",
+    "src/domain/voice/voice-registry.ts",
+    "supabase/migrations/20260717121500_phase2_scripts_and_sidecars.sql",
+    "supabase/migrations/20260717121600_phase2_looks_voices_and_config.sql",
+    "supabase/tests/phase2_zero_spend_foundation.test.sql",
+    "tests/browser/creation.spec.ts",
+    "tests/live/phase2-script-live.spec.ts",
+  ];
+  for (const required of requiredBindings) {
+    if (
+      !manifest.boundFiles.some(({ path: filePath }) =>
+        required.endsWith("/")
+          ? filePath.startsWith(required)
+          : filePath === required,
+      )
+    ) {
+      throw new Error(`${obligationId} lacks required binding ${required}`);
+    }
+  }
+  for (const boundFile of manifest.boundFiles) {
+    if (
+      !exactKeys(boundFile, ["path", "sha256"]) ||
+      typeof boundFile.path !== "string" ||
+      !/^(?:public\/looks|scripts|src|supabase|tests)\/[A-Za-z0-9._/-]+$/.test(
+        boundFile.path,
+      ) ||
+      boundFile.path.includes("..") ||
+      typeof boundFile.sha256 !== "string" ||
+      !/^[a-f0-9]{64}$/.test(boundFile.sha256) ||
+      committedPathSha256(
+        implementationCommit,
+        boundFile.path,
+        obligationId,
+      ) !== boundFile.sha256
+    ) {
+      throw new Error(`${obligationId} has a stale bound implementation file`);
+    }
+  }
+};
+
+const validateCheckpointEvidenceManifest = (
+  artifact,
+  evidenceCommit,
+  obligationId,
+  checkpoint,
+) => {
+  const contract = checkpointEvidenceContracts.get(checkpoint);
+  if (!contract) {
+    throw new Error(
+      `${obligationId} has no explicit checkpoint evidence contract`,
+    );
+  }
+  if (!artifact.path.endsWith(".checkpoint.json")) {
+    throw new Error(
+      `${obligationId} verified evidence requires a typed .checkpoint.json manifest`,
+    );
+  }
+  if (!/^[a-f0-9]{40}$/.test(evidenceCommit ?? "")) {
+    throw new Error(`${obligationId} requires a full evidence commit identity`);
+  }
+  const manifest = readEvidenceJson(
+    artifact,
+    evidenceCommit,
+    obligationId,
+    "genie-checkpoint-evidence.v2",
+  );
+  if (
+    !exactKeys(manifest, [
+      "candidate",
+      "checkpoint",
+      "ci",
+      "commands",
+      "database",
+      "disposition",
+      "generatedAt",
+      "obligationIds",
+      "reviews",
+      "schemaVersion",
+    ]) ||
+    manifest.checkpoint !== checkpoint ||
+    manifest.disposition !== "passed" ||
+    !Array.isArray(manifest.obligationIds) ||
+    new Set(manifest.obligationIds).size !== manifest.obligationIds.length ||
+    !manifest.obligationIds.includes(obligationId) ||
+    !Array.isArray(manifest.commands) ||
+    !Array.isArray(manifest.reviews) ||
+    typeof manifest.generatedAt !== "string" ||
+    Number.isNaN(Date.parse(manifest.generatedAt)) ||
+    Date.parse(manifest.generatedAt) > Date.now()
+  ) {
+    throw new Error(`${obligationId} has an invalid checkpoint evidence manifest`);
+  }
+  if (
+    !exactKeys(manifest.candidate, ["commit", "tree"]) ||
+    !/^[a-f0-9]{40}$/.test(manifest.candidate.commit) ||
+    !/^[a-f0-9]{40}$/.test(manifest.candidate.tree) ||
+    manifest.candidate.commit === evidenceCommit
+  ) {
+    throw new Error(`${obligationId} has an invalid checkpoint candidate identity`);
+  }
+
+  const candidateTree = gitResult(
+    ["rev-parse", `${manifest.candidate.commit}^{tree}`],
+    obligationId,
+    "candidate tree identity",
+  ).trim();
+  if (candidateTree !== manifest.candidate.tree) {
+    throw new Error(`${obligationId} checkpoint candidate tree is not authentic`);
+  }
+  const evidenceParents = gitResult(
+    ["rev-list", "--parents", "-n", "1", evidenceCommit],
+    obligationId,
+    "evidence commit ancestry",
+  )
+    .trim()
+    .split(/\s+/);
+  if (
+    evidenceParents.length !== 2 ||
+    evidenceParents[0] !== evidenceCommit ||
+    evidenceParents[1] !== manifest.candidate.commit
+  ) {
+    throw new Error(
+      `${obligationId} evidence commit must be the candidate's direct single-parent child`,
+    );
+  }
+  const changedEvidencePaths = gitResult(
+    ["diff-tree", "--no-commit-id", "--name-only", "-r", evidenceCommit],
+    obligationId,
+    "evidence-only commit boundary",
+  )
+    .split(/\r?\n/)
+    .filter(Boolean);
+  const checkpointEvidenceRoot = `docs/evidence/${checkpoint}/`;
+  if (
+    changedEvidencePaths.length === 0 ||
+    changedEvidencePaths.some(
+      (changedPath) =>
+        !changedPath.startsWith(checkpointEvidenceRoot) ||
+        changedPath.includes(".."),
+    )
+  ) {
+    throw new Error(
+      `${obligationId} evidence commit contains non-evidence changes`,
+    );
+  }
+
+  for (const requiredPath of [
+    ".github/workflows/ci.yml",
+    "docs/design.md",
+    "docs/implementation-plan.md",
+    "package.json",
+    "pnpm-lock.yaml",
+    "scripts",
+    "src",
+    "supabase/migrations",
+    "supabase/tests",
+    "tests",
+  ]) {
+    gitResult(
+      ["cat-file", "-e", `${manifest.candidate.commit}:${requiredPath}`],
+      obligationId,
+      `candidate implementation path ${requiredPath}`,
+    );
+  }
+  const candidateCommittedAt = Date.parse(
+    gitResult(
+      ["show", "-s", "--format=%cI", manifest.candidate.commit],
+      obligationId,
+      "candidate commit timestamp",
+    ).trim(),
+  );
+  if (
+    Number.isNaN(candidateCommittedAt) ||
+    Date.parse(manifest.generatedAt) < candidateCommittedAt
+  ) {
+    throw new Error(`${obligationId} checkpoint evidence predates its candidate`);
+  }
+
+  const artifactIdentities = new Set();
+  const registerArtifact = (evidenceArtifact, label) => {
+    if (!evidenceArtifact.path.startsWith(checkpointEvidenceRoot)) {
+      throw new Error(`${obligationId} ${label} is outside its checkpoint root`);
+    }
+    const identity = `${evidenceArtifact.path}:${evidenceArtifact.sha256}`;
+    if (artifactIdentities.has(identity)) {
+      throw new Error(`${obligationId} reuses an evidence artifact`);
+    }
+    artifactIdentities.add(identity);
+  };
+  registerArtifact(artifact, "checkpoint manifest");
+
+  if (
+    !exactKeys(manifest.ci, [
+      "attestationArtifact",
+      "commit",
+      "provider",
+      "repository",
+      "runAttempt",
+      "runId",
+      "url",
+      "workflow",
+    ]) ||
+    manifest.ci.commit !== manifest.candidate.commit ||
+    manifest.ci.provider !== "github-actions" ||
+    manifest.ci.repository !== "toolsatZyra/content-genie" ||
+    manifest.ci.workflow !== ".github/workflows/ci.yml" ||
+    typeof manifest.ci.runId !== "string" ||
+    !/^[1-9][0-9]{0,19}$/.test(manifest.ci.runId) ||
+    !Number.isInteger(manifest.ci.runAttempt) ||
+    manifest.ci.runAttempt < 1 ||
+    manifest.ci.runAttempt > 1000 ||
+    manifest.ci.url !==
+      `https://github.com/toolsatZyra/content-genie/actions/runs/${manifest.ci.runId}/attempts/${manifest.ci.runAttempt}`
+  ) {
+    throw new Error(`${obligationId} has an invalid exact-candidate CI identity`);
+  }
+  registerArtifact(manifest.ci.attestationArtifact, "CI attestation");
+  const ciAttestation = readEvidenceJson(
+    manifest.ci.attestationArtifact,
+    evidenceCommit,
+    obligationId,
+    "genie-github-ci-attestation.v1",
+  );
+  if (
+    !exactKeys(ciAttestation, [
+      "candidateCommit",
+      "candidateTree",
+      "conclusion",
+      "generatedAt",
+      "repository",
+      "runAttempt",
+      "runId",
+      "schemaVersion",
+      "workflow",
+      "workflowSha256",
+    ]) ||
+    ciAttestation.candidateCommit !== manifest.candidate.commit ||
+    ciAttestation.candidateTree !== manifest.candidate.tree ||
+    ciAttestation.conclusion !== "success" ||
+    ciAttestation.repository !== manifest.ci.repository ||
+    ciAttestation.workflow !== manifest.ci.workflow ||
+    ciAttestation.runId !== manifest.ci.runId ||
+    ciAttestation.runAttempt !== manifest.ci.runAttempt ||
+    ciAttestation.workflowSha256 !==
+      committedPathSha256(
+        manifest.candidate.commit,
+        manifest.ci.workflow,
+        obligationId,
+      ) ||
+    typeof ciAttestation.generatedAt !== "string" ||
+    Number.isNaN(Date.parse(ciAttestation.generatedAt)) ||
+    Date.parse(ciAttestation.generatedAt) < candidateCommittedAt ||
+    Date.parse(ciAttestation.generatedAt) > Date.now()
+  ) {
+    throw new Error(`${obligationId} has invalid GitHub CI attestation data`);
+  }
+
+  const expectedCommands = [...contract.commands].sort();
+  const actualCommands = manifest.commands.map(({ command }) => command).sort();
+  if (
+    manifest.commands.length !== expectedCommands.length ||
+    new Set(actualCommands).size !== actualCommands.length ||
+    JSON.stringify(actualCommands) !== JSON.stringify(expectedCommands)
+  ) {
+    throw new Error(`${obligationId} checkpoint command set is incomplete`);
+  }
+  for (const command of manifest.commands) {
+    if (
+      !exactKeys(command, [
+        "command",
+        "durationMs",
+        "exitCode",
+        "reportArtifact",
+      ]) ||
+      !contract.commands.includes(command.command) ||
+      command.exitCode !== 0 ||
+      !Number.isInteger(command.durationMs) ||
+      command.durationMs < 1
+    ) {
+      throw new Error(`${obligationId} has an invalid checkpoint command result`);
+    }
+    registerArtifact(command.reportArtifact, "command report");
+    const commandReport = readEvidenceJson(
+      command.reportArtifact,
+      evidenceCommit,
+      obligationId,
+      "genie-command-report.v1",
+    );
+    if (
+      !exactKeys(commandReport, [
+        "candidateCommit",
+        "command",
+        "completedAt",
+        "exitCode",
+        "failed",
+        "passed",
+        "schemaVersion",
+      ]) ||
+      commandReport.candidateCommit !== manifest.candidate.commit ||
+      commandReport.command !== command.command ||
+      commandReport.exitCode !== 0 ||
+      commandReport.failed !== 0 ||
+      !Number.isInteger(commandReport.passed) ||
+      commandReport.passed < 1 ||
+      typeof commandReport.completedAt !== "string" ||
+      Number.isNaN(Date.parse(commandReport.completedAt)) ||
+      Date.parse(commandReport.completedAt) < candidateCommittedAt ||
+      Date.parse(commandReport.completedAt) > Date.now()
+    ) {
+      throw new Error(`${obligationId} has an invalid typed command report`);
+    }
+  }
+
+  if (
+    manifest.database === null ||
+    !exactKeys(manifest.database, [
+      "branchId",
+      "migrationSha256ByPath",
+      "projectRef",
+      "reportArtifact",
+    ]) ||
+    typeof manifest.database.branchId !== "string" ||
+    !/^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(
+      manifest.database.branchId,
+    ) ||
+    typeof manifest.database.projectRef !== "string" ||
+    !/^[a-z0-9]{20}$/.test(manifest.database.projectRef)
+  ) {
+    throw new Error(`${obligationId} has invalid preview-database evidence`);
+  }
+  const candidateMigrationPaths = gitResult(
+    [
+      "ls-tree",
+      "-r",
+      "--name-only",
+      manifest.candidate.commit,
+      "--",
+      "supabase/migrations",
+    ],
+    obligationId,
+    "candidate migration inventory",
+  )
+    .split(/\r?\n/)
+    .filter((migrationPath) =>
+      /^supabase\/migrations\/[0-9]+_phase2_[a-z0-9_]+\.sql$/.test(
+        migrationPath,
+      ),
+    )
+    .sort();
+  const expectedMigrationSha256ByPath = Object.fromEntries(
+    candidateMigrationPaths.map((migrationPath) => [
+      migrationPath,
+      committedPathSha256(
+        manifest.candidate.commit,
+        migrationPath,
+        obligationId,
+      ),
+    ]),
+  );
+  if (
+    candidateMigrationPaths.length === 0 ||
+    !exactKeys(
+      manifest.database.migrationSha256ByPath,
+      candidateMigrationPaths,
+    ) ||
+    JSON.stringify(manifest.database.migrationSha256ByPath) !==
+      JSON.stringify(expectedMigrationSha256ByPath)
+  ) {
+    throw new Error(
+      `${obligationId} preview database is not bound to every candidate migration`,
+    );
+  }
+  registerArtifact(manifest.database.reportArtifact, "database report");
+  const databaseReport = readEvidenceJson(
+    manifest.database.reportArtifact,
+    evidenceCommit,
+    obligationId,
+    "genie-preview-database-report.v1",
+  );
+  if (
+    !exactKeys(databaseReport, [
+      "advisorFindings",
+      "branchId",
+      "candidateCommit",
+      "completedAt",
+      "migrationSha256ByPath",
+      "pgTapFailed",
+      "pgTapPassed",
+      "projectRef",
+      "schemaVersion",
+    ]) ||
+    databaseReport.candidateCommit !== manifest.candidate.commit ||
+    databaseReport.branchId !== manifest.database.branchId ||
+    databaseReport.projectRef !== manifest.database.projectRef ||
+    JSON.stringify(databaseReport.migrationSha256ByPath) !==
+      JSON.stringify(expectedMigrationSha256ByPath) ||
+    databaseReport.pgTapFailed !== 0 ||
+    !Number.isInteger(databaseReport.pgTapPassed) ||
+    databaseReport.pgTapPassed < 1 ||
+    databaseReport.advisorFindings !== 0 ||
+    typeof databaseReport.completedAt !== "string" ||
+    Number.isNaN(Date.parse(databaseReport.completedAt)) ||
+    Date.parse(databaseReport.completedAt) < candidateCommittedAt ||
+    Date.parse(databaseReport.completedAt) > Date.now()
+  ) {
+    throw new Error(`${obligationId} has an invalid typed database report`);
+  }
+
+  const expectedReviewScopes = [...contract.reviewScopes].sort();
+  const actualReviewScopes = manifest.reviews.map(({ scope }) => scope).sort();
+  const reviewerIds = manifest.reviews.map(({ reviewerId }) => reviewerId);
+  if (
+    manifest.reviews.length !== expectedReviewScopes.length ||
+    new Set(reviewerIds).size !== reviewerIds.length ||
+    new Set(actualReviewScopes).size !== actualReviewScopes.length ||
+    JSON.stringify(actualReviewScopes) !== JSON.stringify(expectedReviewScopes)
+  ) {
+    throw new Error(`${obligationId} lacks distinct required cold reviews`);
+  }
+  for (const review of manifest.reviews) {
+    if (
+      !exactKeys(review, [
+        "disposition",
+        "openP0",
+        "openP1",
+        "openP2",
+        "reportArtifact",
+        "reviewerId",
+        "scope",
+      ]) ||
+      review.disposition !== "passed" ||
+      review.openP0 !== 0 ||
+      review.openP1 !== 0 ||
+      review.openP2 !== 0 ||
+      typeof review.reviewerId !== "string" ||
+      !/^[a-z0-9][a-z0-9._-]{2,79}$/.test(review.reviewerId) ||
+      !contract.reviewScopes.includes(review.scope)
+    ) {
+      throw new Error(`${obligationId} has an invalid independent review result`);
+    }
+    registerArtifact(review.reportArtifact, "cold-review report");
+    const reviewReport = readEvidenceJson(
+      review.reportArtifact,
+      evidenceCommit,
+      obligationId,
+      "genie-cold-review.v1",
+    );
+    if (
+      !exactKeys(reviewReport, [
+        "candidateCommit",
+        "candidateTree",
+        "disposition",
+        "findings",
+        "openP0",
+        "openP1",
+        "openP2",
+        "reviewedAt",
+        "reviewerId",
+        "schemaVersion",
+        "scope",
+      ]) ||
+      reviewReport.candidateCommit !== manifest.candidate.commit ||
+      reviewReport.candidateTree !== manifest.candidate.tree ||
+      reviewReport.disposition !== review.disposition ||
+      reviewReport.openP0 !== review.openP0 ||
+      reviewReport.openP1 !== review.openP1 ||
+      reviewReport.openP2 !== review.openP2 ||
+      reviewReport.reviewerId !== review.reviewerId ||
+      reviewReport.scope !== review.scope ||
+      !Array.isArray(reviewReport.findings) ||
+      typeof reviewReport.reviewedAt !== "string" ||
+      Number.isNaN(Date.parse(reviewReport.reviewedAt)) ||
+      Date.parse(reviewReport.reviewedAt) < candidateCommittedAt ||
+      Date.parse(reviewReport.reviewedAt) > Date.now()
+    ) {
+      throw new Error(`${obligationId} has an invalid typed cold-review report`);
+    }
+    for (const finding of reviewReport.findings) {
+      if (
+        !exactKeys(finding, ["id", "severity", "status", "title"]) ||
+        typeof finding.id !== "string" ||
+        !/^[A-Z0-9][A-Z0-9._-]{2,79}$/.test(finding.id) ||
+        !["P0", "P1", "P2", "P3"].includes(finding.severity) ||
+        !["closed", "open"].includes(finding.status) ||
+        typeof finding.title !== "string" ||
+        finding.title.length < 3 ||
+        finding.title.length > 300 ||
+        (["P0", "P1", "P2"].includes(finding.severity) &&
+          finding.status !== "closed")
+      ) {
+        throw new Error(`${obligationId} has malformed or open critical findings`);
+      }
+    }
+  }
+  if (contract.authenticatedProvenance !== true) {
+    throw new Error(
+      `${obligationId} cannot become verified until its checkpoint evidence has externally authenticated provenance`,
+    );
+  }
+};
 const materializeObligation = (
   requirementId,
   obligation,
@@ -1095,10 +1997,24 @@ const materializeObligation = (
   const obligationId = `${requirementId}@${obligation.checkpoint}`;
   expectedEvidenceKeys.add(obligationId);
   const evidence = evidenceEntries[obligationId];
+  const sourceDocument = sourceDocumentFor(requirementId);
+  const definitionBindings = {
+    designDocumentSha256: authoritativeDocumentHashes["docs/design.md"],
+    implementationPlanDocumentSha256:
+      authoritativeDocumentHashes["docs/implementation-plan.md"],
+    sourceDocument,
+    sourceDocumentSha256: authoritativeDocumentHashes[sourceDocument],
+    workPackageDefinitionSha256ById: Object.fromEntries(
+      [...obligation.workPackages]
+        .sort()
+        .map((id) => [id, sha256(workPackageBodies.get(id))]),
+    ),
+  };
   const definitionHash = canonicalDefinitionHash({
     requirementId,
     ...definitionContext,
     obligation,
+    definitionBindings,
   });
   if (evidence) {
     const allowedKeys = [
@@ -1149,8 +2065,52 @@ const materializeObligation = (
     if (evidence.status === "verified" && !evidence.commit) {
       throw new Error(`${obligationId} verified status requires a commit`);
     }
+    const implementationManifests = evidence.evidence.filter(
+      ({ path: artifactPath }) => artifactPath.endsWith(".implementation.json"),
+    );
     for (const artifact of evidence.evidence) {
-      validateEvidenceArtifact(artifact, evidence.commit, obligationId);
+      validateEvidenceArtifact(
+        artifact,
+        implementationManifests.includes(artifact) ? null : evidence.commit,
+        obligationId,
+      );
+    }
+    if (implementationManifests.length > 0) {
+      if (
+        evidence.status !== "implemented_unverified" ||
+        implementationManifests.length !== 1 ||
+        evidence.evidence.length !== 1
+      ) {
+        throw new Error(
+          `${obligationId} typed implementation evidence must be the sole implemented_unverified artifact`,
+        );
+      }
+      validateImplementationEvidenceManifest(
+        implementationManifests[0],
+        evidence.commit,
+        obligationId,
+        obligation.checkpoint,
+        evidence.verifiedAt,
+      );
+    }
+    if (
+      evidence.status === "verified" &&
+      !["phase0", "phase1"].includes(obligation.checkpoint)
+    ) {
+      const manifests = evidence.evidence.filter(({ path: artifactPath }) =>
+        artifactPath.endsWith(".checkpoint.json"),
+      );
+      if (manifests.length !== 1) {
+        throw new Error(
+          `${obligationId} verified evidence requires exactly one typed checkpoint manifest`,
+        );
+      }
+      validateCheckpointEvidenceManifest(
+        manifests[0],
+        evidence.commit,
+        obligationId,
+        obligation.checkpoint,
+      );
     }
   }
   const status = evidence?.status ?? "unimplemented";
@@ -1246,6 +2206,44 @@ const verificationIds = new Set(
     ),
   ].map((match) => match[1]),
 );
+const expectedPhase2VerificationRoutes = {
+  "V-P2-001": ["GEN-PROD-001@phase2"],
+  "V-P2-002": ["GEN-PROD-001@phase2"],
+  "V-P2-003": ["GEN-PROD-001@phase2"],
+  "V-P2-004": ["GEN-PROD-001@phase2"],
+  "V-P2-005": ["GEN-PROD-005@phase2"],
+  "V-P2-006": ["GEN-PROD-006@phase2"],
+  "V-P2-007": ["GEN-PROD-007@phase2"],
+  "V-P2-008": ["TM-12@phase2"],
+  "V-P2-009": ["GEN-PROD-009@phase2"],
+  "V-P2-010": ["TM-14@phase2"],
+  "V-P2-011": ["TM-12@phase2"],
+  "V-P2-012": ["TM-13@phase2"],
+  "V-P2-013": ["TM-18@phase2", "TM-19@phase2", "TM-21@phase2"],
+  "V-P2-014": ["TM-21@phase2"],
+  "V-P2-015": ["TM-22@phase2"],
+  "V-P2-016": ["TM-22@phase2"],
+  "V-P2-017": ["TM-22@phase2"],
+  "V-P2-018": ["TM-28@phase2"],
+  "V-P2-019": ["GEN-PROD-012@phase2"],
+  "V-P2-020": ["GEN-PROD-003@phase2"],
+  "V-P2-021": ["TM-16@phase2"],
+  "V-P2-022": ["TM-22@phase2"],
+  "V-P2-023": ["GEN-PROD-010@phase2"],
+  "V-P2-024": ["GEN-PROD-010@phase2"],
+  "V-P2-025": ["GEN-PROD-010@phase2"],
+  "V-P2-026": ["GEN-PROD-025@phase2"],
+  "V-P2-027": ["GEN-PROD-011@phase2"],
+  "V-P2-028": ["TM-15@phase2"],
+  "V-P2-029": ["AC-QC-001@phase2"],
+  "V-P2-030": ["GEN-PROD-010@phase2", "TM-37@phase2"],
+  "V-P2-031": ["TM-12@phase2", "TM-35@phase2"],
+  "V-P2-032": ["TM-12@phase2", "TM-22@phase2"],
+  "V-P2-033": ["TM-12@phase2", "TM-22@phase2"],
+  "V-P2-034": ["TM-12@phase2", "TM-22@phase2", "TM-35@phase2"],
+};
+const verificationReferences = new Set();
+const phase2VerificationRoutes = new Map();
 for (const requirement of requirements) {
   for (const obligation of requirement.obligations) {
     if (
@@ -1263,6 +2261,12 @@ for (const requirement of requirements) {
       ),
     ].map((match) => match[0]);
     for (const verificationId of referencedVerificationIds) {
+      verificationReferences.add(verificationId);
+      if (verificationId.startsWith("V-P2-")) {
+        const routes = phase2VerificationRoutes.get(verificationId) ?? new Set();
+        routes.add(obligation.obligationId);
+        phase2VerificationRoutes.set(verificationId, routes);
+      }
       if (!verificationIds.has(verificationId)) {
         throw new Error(
           `${obligation.obligationId} references unknown ${verificationId}`,
@@ -1278,6 +2282,29 @@ for (const requirement of requirements) {
       }
     }
   }
+}
+for (const [verificationId, expectedRoutes] of Object.entries(
+  expectedPhase2VerificationRoutes,
+)) {
+  const actualRoutes = [...(phase2VerificationRoutes.get(verificationId) ?? [])].sort();
+  if (
+    actualRoutes.length !== expectedRoutes.length ||
+    actualRoutes.some((route, index) => route !== expectedRoutes[index])
+  ) {
+    throw new Error(
+      `${verificationId} route mismatch: expected ${expectedRoutes.join(",")} but found ${actualRoutes.join(",")}`,
+    );
+  }
+}
+const unroutedPhase2VerificationIds = [...verificationIds].filter(
+  (verificationId) =>
+    verificationId.startsWith("V-P2-") &&
+    !verificationReferences.has(verificationId),
+);
+if (unroutedPhase2VerificationIds.length > 0) {
+  throw new Error(
+    `Unrouted Phase-2 verification IDs: ${unroutedPhase2VerificationIds.join(",")}`,
+  );
 }
 
 const counts = {
@@ -1320,6 +2347,16 @@ const output = {
   generatedDate: "2026-07-17",
   evidenceSource:
     "reference/acceptance/traceability-evidence.v1.json",
+  definitionSources: {
+    authoritativeDocumentSha256ByPath: authoritativeDocumentHashes,
+    workPackageDefinitionSha256ById: Object.fromEntries(
+      [...workPackageBodies.entries()]
+        .sort(([left], [right]) =>
+          left < right ? -1 : left > right ? 1 : 0,
+        )
+        .map(([workPackageId, body]) => [workPackageId, sha256(body)]),
+    ),
+  },
   statusVocabulary,
   gateRule:
     "A phase gates only its own obligation. A parent is verified only after every required obligation is verified.",

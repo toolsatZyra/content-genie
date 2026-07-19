@@ -5,6 +5,7 @@ import {
   deterministicEmptyStudioProjection,
   deterministicStateMatrixProjection,
   deterministicStudioProjection,
+  deterministicUnavailableStudioProjection,
 } from "@/test/fakes/studio";
 
 describe("deterministic studio projection", () => {
@@ -16,6 +17,19 @@ describe("deterministic studio projection", () => {
       "world_setup",
       "pending_qualified_review",
     ]);
+    expect(projection.series[0]?.activeRelease).toMatchObject({
+      kind: "released",
+      releaseNumber: 2,
+      status: "active",
+      continuity: { versionNumber: 3 },
+      look: { availabilityStatus: "active", key: "divine-realism" },
+      voice: {
+        availabilityStatus: "verified",
+        gender: "male",
+        key: "elevenlabs-male-hindi-devotional-v1",
+      },
+    });
+    expect(projection.series[1]?.activeRelease).toEqual({ kind: "unreleased" });
   });
 
   it("renders every canonical state in the responsive acceptance matrix", () => {
@@ -39,6 +53,17 @@ describe("deterministic studio projection", () => {
       notifications: [],
       series: [],
       work: [],
+    });
+  });
+
+  it("provides explicit unavailable lifecycle and malformed-release states", () => {
+    const projection = deterministicUnavailableStudioProjection();
+    expect(projection.episodes[0]?.workflowState).toBe("unavailable");
+    expect(projection.series[0]?.state).toBe("unavailable");
+    expect(projection.series[1]?.activeRelease).toEqual({
+      kind: "unavailable",
+      reason: "release",
+      releaseId: "10000000-0000-4000-8000-0000000000ff",
     });
   });
 });

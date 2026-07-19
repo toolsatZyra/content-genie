@@ -7,6 +7,7 @@ export interface PublicEnvironment {
 }
 
 export interface ServerEnvironment {
+  readonly commandHmacSecret: string | null;
   readonly environment: GenieEnvironment;
   readonly enableExport: boolean;
   readonly enableFinalApproval: boolean;
@@ -143,6 +144,7 @@ export function parseServerEnvironment(source: EnvironmentSource): ServerEnviron
     issues,
   );
   const enableRender = parseBoolean(source, "GENIE_ENABLE_RENDER", issues);
+  const commandHmacSecret = optional(source, "GENIE_COMMAND_HMAC_SECRET");
   const supabaseProjectRef = optional(source, "SUPABASE_PROJECT_REF");
   const supabaseTestProjectRef = optional(source, "SUPABASE_TEST_PROJECT_REF");
   const supabaseServiceRoleKey = optional(source, "SUPABASE_SERVICE_ROLE_KEY");
@@ -197,6 +199,7 @@ export function parseServerEnvironment(source: EnvironmentSource): ServerEnviron
   if (issues.length > 0) throw new EnvironmentContractError(issues);
 
   return Object.freeze({
+    commandHmacSecret,
     environment,
     enableExport,
     enableFinalApproval,

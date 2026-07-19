@@ -63,6 +63,28 @@ export function deterministicStudioProjection(): StudioProjection {
     ],
     series: [
       {
+        activeRelease: {
+          continuity: {
+            id: "10000000-0000-4000-8000-00000000000c",
+            versionNumber: 3,
+          },
+          id: "10000000-0000-4000-8000-00000000000b",
+          kind: "released",
+          look: {
+            availabilityStatus: "active",
+            id: "10000000-0000-4000-8000-00000000000d",
+            key: "divine-realism",
+            name: "Divine Realism",
+          },
+          releaseNumber: 2,
+          status: "active",
+          voice: {
+            availabilityStatus: "verified",
+            gender: "male",
+            id: "ec4e61a6-dc45-53d9-ba4b-fd5c7f267b2f",
+            key: "elevenlabs-male-hindi-devotional-v1",
+          },
+        },
         aggregateVersion: 2,
         description: "Stories of stillness, force and cosmic compassion.",
         id: seriesId,
@@ -71,6 +93,7 @@ export function deterministicStudioProjection(): StudioProjection {
         updatedAt: "2026-07-17T00:00:00.000Z",
       },
       {
+        activeRelease: { kind: "unreleased" },
         aggregateVersion: 1,
         description: "\"'><svg/onload=globalThis.__genieXss=1>",
         id: "10000000-0000-4000-8000-00000000000a",
@@ -148,5 +171,27 @@ export function deterministicEmptyStudioProjection(): StudioProjection {
     notifications: [],
     series: [],
     work: [],
+  };
+}
+
+export function deterministicUnavailableStudioProjection(): StudioProjection {
+  const projection = deterministicStudioProjection();
+  return {
+    ...projection,
+    episodes: projection.episodes.map((episode, index) =>
+      index === 0 ? { ...episode, workflowState: "unavailable" } : episode,
+    ),
+    series: projection.series.map((series, index) =>
+      index === 0
+        ? { ...series, state: "unavailable" }
+        : {
+            ...series,
+            activeRelease: {
+              kind: "unavailable",
+              reason: "release",
+              releaseId: "10000000-0000-4000-8000-0000000000ff",
+            },
+          },
+    ),
   };
 }

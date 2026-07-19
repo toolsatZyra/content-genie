@@ -1,0 +1,1213 @@
+-- Phase 2 / 0011: versioned narrator and look registries plus the mutable
+-- pre-lock Episode configuration candidate. Generated look rows are sourced
+-- from src/domain/look/look-pack.v1.json.
+
+create type public.narrator_gender as enum ('male', 'female');
+create type public.voice_version_availability_status as enum (
+  'pending_authenticated_canary',
+  'verified',
+  'withdrawn'
+);
+create type public.look_version_availability_status as enum ('active', 'withdrawn');
+create type public.configuration_candidate_state as enum (
+  'world_design',
+  'preflight',
+  'ready_to_lock',
+  'locked',
+  'superseded'
+);
+
+create table public.voice_versions (
+  id uuid primary key,
+  voice_key text not null unique check (voice_key ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'),
+  registry_version integer not null check (registry_version > 0),
+  gender public.narrator_gender not null,
+  language text not null check (language = 'hi-IN'),
+  accent text not null check (accent = 'Delhi'),
+  performance_profile text not null
+    check (
+      performance_profile = 'genie-launch-hindi-delhi-sanskrit-performance.v1'
+    ),
+  sanskrit_fluency_required boolean not null check (sanskrit_fluency_required),
+  created_at timestamptz not null default statement_timestamp(),
+  unique (gender, registry_version),
+  unique (id, gender)
+);
+
+insert into public.voice_versions (
+  id,
+  voice_key,
+  registry_version,
+  gender,
+  language,
+  accent,
+  performance_profile,
+  sanskrit_fluency_required
+)
+values
+  (
+    'ec4e61a6-dc45-53d9-ba4b-fd5c7f267b2f',
+    'elevenlabs-male-hindi-devotional-v1',
+    1,
+    'male',
+    'hi-IN',
+    'Delhi',
+    'genie-launch-hindi-delhi-sanskrit-performance.v1',
+    true
+  ),
+  (
+    'bb2db360-9e44-5e17-95d3-a1e38ef21fa7',
+    'elevenlabs-female-hindi-devotional-v1',
+    1,
+    'female',
+    'hi-IN',
+    'Delhi',
+    'genie-launch-hindi-delhi-sanskrit-performance.v1',
+    true
+  );
+
+create table private.voice_provider_configurations (
+  voice_version_id uuid primary key
+    references public.voice_versions(id) on delete cascade,
+  provider text not null check (provider = 'elevenlabs'),
+  provider_account_key text not null check (provider_account_key = 'elevenlabs.primary'),
+  external_voice_id text not null check (external_voice_id ~ '^[A-Za-z0-9]{20}$'),
+  rights_basis text not null check (rights_basis = 'owner-supplied-internal-use'),
+  config_hash text not null unique check (config_hash ~ '^[a-f0-9]{64}$'),
+  created_at timestamptz not null default statement_timestamp(),
+  unique (provider, provider_account_key, external_voice_id)
+);
+
+insert into private.voice_provider_configurations (
+  voice_version_id,
+  provider,
+  provider_account_key,
+  external_voice_id,
+  rights_basis,
+  config_hash
+)
+values
+  (
+    'ec4e61a6-dc45-53d9-ba4b-fd5c7f267b2f',
+    'elevenlabs',
+    'elevenlabs.primary',
+    'b0oby86k6n7Uh5LZcOBR',
+    'owner-supplied-internal-use',
+    encode(
+      extensions.digest(
+        convert_to(
+          'elevenlabs|elevenlabs.primary|b0oby86k6n7Uh5LZcOBR|hi-IN|Delhi|genie-launch-hindi-delhi-sanskrit-performance.v1|v1',
+          'UTF8'
+        ),
+        'sha256'
+      ),
+      'hex'
+    )
+  ),
+  (
+    'bb2db360-9e44-5e17-95d3-a1e38ef21fa7',
+    'elevenlabs',
+    'elevenlabs.primary',
+    'GSdeLRB8detpjZjN63Wn',
+    'owner-supplied-internal-use',
+    encode(
+      extensions.digest(
+        convert_to(
+          'elevenlabs|elevenlabs.primary|GSdeLRB8detpjZjN63Wn|hi-IN|Delhi|genie-launch-hindi-delhi-sanskrit-performance.v1|v1',
+          'UTF8'
+        ),
+        'sha256'
+      ),
+      'hex'
+    )
+  );
+
+revoke all on table private.voice_provider_configurations
+from public, anon, authenticated;
+
+create table public.voice_version_availability (
+  voice_version_id uuid primary key
+    references public.voice_versions(id) on delete cascade,
+  status public.voice_version_availability_status not null
+    default 'pending_authenticated_canary',
+  aggregate_version bigint not null default 1 check (aggregate_version > 0),
+  verified_at timestamptz,
+  withdrawn_at timestamptz,
+  updated_at timestamptz not null default statement_timestamp(),
+  check (status <> 'verified' or verified_at is not null),
+  check (status <> 'pending_authenticated_canary' or verified_at is null),
+  check ((status = 'withdrawn') = (withdrawn_at is not null))
+);
+
+insert into public.voice_version_availability (voice_version_id)
+select id from public.voice_versions;
+
+create table public.look_packs (
+  id text primary key check (id = 'ai-director-curated-looks'),
+  pack_version integer not null check (pack_version = 1),
+  manifest_path text not null
+    check (manifest_path = 'src/domain/look/look-pack.v1.json'),
+  manifest_sha256 text not null unique check (manifest_sha256 ~ '^[a-f0-9]{64}$'),
+  source_repository text not null,
+  source_commit text not null check (source_commit ~ '^[a-f0-9]{40}$'),
+  source_catalog_sha256 text not null check (source_catalog_sha256 ~ '^[a-f0-9]{64}$'),
+  internal_rights_basis text not null
+    check (internal_rights_basis = 'owner-authorized same-company internal use'),
+  creative_review text not null check (creative_review = 'genie-deterministic-tail-v1'),
+  reviewed_at date not null,
+  created_at timestamptz not null default statement_timestamp(),
+  unique (id, pack_version)
+);
+
+insert into public.look_packs (
+  id,
+  pack_version,
+  manifest_path,
+  manifest_sha256,
+  source_repository,
+  source_commit,
+  source_catalog_sha256,
+  internal_rights_basis,
+  creative_review,
+  reviewed_at
+)
+values (
+  'ai-director-curated-looks',
+  1,
+  'src/domain/look/look-pack.v1.json',
+  '__LOOK_PACK_MANIFEST_SHA256__',
+  '__LOOK_PACK_SOURCE_REPOSITORY__',
+  '__LOOK_PACK_SOURCE_COMMIT__',
+  '__LOOK_PACK_SOURCE_CATALOG_SHA256__',
+  '__LOOK_PACK_RIGHTS_BASIS__',
+  '__LOOK_PACK_CREATIVE_REVIEW__',
+  '__LOOK_PACK_REVIEWED_AT__'
+);
+
+create table public.look_versions (
+  id uuid primary key,
+  look_key text not null check (look_key ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'),
+  pack_id text not null,
+  pack_version integer not null,
+  name text not null check (char_length(name) between 1 and 160),
+  family text not null check (char_length(family) between 1 and 160),
+  feel text not null check (char_length(feel) between 1 and 300),
+  modes text[] not null check (cardinality(modes) between 1 and 8),
+  locked_look_block_sha256 text not null
+    check (locked_look_block_sha256 ~ '^[a-f0-9]{64}$'),
+  negative_policy jsonb not null,
+  negative_policy_sha256 text not null
+    check (negative_policy_sha256 ~ '^[a-f0-9]{64}$'),
+  visual_qc_baseline jsonb not null,
+  visual_qc_baseline_sha256 text not null
+    check (visual_qc_baseline_sha256 ~ '^[a-f0-9]{64}$'),
+  preview_path text not null unique check (preview_path ~ '^/looks/[a-z0-9-]+\.webp$'),
+  preview_sha256 text not null unique check (preview_sha256 ~ '^[a-f0-9]{64}$'),
+  preview_width integer not null check (preview_width = 1280),
+  preview_height integer not null check (preview_height = 720),
+  source_prompt_sha256 text not null check (source_prompt_sha256 ~ '^[a-f0-9]{64}$'),
+  source_record_sha256 text not null check (source_record_sha256 ~ '^[a-f0-9]{64}$'),
+  manifest_entry_hash text not null unique check (manifest_entry_hash ~ '^[a-f0-9]{64}$'),
+  created_at timestamptz not null default statement_timestamp(),
+  constraint look_versions_negative_policy_shape check (
+    jsonb_typeof(negative_policy) = 'object'
+    and negative_policy ->> 'schemaVersion' = 'genie-look-negative-policy.v1'
+  ),
+  constraint look_versions_visual_qc_shape check (
+    jsonb_typeof(visual_qc_baseline) = 'object'
+    and visual_qc_baseline ->> 'schemaVersion' = 'genie-look-visual-qc-baseline.v1'
+    and visual_qc_baseline ->> 'sourceLookBlockSha256' = locked_look_block_sha256
+    and visual_qc_baseline ->> 'negativePolicySha256' = negative_policy_sha256
+  ),
+  unique (look_key, pack_version),
+  foreign key (pack_id, pack_version)
+    references public.look_packs(id, pack_version) on delete restrict
+);
+
+create table public.look_version_availability (
+  look_version_id uuid primary key
+    references public.look_versions(id) on delete cascade,
+  status public.look_version_availability_status not null default 'active',
+  aggregate_version bigint not null default 1 check (aggregate_version > 0),
+  withdrawn_at timestamptz,
+  updated_at timestamptz not null default statement_timestamp(),
+  check ((status = 'withdrawn') = (withdrawn_at is not null))
+);
+
+create table private.voice_version_availability_events (
+  command_id uuid primary key,
+  voice_version_id uuid not null
+    references public.voice_versions(id) on delete restrict,
+  idempotency_key text not null unique
+    check (idempotency_key ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$'),
+  request_hash text not null check (request_hash ~ '^[a-f0-9]{64}$'),
+  prior_status public.voice_version_availability_status not null,
+  new_status public.voice_version_availability_status not null,
+  aggregate_version bigint not null check (aggregate_version > 1),
+  constraint voice_availability_events_no_unattested_verification
+    check (new_status <> 'verified'),
+  evidence jsonb not null check ((
+    jsonb_typeof(evidence) = 'object'
+    and new_status = 'withdrawn'
+    and (evidence - array['kind','reason','actor']::text[]) = '{}'::jsonb
+    and evidence ?& array['kind','reason','actor']
+    and jsonb_typeof(evidence -> 'kind') = 'string'
+    and jsonb_typeof(evidence -> 'reason') = 'string'
+    and jsonb_typeof(evidence -> 'actor') = 'string'
+    and evidence ->> 'kind' = 'administrative_withdrawal'
+    and char_length(btrim(evidence ->> 'reason')) between 1 and 1000
+    and char_length(btrim(evidence ->> 'actor')) between 1 and 200
+    and pg_column_size(evidence) <= 65536
+  ) is true),
+  correlation_id uuid not null,
+  created_at timestamptz not null default statement_timestamp(),
+  unique (voice_version_id, aggregate_version)
+);
+
+create table private.look_version_availability_events (
+  command_id uuid primary key,
+  look_version_id uuid not null
+    references public.look_versions(id) on delete restrict,
+  idempotency_key text not null unique
+    check (idempotency_key ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$'),
+  request_hash text not null check (request_hash ~ '^[a-f0-9]{64}$'),
+  prior_status public.look_version_availability_status not null,
+  new_status public.look_version_availability_status not null,
+  aggregate_version bigint not null check (aggregate_version > 1),
+  evidence jsonb not null check ((
+    jsonb_typeof(evidence) = 'object'
+    and (evidence - array['kind','reason','actor']::text[]) = '{}'::jsonb
+    and evidence ?& array['kind','reason','actor']
+    and jsonb_typeof(evidence -> 'kind') = 'string'
+    and jsonb_typeof(evidence -> 'reason') = 'string'
+    and jsonb_typeof(evidence -> 'actor') = 'string'
+    and evidence ->> 'kind' = 'curation_withdrawal'
+    and char_length(btrim(evidence ->> 'reason')) between 1 and 1000
+    and char_length(btrim(evidence ->> 'actor')) between 1 and 200
+    and pg_column_size(evidence) <= 65536
+  ) is true),
+  correlation_id uuid not null,
+  created_at timestamptz not null default statement_timestamp(),
+  unique (look_version_id, aggregate_version)
+);
+
+revoke all on table private.voice_version_availability_events
+from public, anon, authenticated;
+revoke all on table private.look_version_availability_events
+from public, anon, authenticated;
+
+alter table public.series_releases
+  add constraint series_releases_look_version_fk
+  foreign key (look_version_id)
+  references public.look_versions(id) on delete restrict;
+
+create table public.episode_configuration_candidates (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null,
+  episode_id uuid not null,
+  candidate_number integer not null check (candidate_number > 0),
+  script_revision_id uuid not null,
+  narrator_gender public.narrator_gender not null default 'male',
+  voice_version_id uuid not null,
+  look_version_id uuid not null references public.look_versions(id) on delete restrict,
+  performance_profile_id text not null
+    default 'genie-launch-hindi-delhi-sanskrit-performance.v1'
+    check (
+      performance_profile_id = 'genie-launch-hindi-delhi-sanskrit-performance.v1'
+    ),
+  voice_confirmed_by uuid references auth.users(id) on delete restrict,
+  voice_confirmed_at timestamptz,
+  look_confirmed_by uuid references auth.users(id) on delete restrict,
+  look_confirmed_at timestamptz,
+  state public.configuration_candidate_state not null default 'world_design',
+  aggregate_version bigint not null default 1 check (aggregate_version > 0),
+  selected_by uuid not null references auth.users(id) on delete restrict,
+  created_at timestamptz not null default statement_timestamp(),
+  updated_at timestamptz not null default statement_timestamp(),
+  superseded_at timestamptz,
+  locked_at timestamptz,
+  unique (workspace_id, id),
+  unique (workspace_id, episode_id, candidate_number),
+  unique (episode_id, candidate_number),
+  foreign key (workspace_id, episode_id)
+    references public.episodes(workspace_id, id) on delete restrict,
+  foreign key (workspace_id, episode_id, script_revision_id)
+    references public.script_revisions(workspace_id, episode_id, id)
+    on delete restrict,
+  foreign key (voice_version_id, narrator_gender)
+    references public.voice_versions(id, gender) on delete restrict,
+  check ((voice_confirmed_by is null) = (voice_confirmed_at is null)),
+  check ((look_confirmed_by is null) = (look_confirmed_at is null)),
+  check (
+    state not in ('preflight', 'ready_to_lock', 'locked')
+    or (
+      voice_confirmed_by is not null
+      and voice_confirmed_at is not null
+      and look_confirmed_by is not null
+      and look_confirmed_at is not null
+    )
+  ),
+  check (
+    (state = 'superseded' and superseded_at is not null and locked_at is null)
+    or (state = 'locked' and locked_at is not null and superseded_at is null)
+    or (
+      state in ('world_design', 'preflight', 'ready_to_lock')
+      and superseded_at is null
+      and locked_at is null
+    )
+  )
+);
+
+create unique index episode_configuration_one_active_uq
+  on public.episode_configuration_candidates (episode_id)
+  where state not in ('locked', 'superseded');
+create index look_versions_pack_idx
+  on public.look_versions (pack_id, pack_version);
+create index voice_version_availability_status_idx
+  on public.voice_version_availability (status, voice_version_id);
+create index look_version_availability_status_idx
+  on public.look_version_availability (status, look_version_id);
+create index series_releases_look_version_idx
+  on public.series_releases (look_version_id);
+create index episode_configuration_workspace_script_idx
+  on public.episode_configuration_candidates (
+    workspace_id,
+    episode_id,
+    script_revision_id
+  );
+create index episode_configuration_voice_idx
+  on public.episode_configuration_candidates (voice_version_id, narrator_gender);
+create index episode_configuration_look_idx
+  on public.episode_configuration_candidates (look_version_id);
+create index episode_configuration_selected_by_idx
+  on public.episode_configuration_candidates (selected_by);
+
+create trigger episode_configuration_candidates_updated_at
+before update on public.episode_configuration_candidates
+for each row execute function private.set_updated_at();
+
+create trigger voice_version_availability_updated_at
+before update on public.voice_version_availability
+for each row execute function private.set_updated_at();
+
+create trigger look_version_availability_updated_at
+before update on public.look_version_availability
+for each row execute function private.set_updated_at();
+
+create trigger voice_version_availability_events_immutable
+before update or delete on private.voice_version_availability_events
+for each row execute function private.reject_mutation();
+
+create trigger voice_provider_configurations_immutable
+before update or delete on private.voice_provider_configurations
+for each row execute function private.reject_mutation();
+
+create trigger look_version_availability_events_immutable
+before update or delete on private.look_version_availability_events
+for each row execute function private.reject_mutation();
+
+create trigger voice_versions_immutable
+before update or delete on public.voice_versions
+for each row execute function private.reject_mutation();
+
+create trigger look_versions_immutable
+before update or delete on public.look_versions
+for each row execute function private.reject_mutation();
+
+create trigger look_packs_immutable
+before update or delete on public.look_packs
+for each row execute function private.reject_mutation();
+
+create or replace function private.create_look_version_availability()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.look_version_availability (look_version_id)
+  values (new.id);
+  return new;
+end;
+$$;
+
+create trigger look_version_creates_availability
+after insert on public.look_versions
+for each row execute function private.create_look_version_availability();
+
+revoke all on function private.create_look_version_availability()
+from public, anon, authenticated;
+
+create or replace function private.create_configuration_for_script_revision()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  default_look uuid;
+  default_voice uuid;
+  next_candidate integer;
+begin
+  select l.id into default_look
+  from public.look_versions l
+  join public.look_version_availability a on a.look_version_id = l.id
+  where l.look_key = 'glowing-divine-realism'
+    and l.pack_version = 1
+    and a.status = 'active';
+  select v.id into default_voice
+  from public.voice_versions v
+  join public.voice_version_availability a on a.voice_version_id = v.id
+  where v.gender = 'male'
+    and v.registry_version = 1
+    and a.status <> 'withdrawn';
+  if default_look is null or default_voice is null then
+    raise exception 'default creative configuration is unavailable'
+      using errcode = '55000';
+  end if;
+
+  update public.episode_configuration_candidates
+  set state = 'superseded',
+      superseded_at = statement_timestamp(),
+      aggregate_version = aggregate_version + 1
+  where episode_id = new.episode_id
+    and state not in ('locked', 'superseded');
+
+  select coalesce(max(candidate_number), 0) + 1 into next_candidate
+  from public.episode_configuration_candidates
+  where episode_id = new.episode_id;
+
+  insert into public.episode_configuration_candidates (
+    workspace_id,
+    episode_id,
+    candidate_number,
+    script_revision_id,
+    narrator_gender,
+    voice_version_id,
+    look_version_id,
+    selected_by
+  )
+  values (
+    new.workspace_id,
+    new.episode_id,
+    next_candidate,
+    new.id,
+    'male',
+    default_voice,
+    default_look,
+    new.created_by
+  );
+  return new;
+end;
+$$;
+
+create trigger script_revision_creates_configuration
+after insert on public.script_revisions
+for each row execute function private.create_configuration_for_script_revision();
+
+revoke all on function private.create_configuration_for_script_revision()
+from public, anon, authenticated;
+
+create or replace function private.has_current_active_membership()
+returns boolean
+language sql
+volatile
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.memberships m
+    where m.user_id = auth.uid()
+      and m.status = 'active'
+      and private.is_current_session_allowed(m.workspace_id)
+  );
+$$;
+
+revoke all on function private.has_current_active_membership()
+from public, anon, authenticated;
+grant execute on function private.has_current_active_membership()
+to authenticated;
+
+create or replace function public.command_set_voice_version_availability(
+  p_voice_version_id uuid,
+  p_expected_version bigint,
+  p_status public.voice_version_availability_status,
+  p_evidence jsonb,
+  p_command_id uuid,
+  p_idempotency_key text,
+  p_request_hash text,
+  p_correlation_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'service authority required' using errcode = '42501';
+  end if;
+  if p_idempotency_key !~ '^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$'
+    or p_request_hash !~ '^[a-f0-9]{64}$'
+  then
+    raise exception 'invalid availability command envelope' using errcode = '22023';
+  end if;
+  if p_expected_version is null or p_expected_version < 1
+    or p_status is distinct from 'verified'
+    or jsonb_typeof(p_evidence) is distinct from 'object'
+    or pg_column_size(p_evidence) > 65536
+    or not (
+      (p_evidence - array[
+        'kind','provider','result','checkedAt','artifactSha256'
+      ]::text[]) = '{}'::jsonb
+      and p_evidence ?& array[
+        'kind','provider','result','checkedAt','artifactSha256'
+      ]
+      and jsonb_typeof(p_evidence -> 'kind') = 'string'
+      and jsonb_typeof(p_evidence -> 'provider') = 'string'
+      and jsonb_typeof(p_evidence -> 'result') = 'string'
+      and jsonb_typeof(p_evidence -> 'checkedAt') = 'string'
+      and jsonb_typeof(p_evidence -> 'artifactSha256') = 'string'
+      and p_evidence ->> 'kind' = 'authenticated_canary'
+      and p_evidence ->> 'provider' = 'elevenlabs'
+      and p_evidence ->> 'result' = 'passed'
+      and p_evidence ->> 'checkedAt' ~
+        '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?Z$'
+      and p_evidence ->> 'artifactSha256' ~ '^[a-f0-9]{64}$'
+    ) is true
+  then
+    raise exception 'availability evidence is required' using errcode = '22023';
+  end if;
+  raise exception 'voice verification requires an authenticated provider receipt'
+    using errcode = '55000';
+end;
+$$;
+
+create or replace function public.command_withdraw_voice_version(
+  p_voice_version_id uuid,
+  p_expected_version bigint,
+  p_evidence jsonb,
+  p_command_id uuid,
+  p_idempotency_key text,
+  p_request_hash text,
+  p_correlation_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  availability public.voice_version_availability%rowtype;
+  existing private.voice_version_availability_events%rowtype;
+  prior_status public.voice_version_availability_status;
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'service authority required' using errcode = '42501';
+  end if;
+  if p_idempotency_key !~ '^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$'
+    or p_request_hash !~ '^[a-f0-9]{64}$'
+  then
+    raise exception 'invalid availability command envelope' using errcode = '22023';
+  end if;
+  if p_expected_version is null or p_expected_version < 1
+    or jsonb_typeof(p_evidence) is distinct from 'object'
+    or pg_column_size(p_evidence) > 65536
+    or not (
+      (p_evidence - array['kind','reason','actor']::text[]) = '{}'::jsonb
+      and p_evidence ?& array['kind','reason','actor']
+      and jsonb_typeof(p_evidence -> 'kind') = 'string'
+      and jsonb_typeof(p_evidence -> 'reason') = 'string'
+      and jsonb_typeof(p_evidence -> 'actor') = 'string'
+      and p_evidence ->> 'kind' = 'administrative_withdrawal'
+      and char_length(btrim(p_evidence ->> 'reason')) between 1 and 1000
+      and char_length(btrim(p_evidence ->> 'actor')) between 1 and 200
+    ) is true
+  then
+    raise exception 'withdrawal evidence is required' using errcode = '22023';
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(
+      'voice-withdrawal:' || p_idempotency_key,
+      0
+    )
+  );
+  select * into existing
+  from private.voice_version_availability_events
+  where idempotency_key = p_idempotency_key;
+  if found then
+    if existing.request_hash <> p_request_hash
+      or existing.voice_version_id <> p_voice_version_id
+      or existing.new_status <> 'withdrawn'
+      or existing.aggregate_version - 1 is distinct from p_expected_version
+    then
+      raise exception 'idempotency key was already used with a different request'
+        using errcode = '22023';
+    end if;
+    return jsonb_build_object(
+      'ok', true,
+      'voiceVersionId', existing.voice_version_id,
+      'status', existing.new_status,
+      'aggregateVersion', existing.aggregate_version
+    );
+  end if;
+
+  select * into availability
+  from public.voice_version_availability
+  where voice_version_id = p_voice_version_id
+  for update;
+  if not found then
+    raise exception 'voice version availability not found' using errcode = 'P0002';
+  end if;
+  if availability.aggregate_version is distinct from p_expected_version then
+    raise exception 'stale voice availability version' using errcode = '40001';
+  end if;
+  if availability.status not in ('pending_authenticated_canary', 'verified') then
+    raise exception 'invalid voice availability transition' using errcode = '55000';
+  end if;
+  prior_status := availability.status;
+
+  update public.voice_version_availability
+  set status = 'withdrawn',
+      aggregate_version = aggregate_version + 1,
+      withdrawn_at = statement_timestamp()
+  where voice_version_id = p_voice_version_id
+  returning * into availability;
+
+  insert into private.voice_version_availability_events (
+    command_id,
+    voice_version_id,
+    idempotency_key,
+    request_hash,
+    prior_status,
+    new_status,
+    aggregate_version,
+    evidence,
+    correlation_id
+  )
+  values (
+    p_command_id,
+    p_voice_version_id,
+    p_idempotency_key,
+    p_request_hash,
+    prior_status,
+    'withdrawn',
+    availability.aggregate_version,
+    p_evidence,
+    p_correlation_id
+  );
+  return jsonb_build_object(
+    'ok', true,
+    'voiceVersionId', p_voice_version_id,
+    'status', availability.status,
+    'aggregateVersion', availability.aggregate_version
+  );
+end;
+$$;
+
+create or replace function public.command_withdraw_look_version(
+  p_look_version_id uuid,
+  p_expected_version bigint,
+  p_evidence jsonb,
+  p_command_id uuid,
+  p_idempotency_key text,
+  p_request_hash text,
+  p_correlation_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  availability public.look_version_availability%rowtype;
+  existing private.look_version_availability_events%rowtype;
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'service authority required' using errcode = '42501';
+  end if;
+  if p_idempotency_key !~ '^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$'
+    or p_request_hash !~ '^[a-f0-9]{64}$'
+  then
+    raise exception 'invalid availability command envelope' using errcode = '22023';
+  end if;
+  if p_expected_version is null or p_expected_version < 1
+    or jsonb_typeof(p_evidence) is distinct from 'object'
+    or pg_column_size(p_evidence) > 65536
+    or not (
+      (p_evidence - array['kind','reason','actor']::text[]) = '{}'::jsonb
+      and p_evidence ?& array['kind','reason','actor']
+      and jsonb_typeof(p_evidence -> 'kind') = 'string'
+      and jsonb_typeof(p_evidence -> 'reason') = 'string'
+      and jsonb_typeof(p_evidence -> 'actor') = 'string'
+      and p_evidence ->> 'kind' = 'curation_withdrawal'
+      and char_length(btrim(p_evidence ->> 'reason')) between 1 and 1000
+      and char_length(btrim(p_evidence ->> 'actor')) between 1 and 200
+    ) is true
+  then
+    raise exception 'withdrawal evidence is required' using errcode = '22023';
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(
+      'look-availability:' || p_look_version_id::text || ':' || p_idempotency_key,
+      0
+    )
+  );
+  select * into existing
+  from private.look_version_availability_events
+  where idempotency_key = p_idempotency_key;
+  if found then
+    if existing.request_hash <> p_request_hash
+      or existing.look_version_id <> p_look_version_id
+      or existing.new_status <> 'withdrawn'
+      or existing.aggregate_version - 1 is distinct from p_expected_version
+    then
+      raise exception 'idempotency key was already used with a different request'
+        using errcode = '22023';
+    end if;
+    return jsonb_build_object(
+      'ok', true,
+      'lookVersionId', existing.look_version_id,
+      'status', existing.new_status,
+      'aggregateVersion', existing.aggregate_version
+    );
+  end if;
+
+  select * into availability
+  from public.look_version_availability
+  where look_version_id = p_look_version_id
+  for update;
+  if not found then
+    raise exception 'look version availability not found' using errcode = 'P0002';
+  end if;
+  if availability.aggregate_version is distinct from p_expected_version then
+    raise exception 'stale look availability version' using errcode = '40001';
+  end if;
+  if availability.status <> 'active' then
+    raise exception 'invalid look availability transition' using errcode = '55000';
+  end if;
+
+  update public.look_version_availability
+  set status = 'withdrawn',
+      aggregate_version = aggregate_version + 1,
+      withdrawn_at = statement_timestamp()
+  where look_version_id = p_look_version_id
+  returning * into availability;
+  insert into private.look_version_availability_events (
+    command_id,
+    look_version_id,
+    idempotency_key,
+    request_hash,
+    prior_status,
+    new_status,
+    aggregate_version,
+    evidence,
+    correlation_id
+  )
+  values (
+    p_command_id,
+    p_look_version_id,
+    p_idempotency_key,
+    p_request_hash,
+    'active',
+    'withdrawn',
+    availability.aggregate_version,
+    p_evidence,
+    p_correlation_id
+  );
+  return jsonb_build_object(
+    'ok', true,
+    'lookVersionId', p_look_version_id,
+    'status', availability.status,
+    'aggregateVersion', availability.aggregate_version
+  );
+end;
+$$;
+
+revoke all on function public.command_set_voice_version_availability(
+  uuid,bigint,public.voice_version_availability_status,jsonb,uuid,text,text,uuid
+) from public, anon, authenticated;
+grant execute on function public.command_set_voice_version_availability(
+  uuid,bigint,public.voice_version_availability_status,jsonb,uuid,text,text,uuid
+) to service_role;
+
+revoke all on function public.command_withdraw_voice_version(
+  uuid,bigint,jsonb,uuid,text,text,uuid
+) from public, anon, authenticated;
+grant execute on function public.command_withdraw_voice_version(
+  uuid,bigint,jsonb,uuid,text,text,uuid
+) to service_role;
+
+revoke all on function public.command_withdraw_look_version(
+  uuid,bigint,jsonb,uuid,text,text,uuid
+)
+from public, anon, authenticated;
+grant execute on function public.command_withdraw_look_version(
+  uuid,bigint,jsonb,uuid,text,text,uuid
+)
+to service_role;
+
+create or replace function public.command_select_episode_voice(
+  p_workspace_id uuid,
+  p_episode_id uuid,
+  p_configuration_candidate_id uuid,
+  p_expected_candidate_version bigint,
+  p_narrator_gender public.narrator_gender,
+  p_voice_version_id uuid,
+  p_command_id uuid,
+  p_idempotency_key text,
+  p_request_hash text,
+  p_correlation_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_id uuid := auth.uid();
+  candidate public.episode_configuration_candidates%rowtype;
+  episode_version bigint;
+  response jsonb;
+  selected_voice_status public.voice_version_availability_status;
+begin
+  if actor_id is null then
+    raise exception 'authentication required' using errcode = '42501';
+  end if;
+  perform private.assert_active_session(p_workspace_id);
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(
+      p_workspace_id::text || actor_id::text || p_idempotency_key,
+      0
+    )
+  );
+  response := private.existing_command_response(
+    p_workspace_id,
+    actor_id,
+    p_idempotency_key,
+    'episode.voice.select',
+    p_request_hash
+  );
+  if response is not null then return response; end if;
+
+  select * into candidate
+  from public.episode_configuration_candidates c
+  where c.workspace_id = p_workspace_id
+    and c.episode_id = p_episode_id
+    and c.id = p_configuration_candidate_id
+  for update;
+  if not found or candidate.state <> 'world_design' then
+    raise exception 'active world configuration not found' using errcode = 'P0002';
+  end if;
+  if p_expected_candidate_version is null
+    or candidate.aggregate_version is distinct from p_expected_candidate_version
+  then
+    raise exception 'stale configuration candidate' using errcode = '40001';
+  end if;
+  select a.status into selected_voice_status
+  from public.voice_versions v
+  join public.voice_version_availability a on a.voice_version_id = v.id
+  where v.id = p_voice_version_id
+    and v.gender = p_narrator_gender
+  for update of a;
+  if not found or selected_voice_status = 'withdrawn' then
+    raise exception 'exact voice version is unavailable' using errcode = '23503';
+  end if;
+
+  update public.episode_configuration_candidates
+  set narrator_gender = p_narrator_gender,
+      voice_version_id = p_voice_version_id,
+      voice_confirmed_by = actor_id,
+      voice_confirmed_at = statement_timestamp(),
+      selected_by = actor_id,
+      aggregate_version = aggregate_version + 1
+  where id = p_configuration_candidate_id
+  returning * into candidate;
+
+  update public.episodes
+  set aggregate_version = aggregate_version + 1
+  where workspace_id = p_workspace_id and id = p_episode_id
+  returning aggregate_version into episode_version;
+  update private.aggregate_versions as aggregate_state
+  set current_version = aggregate_state.current_version + 1,
+      updated_at = statement_timestamp()
+  where aggregate_state.workspace_id = p_workspace_id
+    and aggregate_state.aggregate_type = 'episode'
+    and aggregate_state.aggregate_id = p_episode_id;
+
+  perform private.emit_domain_event(
+    p_workspace_id,
+    'episode.voice_selected.v1',
+    'episode',
+    p_episode_id,
+    episode_version,
+    p_correlation_id,
+    jsonb_build_object(
+      'episodeId', p_episode_id,
+      'configurationCandidateId', candidate.id,
+      'configurationVersion', candidate.aggregate_version,
+      'narratorGender', p_narrator_gender,
+      'performanceProfileId', candidate.performance_profile_id,
+      'selectionOrigin', 'human_confirmed',
+      'confirmedAt', candidate.voice_confirmed_at,
+      'confirmedBy', candidate.voice_confirmed_by,
+      'voiceVersionId', p_voice_version_id
+    )
+  );
+  response := jsonb_build_object(
+    'ok', true,
+    'configurationCandidateId', candidate.id,
+    'configurationVersion', candidate.aggregate_version,
+    'episodeVersion', episode_version,
+    'narratorGender', p_narrator_gender,
+    'performanceProfileId', candidate.performance_profile_id,
+    'selectionOrigin', 'human_confirmed',
+    'confirmedAt', candidate.voice_confirmed_at,
+    'confirmedBy', candidate.voice_confirmed_by,
+    'voiceVersionId', p_voice_version_id
+  );
+  perform private.record_command(
+    p_command_id,
+    p_workspace_id,
+    actor_id,
+    p_idempotency_key,
+    'episode.voice.select',
+    'episode',
+    p_episode_id,
+    p_expected_candidate_version,
+    p_request_hash,
+    response,
+    p_correlation_id
+  );
+  perform private.insert_audit_event(
+    p_workspace_id,
+    'episode.voice.select',
+    'episode_configuration_candidate',
+    candidate.id,
+    candidate.aggregate_version,
+    p_command_id,
+    p_idempotency_key,
+    p_correlation_id,
+    'allow',
+    'accepted'
+  );
+  return response;
+end;
+$$;
+
+create or replace function public.command_select_episode_look(
+  p_workspace_id uuid,
+  p_episode_id uuid,
+  p_configuration_candidate_id uuid,
+  p_expected_candidate_version bigint,
+  p_look_version_id uuid,
+  p_command_id uuid,
+  p_idempotency_key text,
+  p_request_hash text,
+  p_correlation_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_id uuid := auth.uid();
+  candidate public.episode_configuration_candidates%rowtype;
+  episode_version bigint;
+  response jsonb;
+  selected_look_status public.look_version_availability_status;
+begin
+  if actor_id is null then
+    raise exception 'authentication required' using errcode = '42501';
+  end if;
+  perform private.assert_active_session(p_workspace_id);
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(
+      p_workspace_id::text || actor_id::text || p_idempotency_key,
+      0
+    )
+  );
+  response := private.existing_command_response(
+    p_workspace_id,
+    actor_id,
+    p_idempotency_key,
+    'episode.look.select',
+    p_request_hash
+  );
+  if response is not null then return response; end if;
+
+  select * into candidate
+  from public.episode_configuration_candidates c
+  where c.workspace_id = p_workspace_id
+    and c.episode_id = p_episode_id
+    and c.id = p_configuration_candidate_id
+  for update;
+  if not found or candidate.state <> 'world_design' then
+    raise exception 'active world configuration not found' using errcode = 'P0002';
+  end if;
+  if p_expected_candidate_version is null
+    or candidate.aggregate_version is distinct from p_expected_candidate_version
+  then
+    raise exception 'stale configuration candidate' using errcode = '40001';
+  end if;
+  select a.status into selected_look_status
+  from public.look_versions l
+  join public.look_version_availability a on a.look_version_id = l.id
+  where l.id = p_look_version_id
+  for update of a;
+  if not found or selected_look_status <> 'active' then
+    raise exception 'exact look version is unavailable' using errcode = '23503';
+  end if;
+
+  update public.episode_configuration_candidates
+  set look_version_id = p_look_version_id,
+      look_confirmed_by = actor_id,
+      look_confirmed_at = statement_timestamp(),
+      selected_by = actor_id,
+      aggregate_version = aggregate_version + 1
+  where id = p_configuration_candidate_id
+  returning * into candidate;
+
+  update public.episodes
+  set aggregate_version = aggregate_version + 1
+  where workspace_id = p_workspace_id and id = p_episode_id
+  returning aggregate_version into episode_version;
+  update private.aggregate_versions as aggregate_state
+  set current_version = aggregate_state.current_version + 1,
+      updated_at = statement_timestamp()
+  where aggregate_state.workspace_id = p_workspace_id
+    and aggregate_state.aggregate_type = 'episode'
+    and aggregate_state.aggregate_id = p_episode_id;
+
+  perform private.emit_domain_event(
+    p_workspace_id,
+    'episode.look_selected.v1',
+    'episode',
+    p_episode_id,
+    episode_version,
+    p_correlation_id,
+    jsonb_build_object(
+      'episodeId', p_episode_id,
+      'configurationCandidateId', candidate.id,
+      'configurationVersion', candidate.aggregate_version,
+      'selectionOrigin', 'human_confirmed',
+      'confirmedAt', candidate.look_confirmed_at,
+      'confirmedBy', candidate.look_confirmed_by,
+      'lookVersionId', p_look_version_id
+    )
+  );
+  response := jsonb_build_object(
+    'ok', true,
+    'configurationCandidateId', candidate.id,
+    'configurationVersion', candidate.aggregate_version,
+    'episodeVersion', episode_version,
+    'selectionOrigin', 'human_confirmed',
+    'confirmedAt', candidate.look_confirmed_at,
+    'confirmedBy', candidate.look_confirmed_by,
+    'lookVersionId', p_look_version_id
+  );
+  perform private.record_command(
+    p_command_id,
+    p_workspace_id,
+    actor_id,
+    p_idempotency_key,
+    'episode.look.select',
+    'episode',
+    p_episode_id,
+    p_expected_candidate_version,
+    p_request_hash,
+    response,
+    p_correlation_id
+  );
+  perform private.insert_audit_event(
+    p_workspace_id,
+    'episode.look.select',
+    'episode_configuration_candidate',
+    candidate.id,
+    candidate.aggregate_version,
+    p_command_id,
+    p_idempotency_key,
+    p_correlation_id,
+    'allow',
+    'accepted'
+  );
+  return response;
+end;
+$$;
+
+alter table public.voice_versions enable row level security;
+alter table public.voice_versions force row level security;
+alter table public.voice_version_availability enable row level security;
+alter table public.voice_version_availability force row level security;
+alter table public.look_versions enable row level security;
+alter table public.look_versions force row level security;
+alter table public.look_version_availability enable row level security;
+alter table public.look_version_availability force row level security;
+alter table public.look_packs enable row level security;
+alter table public.look_packs force row level security;
+alter table public.episode_configuration_candidates enable row level security;
+alter table public.episode_configuration_candidates force row level security;
+
+create policy voice_versions_read_active_member
+on public.voice_versions for select
+to authenticated
+using (private.has_current_active_membership());
+
+create policy voice_version_availability_read_active_member
+on public.voice_version_availability for select
+to authenticated
+using (private.has_current_active_membership());
+
+create policy look_versions_read_active_member
+on public.look_versions for select
+to authenticated
+using (private.has_current_active_membership());
+
+create policy look_version_availability_read_active_member
+on public.look_version_availability for select
+to authenticated
+using (private.has_current_active_membership());
+
+create policy look_packs_read_active_member
+on public.look_packs for select
+to authenticated
+using (private.has_current_active_membership());
+
+create policy episode_configuration_read_active_workspace
+on public.episode_configuration_candidates for select
+to authenticated
+using (private.is_current_session_allowed(workspace_id));
+
+revoke all on table public.voice_versions from public, anon, authenticated;
+revoke all on table public.voice_version_availability
+  from public, anon, authenticated;
+revoke all on table public.look_versions from public, anon, authenticated;
+revoke all on table public.look_version_availability
+  from public, anon, authenticated;
+revoke all on table public.look_packs from public, anon, authenticated;
+revoke all on table public.episode_configuration_candidates
+  from public, anon, authenticated;
+grant select on table public.voice_versions to authenticated;
+grant select on table public.voice_version_availability to authenticated;
+grant select on table public.look_versions to authenticated;
+grant select on table public.look_version_availability to authenticated;
+grant select on table public.look_packs to authenticated;
+grant select on table public.episode_configuration_candidates to authenticated;
+
+revoke all on function public.command_select_episode_voice(
+  uuid,uuid,uuid,bigint,public.narrator_gender,uuid,uuid,text,text,uuid
+) from public, anon, authenticated;
+grant execute on function public.command_select_episode_voice(
+  uuid,uuid,uuid,bigint,public.narrator_gender,uuid,uuid,text,text,uuid
+) to authenticated;
+
+revoke all on function public.command_select_episode_look(
+  uuid,uuid,uuid,bigint,uuid,uuid,text,text,uuid
+) from public, anon, authenticated;
+grant execute on function public.command_select_episode_look(
+  uuid,uuid,uuid,bigint,uuid,uuid,text,text,uuid
+) to authenticated;

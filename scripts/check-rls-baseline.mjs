@@ -6,7 +6,7 @@ import { analyzePhase1Migrations } from "./rls-policy.mjs";
 const root = process.cwd();
 const directory = join(root, "supabase", "migrations");
 const files = readdirSync(directory)
-  .filter((file) => file.endsWith(".sql"))
+  .filter((file) => file.endsWith(".sql") && file.includes("_phase1_"))
   .sort();
 const sources = files.map((file) => ({
   file,

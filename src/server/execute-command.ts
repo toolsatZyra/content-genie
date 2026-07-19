@@ -5,6 +5,7 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 import { getServerEnvironment } from "@/config/server-env";
 import {
+  assertExactPayloadKeys,
   boundedText,
   CommandValidationError,
   deriveInvitationToken,
@@ -14,6 +15,11 @@ import {
   type ParsedCommand,
   uuidValue,
 } from "@/security/command-envelope";
+import { findLookByVersionId } from "@/domain/look/look-registry";
+import {
+  findVoiceByVersionId,
+  parseNarratorGender,
+} from "@/domain/voice/voice-registry";
 
 interface CommandResult {
   readonly inviteToken?: string;
@@ -21,6 +27,14 @@ interface CommandResult {
 }
 
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+function validatedNarratorGender(value: unknown) {
+  try {
+    return parseNarratorGender(value);
+  } catch {
+    throw new CommandValidationError("narratorGender is invalid.");
+  }
+}
 
 function commandBase(command: ParsedCommand, idempotencyKey: string) {
   const identity = newCommandIdentity();
@@ -55,7 +69,9 @@ export async function executeCommand(
     case "series.create": {
       const title = boundedText(payload, "title", 200);
       const requestedSlug = boundedText(payload, "slug", 120).toLowerCase();
-      if (!slugPattern.test(requestedSlug)) throw new Error("slug is invalid.");
+      if (!slugPattern.test(requestedSlug)) {
+        throw new CommandValidationError("slug is invalid.");
+      }
       return {
         result: await rpc(client, "command_create_series", {
           ...base,
@@ -78,6 +94,66 @@ export async function executeCommand(
           p_workspace_id: uuidValue(payload, "workspaceId"),
         }),
       };
+    case "episode.voice.select": {
+      assertExactPayloadKeys(payload, [
+        "configurationCandidateId",
+        "episodeId",
+        "expectedCandidateVersion",
+        "narratorGender",
+        "voiceVersionId",
+        "workspaceId",
+      ]);
+      const voiceVersionId = uuidValue(payload, "voiceVersionId");
+      const voice = findVoiceByVersionId(voiceVersionId);
+      const gender = validatedNarratorGender(payload.narratorGender);
+      if (!voice || voice.gender !== gender) {
+        throw new CommandValidationError("voiceVersionId is invalid.");
+      }
+      return {
+        result: await rpc(client, "command_select_episode_voice", {
+          ...base,
+          p_configuration_candidate_id: uuidValue(payload, "configurationCandidateId"),
+          p_episode_id: uuidValue(payload, "episodeId"),
+          p_expected_candidate_version: integerValue(
+            payload,
+            "expectedCandidateVersion",
+            1,
+            Number.MAX_SAFE_INTEGER,
+          ),
+          p_narrator_gender: gender,
+          p_voice_version_id: voiceVersionId,
+          p_workspace_id: uuidValue(payload, "workspaceId"),
+        }),
+      };
+    }
+    case "episode.look.select": {
+      assertExactPayloadKeys(payload, [
+        "configurationCandidateId",
+        "episodeId",
+        "expectedCandidateVersion",
+        "lookVersionId",
+        "workspaceId",
+      ]);
+      const lookVersionId = uuidValue(payload, "lookVersionId");
+      if (!findLookByVersionId(lookVersionId)) {
+        throw new CommandValidationError("lookVersionId is invalid.");
+      }
+      return {
+        result: await rpc(client, "command_select_episode_look", {
+          ...base,
+          p_configuration_candidate_id: uuidValue(payload, "configurationCandidateId"),
+          p_episode_id: uuidValue(payload, "episodeId"),
+          p_expected_candidate_version: integerValue(
+            payload,
+            "expectedCandidateVersion",
+            1,
+            Number.MAX_SAFE_INTEGER,
+          ),
+          p_look_version_id: lookVersionId,
+          p_workspace_id: uuidValue(payload, "workspaceId"),
+        }),
+      };
+    }
     case "series.archive":
       return {
         result: await rpc(client, "command_archive_series", {
@@ -104,14 +180,14 @@ export async function executeCommand(
     case "invitation.create": {
       const email = boundedText(payload, "email", 320).toLowerCase();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        throw new Error("email is invalid.");
+        throw new CommandValidationError("email is invalid.");
       }
       const maximumRole = payload.maximumRole;
       if (maximumRole !== "member" && maximumRole !== "reviewer") {
-        throw new Error("maximumRole is invalid.");
+        throw new CommandValidationError("maximumRole is invalid.");
       }
       const workspaceId = uuidValue(payload, "workspaceId");
-      const invitationSecret = getServerEnvironment().supabaseServiceRoleKey;
+      const invitationSecret = getServerEnvironment().commandHmacSecret;
       if (!invitationSecret) {
         throw new CommandValidationError("Invitation service is unavailable.");
       }

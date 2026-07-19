@@ -24,6 +24,16 @@ assert.deepEqual(
     rejected: [],
   },
 );
+assert.deepEqual(evaluateProductionLicenses({ Unlicense: [{ name: "postgres" }] }), {
+  packages: 1,
+  rejected: [],
+});
+assert.equal(
+  evaluateProductionLicenses({
+    Unlicense: [{ name: "unrelated-unlicensed-package" }],
+  }).rejected.length,
+  1,
+);
 assert.equal(
   evaluateProductionLicenses({
     "LGPL-3.0-or-later": [{ name: "unrelated-lgpl-package" }],

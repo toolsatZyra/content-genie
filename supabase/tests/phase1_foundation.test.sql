@@ -197,9 +197,19 @@ select is(
     join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public'
       and has_function_privilege('authenticated', p.oid, 'execute')
+      and p.proname in (
+        'authorize_storage_sign',
+        'command_accept_invitation',
+        'command_archive_series',
+        'command_claim_work_item',
+        'command_create_episode',
+        'command_create_invitation',
+        'command_create_series',
+        'command_offboard_member'
+      )
   ),
   8::bigint,
-  'authenticated can execute only seven command functions and the Storage authorizer'
+  'Phase 1 exposes only seven reviewed commands and the Storage authorizer'
 );
 select ok(
   (

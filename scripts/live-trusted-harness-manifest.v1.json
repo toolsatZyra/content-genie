@@ -1,0 +1,296 @@
+{
+  "entries": [
+    {
+      "path": ".github/workflows/live-branch-reaper.yml",
+      "role": "scheduled-reaper-workflow",
+      "sha256": "713327590208cf315f275e449f6fee1896f7ace5d6b19e698f3dbe0ea3ed26a1"
+    },
+    {
+      "path": "package.json",
+      "role": "package-manifest",
+      "sha256": "d9002a21bb7d4d61c33429792ec19193dda2ccdaf2738593a051e5cdc4599c02"
+    },
+    {
+      "path": "playwright.live.config.ts",
+      "role": "live-browser-spec",
+      "sha256": "7ce4d278973db1bd5f7f61221ea12aca3e6226087d5e18802a7a403dfe1cd58e"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "role": "dependency-lock",
+      "sha256": "08ee5fe5300be86da73bfbfa04939488e37f06845e51e572facbc56772065847"
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "role": "package-manager-workspace",
+      "sha256": "029a0e7d7100e13f77c01fe931f63e338c0b09373a11d9f14c3c160438ef5a0f"
+    },
+    {
+      "path": "scripts/database-harness-policy.mjs",
+      "role": "database-boundary-policy",
+      "sha256": "71dadb6d5d2a0f6757e0e8fb19af4254bf6537f9c8d9d96f3ae0a6ed5b6ee82c"
+    },
+    {
+      "path": "scripts/direct-database-result.mjs",
+      "role": "database-result-validator",
+      "sha256": "13410a6e079887f4d7af61fac471e3b187b82b6b9c975573120f2f1e876c7c8e"
+    },
+    {
+      "path": "scripts/live-branch-reaper.mjs",
+      "role": "durable-branch-reaper",
+      "sha256": "21408cc125dbe6f26f0ce62dd7b5a3b681319c3c73c245ac8823b485c8ff69b1"
+    },
+    {
+      "path": "scripts/live-broker-signing.mjs",
+      "role": "request-signer",
+      "sha256": "dcc385d20f3b92cc8ab5885bba43f298ddc1ea1da3b5bc383dc695ba30918cdc"
+    },
+    {
+      "path": "scripts/live-candidate-evidence.mjs",
+      "role": "strict-evidence-validator",
+      "sha256": "ca43a2e61d310eb2a1aaf73c405cc60db3278eed7c345a22c7cb4124dadc890b"
+    },
+    {
+      "path": "scripts/live-evidence-policy.mjs",
+      "role": "candidate-binding-policy",
+      "sha256": "bfa5dca7a3246261fe69665f530b33598afe449fbd695486684935751ef3ed5e"
+    },
+    {
+      "path": "scripts/pgtap-harness-policy.mjs",
+      "role": "pgtap-hardening-policy",
+      "sha256": "3184c57d323c3c98c5d10ec5823347cb6b9bbaee7c75859317eb32001ec19bdc"
+    },
+    {
+      "path": "scripts/phase1-live-harness.mjs",
+      "role": "live-authorization-harness",
+      "sha256": "3f7c805d9620a94e9916e29ba7bf7740c17b09ffad5f4266119eb9237c4a6603"
+    },
+    {
+      "path": "scripts/phase2-coordinate-upgrade-drill.mjs",
+      "role": "predecessor-fixture-validator",
+      "sha256": "2dadd0c0b2ad863e95ec918c21bd396e56c81d7540d2c827d6609121a0ba3c5e"
+    },
+    {
+      "path": "scripts/private-runtime-path.mjs",
+      "role": "credential-containment-policy",
+      "sha256": "3b73397c116b6cc845fd8931febda226eaf9921c2bf14184f63fbff8019b821e"
+    },
+    {
+      "path": "scripts/reap-trusted-live-branches.mjs",
+      "role": "scheduled-reaper-entrypoint",
+      "sha256": "7c7f7063a9f9223583bec870be91335d26da63b5bcb8a25183dbdfd35088d592"
+    },
+    {
+      "path": "scripts/remote-live-broker.mjs",
+      "role": "remote-broker-client",
+      "sha256": "cae0c968fe98aada3687be0a4e21d41187242e9c8d955cbf15d06a9c89c9ee8a"
+    },
+    {
+      "path": "scripts/run-frozen-live-suite.mjs",
+      "role": "trusted-launcher",
+      "sha256": "3dd62e8b1dd2e3ff0f018a0347f582c17a08ae8b68ee252d498edd751b2a1ca8"
+    },
+    {
+      "path": "scripts/run-isolated-next-dev.mjs",
+      "role": "isolated-browser-runner",
+      "sha256": "2dbeeba9e390e85c4fdd4111d151fb59b7008f21590e5dd62829e828e353748a"
+    },
+    {
+      "path": "scripts/run-phase1-forward-rollback-drill.mjs",
+      "role": "forward-rollback-runner",
+      "sha256": "ac0bf7ae33b4670c7df502f711741af3e5dbbfa2a1c3427346d8360e2b0403e1"
+    },
+    {
+      "path": "scripts/run-phase1-live-suite.mjs",
+      "role": "candidate-runner",
+      "sha256": "d4e60a1084d6bd8a350e29d915c03806fe0c990f723f1f5bde716a1fb2b7598c"
+    },
+    {
+      "path": "scripts/transient-failure-policy.mjs",
+      "role": "retry-policy",
+      "sha256": "b750a4bc92948579b1cd780e00cc00a41dec872ba2c2b95d4e201fe55ce1b6f0"
+    },
+    {
+      "path": "scripts/trusted-live-branch-control.mjs",
+      "role": "trusted-branch-controller",
+      "sha256": "656dfcafff679eea7fddc2b4c27284d3de363cea1796214d97ce9506a33429a1"
+    },
+    {
+      "path": "src/app/api/internal/live-broker/route.ts",
+      "role": "broker-route",
+      "sha256": "33e87e6d2a657cca0f6c3165660520da00924205845276042f75036f19b5867e"
+    },
+    {
+      "path": "src/server/live-broker-contract.ts",
+      "role": "broker-contract",
+      "sha256": "3aff0f877dd2cd9a86289a96cedf92c147dbe7e5add27df1ff14b1a53b2fc1a8"
+    },
+    {
+      "path": "src/server/live-broker-evidence.ts",
+      "role": "evidence-signer",
+      "sha256": "e907fa01e0f4f8baa57f53af290dcdd5a6203ae8043bcfc7730f25908ccea3d0"
+    },
+    {
+      "path": "src/server/live-broker-ledger.ts",
+      "role": "broker-ledger",
+      "sha256": "6ec1a48d37c4181c7b1b8f0e08ec69de26b0d1a7df816639341311ec3a358848"
+    },
+    {
+      "path": "src/server/live-sandbox-control.ts",
+      "role": "broker-controller",
+      "sha256": "c045cc34c5efdf134ab749ef2f59d58ac7568f9b4d119cb4cbf281625436802d"
+    },
+    {
+      "path": "supabase/migrations/20260717121500_phase2_scripts_and_sidecars.sql",
+      "role": "phase2-migration",
+      "sha256": "5e37ab1298a0ad0a1174c0e3d2060308368b2a8080ae766211ba6fbab46a4779"
+    },
+    {
+      "path": "supabase/migrations/20260717121501_phase2_script_coordinate_hardening.sql",
+      "role": "phase2-migration",
+      "sha256": "d5d20bf4c29cc0546a7aedbf7ac336e0ab99f3ddc740e35594896f932439f518"
+    },
+    {
+      "path": "supabase/migrations/20260717121600_phase2_looks_voices_and_config.sql",
+      "role": "phase2-migration",
+      "sha256": "45003176c103ee706b6e88eb365ae938141b34d3834daf822ca3210bc349a94f"
+    },
+    {
+      "path": "supabase/migrations/20260717121601_phase2_0011_look_seed_01.sql",
+      "role": "phase2-migration",
+      "sha256": "b690cbdae8b67c9f55b3f3c207156fc6d1e06e71132cd74ab7935b1121684777"
+    },
+    {
+      "path": "supabase/migrations/20260717121602_phase2_0011_look_seed_02.sql",
+      "role": "phase2-migration",
+      "sha256": "1ed0b6d5e0349b0d1b80994f4be4987feb7bb4536a541ce7998292034671eb36"
+    },
+    {
+      "path": "supabase/migrations/20260717121603_phase2_0011_look_seed_03.sql",
+      "role": "phase2-migration",
+      "sha256": "ad63d0d5bf5fab587052587dd1686d043c509e0e8d44cb947472f2cf5164e36a"
+    },
+    {
+      "path": "supabase/migrations/20260717121604_phase2_0011_look_seed_04.sql",
+      "role": "phase2-migration",
+      "sha256": "9581fc9fe2100a96b7cd1150d66ba8b155392ce09511e274b0404065ae0fbf96"
+    },
+    {
+      "path": "supabase/migrations/20260717121605_phase2_0011_look_pack_provenance_correction.sql",
+      "role": "phase2-migration",
+      "sha256": "d69a99a359ab28c9dbe0baed1ae5dc6dc9eff7af0c7076d63901dfd5b6f73f47"
+    },
+    {
+      "path": "supabase/migrations/20260717121606_phase2_voice_canary_fail_closed.sql",
+      "role": "phase2-migration",
+      "sha256": "fc2dc492ae9bf8368e49aafac7d25a447bedb9ec3016102e989c77e6c77e7c59"
+    },
+    {
+      "path": "supabase/migrations/20260717121607_phase2_script_coordinate_v2_forward.sql",
+      "role": "phase2-migration",
+      "sha256": "df348945d18efe585b23586196aa7641bd05c74f88f8b1a37f0afee24e0093d6"
+    },
+    {
+      "path": "supabase/migrations/20260717121608_phase2_look_policy_baselines.sql",
+      "role": "phase2-migration",
+      "sha256": "ba64b40989106ff76ec6897e2f3ac9fba360ba0c6694a5b8bfddc2b09e51ce1a"
+    },
+    {
+      "path": "supabase/migrations/20260717121609_phase2_live_broker_control_plane.sql",
+      "role": "phase2-migration",
+      "sha256": "d8d4e27f48d4ee93375aa6ac74eb36ba973c3574864764ae44d98a062b65c0ad"
+    },
+    {
+      "path": "supabase/migrations/20260717121610_phase2_episode_release_eligibility.sql",
+      "role": "phase2-migration",
+      "sha256": "d7766aed8d7705632e25c2c0315f0c61cd312af52b723145069fb28b5eba9c47"
+    },
+    {
+      "path": "supabase/migrations/20260717121611_phase2_checkpoint_adversarial_hardening.sql",
+      "role": "phase2-migration",
+      "sha256": "66b79fa6815ca65924b095227d300f081d4e7ecbce7004803cb6fe3b0b204715"
+    },
+    {
+      "path": "supabase/migrations/20260717121612_phase2_release_creative_identity_truth.sql",
+      "role": "phase2-migration",
+      "sha256": "1d6e5c91ecc2347e45167b946cf8db676b3a695c5bba58d214dd02c27fc2bc57"
+    },
+    {
+      "path": "supabase/tests/fixtures/phase2_coordinate_v1_verifiers.sql",
+      "role": "predecessor-fixture",
+      "sha256": "2df42a28cd04b193b0eaf97c882a17edfb13688cad7aca9bf8845408e9d7ec1c"
+    },
+    {
+      "path": "supabase/tests/phase1_foundation.test.sql",
+      "role": "pgtap-source",
+      "sha256": "c490f7639404c79ca200537494ff8d12d3748eb3273ad32611331ff3cee19767"
+    },
+    {
+      "path": "supabase/tests/phase2_zero_spend_foundation.test.sql",
+      "role": "pgtap-source",
+      "sha256": "8dda0f7d580b6153a673d0956efca784c27c644f8e5169ed32980d3c0496ec43"
+    },
+    {
+      "path": "tests/live/phase1-live.spec.ts",
+      "role": "live-browser-spec",
+      "sha256": "d3460b95998750b724f652a122b26ce621556763d159ae8348c531e9e0f75dbd"
+    },
+    {
+      "path": "tests/live/phase2-script-live.spec.ts",
+      "role": "live-browser-spec",
+      "sha256": "a73b0a2aa349b3bc01e9b723df56155ee92ed8aa38af7550786eaf8e2e9cc77e"
+    }
+  ],
+  "liveSpecs": [
+    "playwright.live.config.ts",
+    "tests/live/phase1-live.spec.ts",
+    "tests/live/phase2-script-live.spec.ts"
+  ],
+  "manifestPath": "scripts/live-trusted-harness-manifest.v1.json",
+  "packageManager": {
+    "declaration": "pnpm@11.9.0",
+    "name": "pnpm",
+    "version": "11.9.0"
+  },
+  "pgTapSuites": [
+    {
+      "hardenedQuerySha256": "d0c55b8b7170b43f1fc86acaf968d9245fb21138d32db577004e2dcd5e34c4b8",
+      "plannedAssertions": 104,
+      "sourceSha256": "c490f7639404c79ca200537494ff8d12d3748eb3273ad32611331ff3cee19767",
+      "testFile": "phase1_foundation.test.sql"
+    },
+    {
+      "hardenedQuerySha256": "50876065d893c076897aa08a61ed1583f07ddc81d523a6a344e30c3bc95abcae",
+      "plannedAssertions": 158,
+      "sourceSha256": "8dda0f7d580b6153a673d0956efca784c27c644f8e5169ed32980d3c0496ec43",
+      "testFile": "phase2_zero_spend_foundation.test.sql"
+    }
+  ],
+  "phase2Migrations": [
+    "supabase/migrations/20260717121500_phase2_scripts_and_sidecars.sql",
+    "supabase/migrations/20260717121501_phase2_script_coordinate_hardening.sql",
+    "supabase/migrations/20260717121600_phase2_looks_voices_and_config.sql",
+    "supabase/migrations/20260717121601_phase2_0011_look_seed_01.sql",
+    "supabase/migrations/20260717121602_phase2_0011_look_seed_02.sql",
+    "supabase/migrations/20260717121603_phase2_0011_look_seed_03.sql",
+    "supabase/migrations/20260717121604_phase2_0011_look_seed_04.sql",
+    "supabase/migrations/20260717121605_phase2_0011_look_pack_provenance_correction.sql",
+    "supabase/migrations/20260717121606_phase2_voice_canary_fail_closed.sql",
+    "supabase/migrations/20260717121607_phase2_script_coordinate_v2_forward.sql",
+    "supabase/migrations/20260717121608_phase2_look_policy_baselines.sql",
+    "supabase/migrations/20260717121609_phase2_live_broker_control_plane.sql",
+    "supabase/migrations/20260717121610_phase2_episode_release_eligibility.sql",
+    "supabase/migrations/20260717121611_phase2_checkpoint_adversarial_hardening.sql",
+    "supabase/migrations/20260717121612_phase2_release_creative_identity_truth.sql"
+  ],
+  "predecessorFixture": {
+    "capturedAt": "2026-07-18",
+    "lastAppliedMigration": "20260717121606",
+    "nextMigration": "20260717121607",
+    "sha256": "2df42a28cd04b193b0eaf97c882a17edfb13688cad7aca9bf8845408e9d7ec1c",
+    "source": "pg_get_functiondef",
+    "sourceProjectRef": "iuzijmzcimtwyowhwinu"
+  },
+  "predecessorFixtureSource": "supabase/tests/fixtures/phase2_coordinate_v1_verifiers.sql",
+  "schemaVersion": "genie-live-trusted-harness-manifest.v1"
+}

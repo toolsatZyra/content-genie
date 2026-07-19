@@ -13,6 +13,25 @@ work packages, status, existing `docs/evidence/` artifact paths and SHA-256
 values, a real evidence-containing Git commit when verified, and a non-future
 decision timestamp. The generated plan must not be edited by hand.
 
+Repository-authored checkpoint, CI, command, database, and reviewer JSON proves
+shape, internal consistency, and committed hashes only. It cannot authenticate
+that GitHub, Supabase, a command runner, or an independent reviewer produced the
+claim. From Phase 2 onward, the generator therefore rejects `verified` promotion
+until an external cryptographic provenance contract is enabled and validated.
+Until then, completed code and locally reviewed evidence must remain
+`implemented_unverified`.
+
+Even that Phase 2 implementation promotion is evidence-gated. The
+`create-phase2-implementation-evidence.mjs` command refuses to update the
+ledger unless one committed candidate commit/tree has all of the following:
+the passing local `precheckpoint-gate.v1.json`, a later passing remote
+`genie-live-suite-evidence.v3` artifact from the published-commit Firecracker
+path, and later fresh `acceptance`, `security`, and `ui-ux` cold-review
+manifests from three distinct reviewers with no open P0/P1 findings. Missing,
+local-only, stale, mixed-tree, or reused-review evidence fails closed. The
+launch runner records both candidate commit and tree so this binding can be
+checked directly.
+
 The machine ledger contains 207 individually mapped requirements:
 
 - 25 product requirements;
@@ -68,7 +87,7 @@ Grouped ranges in other documents are routing summaries, never proof.
 | `GEN-PROD-019` | `docs/design.md` — Search, notifications, library, exports | Phase 1 / `P1-04`; Phase 4 / `P4-05`, `P4-06` | search/export; `0043`, `0045` | RLS/search/history tests | retrieval journey | `unimplemented` | — |
 | `GEN-PROD-020` | QC contract — EXPORT_ACCEPTANCE; state withdrawal | Phase 4 / `P4-05`, `P4-09`; deploy / `D-06` | export/incidents; `0043`, `0044` | eligibility/checksum/revocation and deployed journey | package inspection | `unimplemented` | — |
 | `GEN-PROD-021` | provider contract — video routing | Phase 2 / `P2-11`; Phase 3 / `P3-02`, `P3-06` | router/provider; `0017`, `0020`, `0031` | route decision table | route canaries | `unimplemented` | — |
-| `GEN-PROD-022` | `docs/design.md` — Cost and performance; cost envelope | Phase 2 / `P2-06`, `P2-12`; Phase 3 / `P3-02`; deploy / `D-04` | budgets/cost; `0017`, `0019` | quote/slot/settlement/concurrency | cost program review | `unimplemented` | — |
+| `GEN-PROD-022` | `docs/design.md` — Quality, reliability, cost, speed; cost envelope | Phase 2 / `P2-06`, `P2-12`; Phase 3 / `P3-02`; deploy / `D-04` | provider reconciliation/recovery plus budgets/cost; `0017`, `0019` | quote/slot/settlement/concurrency/callback/retry/recovery | reliability and cost program review | `unimplemented` | — |
 | `GEN-PROD-023` | `docs/design.md` — Launch scope; Rendering | Phase 3 / `P3-01`, `P3-08`; deploy / `D-03`, `D-04` | queues/render | load/disk/queue tests | five-Episode qualification | `unimplemented` | — |
 | `GEN-PROD-024` | `docs/design.md` — Included; Diagnostics without Sentry | Phase 0 / `P0-04`; Phase 4 / `P4-05` | diagnostics/export; `0006`, `0043` | telemetry/export tests | dashboard review | `unimplemented` | — |
 | `GEN-PROD-025` | `DESIGN.md` — Living Cinema system and responsive behavior | Phases 1–4 / `P1-03`, `P2-14`, `P3-10`, `P4-01` | `src/app`, `src/components` | browser/axe/visual/state matrix | owner design review | `unimplemented` | — |
@@ -158,7 +177,7 @@ Grouped ranges in other documents are routing summaries, never proof.
 | `TM-34` | Threat matrix — supply-chain compromise | Phase 0 / `P0-01` | CI/dependencies | lock/SBOM/scan/secretless fork | dependency review | `unimplemented` | — |
 | `TM-35` | Threat matrix — preview/project identity uses production | Phase 0 / `P0-02`, `P0-03`; Phase 2 / `P2-06`; deploy / `D-01`, `D-02` | env/projects/broker | production-shaped and cross-project identity denial tests | environment inventory | `unimplemented` | — |
 | `TM-36` | Threat matrix — restore divergence | Phase 4 / `P4-07`; deploy / `D-05` | backup/reconcile; `0046` | timed restore/divergence test | recovery review | `unimplemented` | — |
-| `TM-37` | Threat matrix — delete user before transfer | Phase 1 / `P1-01` | offboarding; `0002`, `0005` | owner/lease/run transfer test | admin workflow review | `unimplemented` | — |
+| `TM-37` | Threat matrix — delete user before transfer | Phase 1 / `P1-01`; Phase 2 / `P2-13` | offboarding; `0002`, `0005`, `0021` | owner/lease transfer plus active-run reassign/pause tests | admin workflow and active-run offboarding review | `unimplemented` | — |
 | `TM-38` | Threat matrix — audit mutation | Deployment / `P1-02`, `P1-05`, `D-05` | audit/Vault; `0006` | app-role update/delete + Vault immutability tests | Vault review | `unimplemented` | — |
 | `TM-39` | Threat matrix — search leakage | Phase 4 / `P4-06` | search; `0045` | unique cross-workspace phrase | search UX review | `unimplemented` | — |
 | `TM-40` | Threat matrix — stored XSS | Phase 1 / `P1-03`; Phase 2 / `P2-14`; Phase 3 / `P3-10`; Phase 4 / `P4-01` | render boundaries | payload corpus across every rendered field | CSP/UX review | `unimplemented` | — |
@@ -176,7 +195,8 @@ At each phase checkpoint:
 3. commit nonempty evidence artifacts under `docs/evidence/`, record their
    SHA-256 values, and copy the generated obligation-definition hash;
 4. use `implemented_unverified` after code exists but before proof;
-5. set an obligation to `verified` only after passing automated/manual proof;
+5. set an obligation to `verified` only after passing automated/manual proof
+   and, from Phase 2 onward, the external authenticated-provenance gate;
 6. record commit SHA and date;
 7. preserve failed/superseded history in the evidence artifact;
 8. regenerate and validate all 207 IDs, child obligations, and parent status.

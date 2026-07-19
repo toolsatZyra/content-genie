@@ -8,6 +8,11 @@ import {
   parseSignedStorageRequest,
   StoragePathValidationError,
 } from "@/security/storage-path";
+import {
+  BoundedRequestBodyError,
+  declaredRequestBodyBytes,
+  readBoundedUtf8RequestBody,
+} from "@/server/bounded-request-body";
 
 const MAX_STORAGE_SIGN_BYTES = 2_048;
 
@@ -37,17 +42,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   ) {
     return response({ code: "JSON_REQUIRED", ok: false }, 415);
   }
-  const declaredLength = Number(request.headers.get("content-length") ?? 0);
-  if (declaredLength > MAX_STORAGE_SIGN_BYTES) {
-    return response({ code: "REQUEST_TOO_LARGE", ok: false }, 413);
-  }
-
   try {
-    const raw = await request.text();
-    if (Buffer.byteLength(raw, "utf8") > MAX_STORAGE_SIGN_BYTES) {
-      return response({ code: "REQUEST_TOO_LARGE", ok: false }, 413);
-    }
-    const input = parseSignedStorageRequest(JSON.parse(raw) as unknown);
+    const declaredLength = declaredRequestBodyBytes(
+      request.headers,
+      MAX_STORAGE_SIGN_BYTES,
+    );
     const client = await createServerSupabaseClient();
     const {
       data: { user },
@@ -56,6 +55,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (authenticationError || !user) {
       return response({ code: "AUTHENTICATION_REQUIRED", ok: false }, 401);
     }
+    const raw = await readBoundedUtf8RequestBody(
+      request,
+      MAX_STORAGE_SIGN_BYTES,
+      declaredLength,
+    );
+    const input = parseSignedStorageRequest(JSON.parse(raw) as unknown);
     const { data: authorized, error: authorizationError } = await client.rpc(
       "authorize_storage_sign",
       {
@@ -82,6 +87,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { headers: { "cache-control": "no-store" } },
     );
   } catch (error) {
+    if (error instanceof BoundedRequestBodyError && error.failure === "too-large") {
+      return response({ code: "REQUEST_TOO_LARGE", ok: false }, 413);
+    }
+    if (error instanceof BoundedRequestBodyError) {
+      return response({ code: "INVALID_STORAGE_REQUEST", ok: false }, 400);
+    }
     if (error instanceof SyntaxError || error instanceof StoragePathValidationError) {
       return response({ code: "INVALID_STORAGE_REQUEST", ok: false }, 400);
     }

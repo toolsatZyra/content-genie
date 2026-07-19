@@ -23,7 +23,7 @@ Only presence was inspected; values were not printed.
 | `NEXT_PUBLIC_SUPABASE_URL` | Public | Supabase project URL | browser/server client |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public | Supabase publishable/anon key | browser/server client |
 | `SUPABASE_SERVICE_ROLE_KEY` | Vercel server-only | narrow server administration and signed operations | server control plane |
-| `SUPABASE_ACCESS_TOKEN` | Local CLI only | Supabase integration/CLI authentication | migrations/project operations |
+| `SUPABASE_ACCESS_TOKEN` | Trusted local/CI control only | Supabase integration/CLI authentication | migrations, disposable branches, scheduled branch reaping |
 | `TRIGGER_SECRET_KEY` | Vercel server-only + Trigger deployment tooling | Trigger.dev SDK authentication | workflow enqueue/deploy |
 | `ELEVENLABS_API_KEY` | Vercel provider broker only | narration | voice adapter |
 | `FAL_KEY` | Vercel provider broker only | image/video/provider calls | Kling and fal-hosted adapters |
@@ -32,6 +32,7 @@ Only presence was inspected; values were not printed.
 | `ANTHROPIC_API_KEY` | Vercel provider broker only | independent judge/challenger where enabled | configured adapters |
 | `SARVAM_API_KEY` | Vercel provider broker only | Hindi speech/alignment capability where enabled | configured adapter |
 | `CRON_SECRET` | Vercel server-only | authenticated scheduled reconciliation | production cron |
+| `GENIE_LIVE_EVIDENCE_PRIVATE_KEY_PKCS8_BASE64` | Vercel production server-only | sign deployment-, request-, and result-bound live-proof evidence | trusted live broker only |
 
 Sentry variables remain unused and must not be added to runtime imports.
 
@@ -44,7 +45,10 @@ Sentry variables remain unused and must not be added to runtime imports.
 | `SUPABASE_TEST_PROJECT_REF` | Local CI/deploy | isolated preview/test project; never production |
 | `SUPABASE_DB_URL` | Local CI/deploy | migrations only; prefer ephemeral/pooled form appropriate to tool |
 | `TRIGGER_PROJECT_REF` | Local CI/deploy | explicit Trigger.dev project selection |
-| `GENIE_COMMAND_HMAC_SECRET` | Vercel server-only | sign narrow internal command/callback envelopes |
+| `GENIE_APPROVED_LIVE_BROKER_COMMIT` | Local CI only | independently reviewed production broker deployment pin; exact 40-character Git commit |
+| `GENIE_LIVE_BRANCH_REAPER_MIN_AGE_MINUTES` | Trusted local/CI control only | optional stale orphan threshold; integer minutes, minimum 60, default 360 |
+| `GENIE_LIVE_BROKER_SIGNING_PRIVATE_KEY_PKCS8_BASE64` | Protected local/CI environment only | dedicated Ed25519 request authority for the live-proof broker; independently generated and never derived from the Supabase management token |
+| `GENIE_COMMAND_HMAC_SECRET` | Vercel server-only | dedicated invitation/command HMAC authority; must be independent of the Supabase service-role key |
 | `GENIE_CAPABILITY_SIGNING_PRIVATE_KEY` | Vercel issuer only | sign short-lived per-attempt capability tokens |
 | `GENIE_CAPABILITY_VERIFY_PUBLIC_KEY` | Vercel/Trigger verifier | verify tokens; cannot mint |
 | `GENIE_BROKER_CLIENT_ID` | Each Trigger project only | stable, environment-scoped service identity; unique per Trigger project |
@@ -71,6 +75,15 @@ Sentry variables remain unused and must not be added to runtime imports.
 
 Secrets must be independently generated per environment and at least 32 random
 bytes where used for HMAC/token signing.
+The Supabase management token controls disposable branch lifecycle only. It is
+never reused or transformed into broker request-signing authority.
+
+The GitHub `Trusted live branch reaper` workflow stores
+`SUPABASE_ACCESS_TOKEN` and the exact production `SUPABASE_PROJECT_REF` as
+repository secrets. Scheduled and manually dispatched reaper jobs fail closed
+when either value is absent or malformed. The token is supplied only to the
+trusted parent process and pinned Supabase CLI; it never enters candidate
+source, a candidate process, an artifact, or the production application.
 
 ## 4. Non-secret versioned configuration
 

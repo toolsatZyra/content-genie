@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  assertExactPayloadKeys,
   boundedText,
   canonicalJson,
   CommandValidationError,
@@ -81,5 +82,20 @@ describe("command envelope", () => {
     expect(integerValue({ version: 2 }, "version", 1, 3)).toBe(2);
     expect(() => integerValue({ version: 2.5 }, "version", 1, 3)).toThrow("version");
     expect(() => uuidValue({ id: "not-a-uuid" }, "id")).toThrow("UUID");
+  });
+
+  it("rejects missing or model-invented command fields", () => {
+    expect(() =>
+      assertExactPayloadKeys({ episodeId: "one", workspaceId: "two" }, [
+        "episodeId",
+        "workspaceId",
+      ]),
+    ).not.toThrow();
+    expect(() =>
+      assertExactPayloadKeys({ approval: true, episodeId: "one", workspaceId: "two" }, [
+        "episodeId",
+        "workspaceId",
+      ]),
+    ).toThrow("exactly");
   });
 });

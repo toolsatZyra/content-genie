@@ -14,6 +14,10 @@ const allowedProductionLicenses = new Set([
 const packageScopedLicenseExceptions = new Map([
   ["@img/sharp-libvips-linux-x64", new Set(["LGPL-3.0-or-later"])],
   ["@img/sharp-libvips-linuxmusl-x64", new Set(["LGPL-3.0-or-later"])],
+  // postgres.js is the pinned, trusted broker-side database client. Its npm
+  // package metadata declares the permissive public-domain Unlicense; keep the
+  // exception package-scoped so no unrelated dependency inherits it.
+  ["postgres", new Set(["Unlicense"])],
 ]);
 
 function isAllowedPackageLicense(license, packageName) {

@@ -1,5 +1,4 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -537,40 +536,34 @@ if (!outsiderSignedUrl.error) {
   throw new Error("Outsider issued a signed URL for owner workspace media");
 }
 
-await writeFile(
-  ".tmp/phase1-live-credentials.json",
-  JSON.stringify(
-    {
+owner.realtime.disconnect();
+outsider.realtime.disconnect();
+
+console.log(
+  JSON.stringify({
+    credentials: {
       email: ownerEmail,
+      episodeId: episodeResponses[0].data.episodeId,
       objectPath,
       outsiderEmail,
       password,
       seriesId: firstSeries.data.seriesId,
       workspaceId: workspace.id,
     },
-    null,
-    2,
-  ),
-  { encoding: "utf8", mode: 0o600 },
-);
-
-owner.realtime.disconnect();
-outsider.realtime.disconnect();
-
-console.log(
-  JSON.stringify({
-    commandReplay: "pass",
-    concurrentEpisodeNumbers: numbers,
-    crossWorkspaceCrud: "denied",
-    crossWorkspaceRead: "denied",
-    directMutation: "denied",
-    directSignedUpload: "denied",
-    liveUser: "created",
-    realtimeIsolation: realtimeReconciliation,
-    realtimeReadinessAttempts,
-    realtimeReconnectReconciliation: realtimeReconciliation,
-    directSignedUrl: "denied",
-    storageIsolation: "pass",
-    workspaceId: workspace.id,
+    evidence: {
+      commandReplay: "pass",
+      concurrentEpisodeNumbers: numbers,
+      crossWorkspaceCrud: "denied",
+      crossWorkspaceRead: "denied",
+      directMutation: "denied",
+      directSignedUpload: "denied",
+      liveUser: "created",
+      realtimeIsolation: realtimeReconciliation,
+      realtimeReadinessAttempts,
+      realtimeReconnectReconciliation: realtimeReconciliation,
+      directSignedUrl: "denied",
+      storageIsolation: "pass",
+      workspaceId: workspace.id,
+    },
   }),
 );

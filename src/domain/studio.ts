@@ -18,7 +18,8 @@ export const episodeWorkflowStates = [
   "release_blocked",
 ] as const;
 
-export type EpisodeWorkflowState = (typeof episodeWorkflowStates)[number];
+export type AuthoritativeEpisodeWorkflowState = (typeof episodeWorkflowStates)[number];
+export type EpisodeWorkflowState = AuthoritativeEpisodeWorkflowState | "unavailable";
 export type EpisodeStateTone = "attention" | "complete" | "draft" | "working";
 export type EpisodeSummaryBucket = "attention" | "creating" | "ready";
 
@@ -55,6 +56,11 @@ const episodeStatePresentations = {
     tone: "attention",
   },
   retrying: { label: "Retrying", summaryBucket: "creating", tone: "working" },
+  unavailable: {
+    label: "Unavailable",
+    summaryBucket: null,
+    tone: "attention",
+  },
   world_setup: { label: "World design", summaryBucket: null, tone: "draft" },
 } as const satisfies Record<EpisodeWorkflowState, EpisodeStatePresentation>;
 
@@ -66,11 +72,51 @@ export interface WorkspaceSummary {
   readonly slug: string;
 }
 
+export type SeriesLifecycleState = "active" | "archived" | "unavailable";
+export type SeriesReleaseStatus = "active" | "superseded" | "withdrawn";
+
+export type ActiveSeriesReleaseProjection =
+  | Readonly<{
+      kind: "released";
+      id: string;
+      releaseNumber: number;
+      status: SeriesReleaseStatus;
+      look: Readonly<{
+        availabilityStatus: "active" | "withdrawn";
+        id: string;
+        key: string;
+        name: string;
+      }>;
+      voice: Readonly<{
+        availabilityStatus: "pending_authenticated_canary" | "verified" | "withdrawn";
+        gender: "female" | "male";
+        id: string;
+        key: string;
+      }>;
+      continuity: Readonly<{
+        id: string;
+        versionNumber: number;
+      }> | null;
+    }>
+  | Readonly<{
+      kind: "unavailable";
+      reason: "continuity" | "look" | "release" | "voice";
+      releaseId: string | null;
+    }>
+  | Readonly<{
+      kind: "unreleased";
+    }>;
+
 export interface SeriesSummary {
+  /**
+   * Absent only on legacy/partial projections. Consumers must treat absence as
+   * unavailable, never as an unreleased Series.
+   */
+  readonly activeRelease?: ActiveSeriesReleaseProjection;
   readonly aggregateVersion: number;
   readonly description: string;
   readonly id: string;
-  readonly state: "active" | "archived";
+  readonly state: SeriesLifecycleState;
   readonly title: string;
   readonly updatedAt: string;
 }
@@ -140,7 +186,47 @@ export function episodeStatePresentation(
 
 export function parseEpisodeWorkflowState(value: unknown): EpisodeWorkflowState {
   return typeof value === "string" &&
-    episodeWorkflowStates.includes(value as EpisodeWorkflowState)
-    ? (value as EpisodeWorkflowState)
-    : "draft";
+    episodeWorkflowStates.includes(value as AuthoritativeEpisodeWorkflowState)
+    ? (value as AuthoritativeEpisodeWorkflowState)
+    : "unavailable";
+}
+
+export function parseSeriesLifecycleState(value: unknown): SeriesLifecycleState {
+  return value === "active" || value === "archived" ? value : "unavailable";
+}
+
+export function canCreateEpisodeInSeries(series: SeriesSummary): boolean {
+  return episodeCreationBlocker(series) === null;
+}
+
+export function episodeCreationBlocker(series: SeriesSummary): string | null {
+  if (series.state === "archived") return "Archived Series";
+  if (series.state !== "active") return "Series lifecycle unavailable";
+
+  const release = series.activeRelease;
+  if (!release) return "Series Release unavailable";
+  if (release.kind === "unreleased") return null;
+  if (release.kind === "unavailable") {
+    if (release.reason === "look") return "Pinned look unavailable";
+    if (release.reason === "voice") return "Pinned voice unavailable";
+    if (release.reason === "continuity") return "Pinned continuity unavailable";
+    return "Series Release unavailable";
+  }
+  if (release.status === "superseded") return "Series Release superseded";
+  if (release.status === "withdrawn") return "Series Release withdrawn";
+  if (release.look.availabilityStatus === "withdrawn") {
+    return "Pinned look withdrawn";
+  }
+  if (release.voice.availabilityStatus === "withdrawn") {
+    return "Pinned voice withdrawn";
+  }
+  return null;
+}
+
+export function canArchiveSeries(series: SeriesSummary): boolean {
+  return (
+    series.state === "active" &&
+    series.activeRelease !== undefined &&
+    series.activeRelease.kind !== "unavailable"
+  );
 }

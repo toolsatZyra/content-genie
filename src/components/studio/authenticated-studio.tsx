@@ -1,17 +1,25 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
   useSyncExternalStore,
   type FormEvent,
+  type RefObject,
 } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { creationAccessForEpisode } from "@/domain/creation";
 import {
+  canArchiveSeries,
+  canCreateEpisodeInSeries,
+  episodeCreationBlocker,
   episodeStatePresentation,
+  type EpisodeWorkflowState,
   type EpisodeSummary,
   type SeriesSummary,
   type StudioProjection,
@@ -25,7 +33,59 @@ import { useStudioSearch } from "@/components/studio/use-studio-search";
 
 type StudioView = "atrium" | "series" | "library" | "monica";
 type ComposerMode = "episode" | "series";
+type EpisodeProgressState = "complete" | "current" | "stopped" | "upcoming";
 const subscribeToHydration = (): (() => void) => () => {};
+
+const episodeProgressLabels = [
+  "Episode organized",
+  "World setup",
+  "Production engine",
+  "Monica & release",
+] as const;
+
+const episodeProgressIndex = {
+  approved: 3,
+  awaiting_final_review: 3,
+  blocked: 2,
+  delayed: 2,
+  delivered: 4,
+  draft: 0,
+  paused: 2,
+  pending_qualified_review: 3,
+  producing: 2,
+  ready_to_produce: 2,
+  release_blocked: 3,
+  retrying: 2,
+  world_setup: 1,
+} as const satisfies Partial<Record<EpisodeWorkflowState, number>>;
+
+function episodeProgressThread(state: EpisodeWorkflowState): readonly {
+  label: (typeof episodeProgressLabels)[number];
+  state: EpisodeProgressState;
+}[] {
+  if (state === "unavailable") {
+    return episodeProgressLabels.map((label) => ({
+      label,
+      state: "stopped",
+    }));
+  }
+  if (state === "abandoned" || state === "canceled") {
+    return episodeProgressLabels.map((label, index) => ({
+      label,
+      state: index === 0 ? "complete" : "stopped",
+    }));
+  }
+  const currentIndex = episodeProgressIndex[state];
+  return episodeProgressLabels.map((label, index) => ({
+    label,
+    state:
+      index < currentIndex
+        ? "complete"
+        : index === currentIndex
+          ? "current"
+          : "upcoming",
+  }));
+}
 
 function mergeById<T extends Readonly<{ id: string }>>(
   primary: readonly T[],
@@ -123,9 +183,16 @@ function useRealtimeReconciliation(workspaceId: string, enabled: boolean): void 
 }
 
 export function AuthenticatedStudio({
+  initialEpisodeId,
+  initialSeriesId,
   projection,
   realtimeEnabled = true,
-}: Readonly<{ projection: StudioProjection; realtimeEnabled?: boolean }>) {
+}: Readonly<{
+  initialEpisodeId?: string | undefined;
+  initialSeriesId?: string | undefined;
+  projection: StudioProjection;
+  realtimeEnabled?: boolean;
+}>) {
   const router = useRouter();
   const hydrated = useSyncExternalStore(
     subscribeToHydration,
@@ -133,14 +200,21 @@ export function AuthenticatedStudio({
     () => false,
   );
   const [view, setView] = useState<StudioView>("atrium");
+  const initialEpisode = projection.episodes.find(({ id }) => id === initialEpisodeId);
   const [selectedEpisodeId, setSelectedEpisodeId] = useState(
-    projection.episodes[0]?.id ?? "",
+    initialEpisode?.id ?? projection.episodes[0]?.id ?? "",
   );
   const [selectedSeriesId, setSelectedSeriesId] = useState(
-    projection.series[0]?.id ?? "",
+    projection.series.some(({ id }) => id === initialSeriesId)
+      ? (initialSeriesId ?? "")
+      : (initialEpisode?.seriesId ?? projection.series[0]?.id ?? ""),
   );
   const [query, setQuery] = useState("");
   const [composerMode, setComposerMode] = useState<ComposerMode>("episode");
+  const [composerSeriesId, setComposerSeriesId] = useState(selectedSeriesId);
+  const [composerDraftKey, setComposerDraftKey] = useState(
+    `episode:${selectedSeriesId}`,
+  );
   const [commandStatus, setCommandStatus] = useState("");
   const [working, setWorking] = useState(false);
   const [discoveredEpisodes, setDiscoveredEpisodes] = useState<
@@ -153,6 +227,21 @@ export function AuthenticatedStudio({
   const activityRef = useRef<HTMLDialogElement>(null);
   const composerRef = useRef<HTMLDialogElement>(null);
   const accountRef = useRef<HTMLDialogElement>(null);
+  const episodeFocusRef = useRef<HTMLElement>(null);
+
+  const anyDialogOpen = useCallback(
+    () =>
+      [searchRef, activityRef, composerRef, accountRef].some(
+        ({ current }) => current?.open,
+      ),
+    [],
+  );
+  const openDialog = useCallback(
+    (dialog: RefObject<HTMLDialogElement | null>): void => {
+      if (!anyDialogOpen() && !dialog.current?.open) dialog.current?.showModal();
+    },
+    [anyDialogOpen],
+  );
 
   useRealtimeReconciliation(projection.workspace.id, realtimeEnabled);
 
@@ -163,6 +252,10 @@ export function AuthenticatedStudio({
   const allEpisodes = useMemo(
     () => mergeById(projection.episodes, discoveredEpisodes),
     [discoveredEpisodes, projection.episodes],
+  );
+  const creatableSeries = useMemo(
+    () => allSeries.filter(canCreateEpisodeInSeries),
+    [allSeries],
   );
   const seriesById = useMemo(
     () => new Map(allSeries.map((series) => [series.id, series])),
@@ -177,9 +270,20 @@ export function AuthenticatedStudio({
       ? allEpisodes.filter(({ seriesId }) => seriesId === selectedSeries.id)
       : allEpisodes;
   const search = useStudioSearch(query, projection.workspace.id);
+  const searchLiveStatus = !query
+    ? "Type at least two characters to search."
+    : !search.queryReady
+      ? "Type at least two characters to search."
+      : search.loading
+        ? search.matches.length > 0
+          ? `Searching authorized studio. ${search.matches.length} of ${search.total} results shown.`
+          : "Searching authorized studio."
+        : search.matches.length === 0
+          ? "No authorized match found."
+          : `${search.matches.length} of ${search.total} authorized results shown.`;
 
   const counts = useMemo(() => {
-    return projection.episodes.reduce(
+    return allEpisodes.reduce(
       (result, episode) => {
         const bucket = episodeStatePresentation(episode.workflowState).summaryBucket;
         if (bucket) result[bucket] += 1;
@@ -187,28 +291,50 @@ export function AuthenticatedStudio({
       },
       { attention: 0, creating: 0, ready: 0 },
     );
-  }, [projection.episodes]);
+  }, [allEpisodes]);
+
+  const openComposer = useCallback(
+    (mode: ComposerMode, seriesId?: string): void => {
+      if (anyDialogOpen()) return;
+      const candidateIds = [seriesId, selectedEpisode?.seriesId, selectedSeries?.id];
+      const candidate = candidateIds
+        .map((id) => creatableSeries.find((series) => series.id === id))
+        .find((series) => series !== undefined);
+      const effectiveMode =
+        mode === "episode" && !candidate && creatableSeries.length === 0
+          ? "series"
+          : mode;
+      const targetSeriesId = candidate?.id ?? creatableSeries[0]?.id ?? "";
+      setComposerMode(effectiveMode);
+      setComposerSeriesId(targetSeriesId);
+      setComposerDraftKey(
+        effectiveMode === "series" ? "series:new" : `episode:${targetSeriesId}`,
+      );
+      setCommandStatus("");
+      openDialog(composerRef);
+    },
+    [
+      anyDialogOpen,
+      creatableSeries,
+      openDialog,
+      selectedEpisode?.seriesId,
+      selectedSeries?.id,
+    ],
+  );
 
   useEffect(() => {
     const shortcut = (event: KeyboardEvent): void => {
-      if (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey)) {
-        event.preventDefault();
-        searchRef.current?.showModal();
-      }
-      if (event.key.toLowerCase() === "n" && (event.metaKey || event.ctrlKey)) {
-        event.preventDefault();
-        openComposer(allSeries.length > 0 ? "episode" : "series");
-      }
+      const commandChord = event.metaKey || event.ctrlKey;
+      const key = event.key.toLowerCase();
+      if (!commandChord || (key !== "k" && key !== "n")) return;
+      event.preventDefault();
+      if (event.repeat || anyDialogOpen()) return;
+      if (key === "k") openDialog(searchRef);
+      else openComposer(creatableSeries.length > 0 ? "episode" : "series");
     };
     window.addEventListener("keydown", shortcut);
     return () => window.removeEventListener("keydown", shortcut);
-  }, [allSeries.length]);
-
-  function openComposer(mode: ComposerMode): void {
-    setComposerMode(mode);
-    setCommandStatus("");
-    if (!composerRef.current?.open) composerRef.current?.showModal();
-  }
+  }, [anyDialogOpen, creatableSeries.length, openComposer, openDialog]);
 
   function chooseSearchResult(match: StudioSearchMatch): void {
     searchRef.current?.close();
@@ -217,18 +343,35 @@ export function AuthenticatedStudio({
     if (match.kind === "Episode") {
       setDiscoveredEpisodes((current) => mergeById(current, [match.episode]));
       setView("atrium");
-      setSelectedEpisodeId(match.id);
+      selectEpisode(match.id, true);
     } else {
       setView("series");
       setSelectedSeriesId(match.id);
     }
   }
 
+  function selectEpisode(id: string, revealOnNarrowScreen = true): void {
+    setSelectedEpisodeId(id);
+    if (
+      !revealOnNarrowScreen ||
+      typeof window === "undefined" ||
+      !window.matchMedia("(max-width: 1050px)").matches
+    ) {
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      const focus = episodeFocusRef.current;
+      focus?.focus({ preventScroll: true });
+      focus?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   async function createItem(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setWorking(true);
     setCommandStatus("");
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     try {
       if (composerMode === "series") {
         const title = String(form.get("title") ?? "");
@@ -239,13 +382,24 @@ export function AuthenticatedStudio({
           workspaceId: projection.workspace.id,
         });
       } else {
+        const seriesId = String(form.get("seriesId") ?? "");
+        const series = allSeries.find(({ id }) => id === seriesId);
+        if (!series || !creatableSeries.some(({ id }) => id === seriesId)) {
+          setCommandStatus(
+            series
+              ? `Episode creation blocked: ${episodeCreationBlocker(series) ?? "Series eligibility unavailable"}.`
+              : "Episode creation blocked: Series unavailable.",
+          );
+          return;
+        }
         await sendCommand("episode.create", {
-          seriesId: String(form.get("seriesId") ?? ""),
+          seriesId,
           summary: String(form.get("summary") ?? ""),
           title: String(form.get("title") ?? ""),
           workspaceId: projection.workspace.id,
         });
       }
+      formElement.reset();
       composerRef.current?.close();
       router.refresh();
     } catch (error) {
@@ -258,6 +412,12 @@ export function AuthenticatedStudio({
   }
 
   async function archiveSeries(series: SeriesSummary): Promise<void> {
+    if (!canArchiveSeries(series)) {
+      setCommandStatus(
+        "Series archival is unavailable because its lifecycle projection is not authoritative.",
+      );
+      return;
+    }
     if (!window.confirm(`Archive “${series.title}”? Its Episodes will be preserved.`)) {
       return;
     }
@@ -317,17 +477,17 @@ export function AuthenticatedStudio({
           <button
             aria-label="Open global search"
             className="search-trigger"
-            onClick={() => searchRef.current?.showModal()}
+            onClick={() => openDialog(searchRef)}
             type="button"
           >
             <span aria-hidden="true">⌕</span>
             <span>Find anything</span>
-            <kbd>⌘ K</kbd>
+            <kbd>Ctrl / ⌘ K</kbd>
           </button>
           <button
             aria-label="Open activity and notifications"
             className="icon-button notification-button"
-            onClick={() => activityRef.current?.showModal()}
+            onClick={() => openDialog(activityRef)}
             type="button"
           >
             <span aria-hidden="true">◌</span>
@@ -338,7 +498,7 @@ export function AuthenticatedStudio({
           <button
             aria-label="Open account settings"
             className="avatar-button"
-            onClick={() => accountRef.current?.showModal()}
+            onClick={() => openDialog(accountRef)}
             type="button"
           >
             <span>{projection.displayName.slice(0, 2).toUpperCase()}</span>
@@ -400,7 +560,7 @@ export function AuthenticatedStudio({
               {view === "atrium"
                 ? "Move between Episodes while Genie’s crew works in parallel."
                 : view === "series"
-                  ? "Characters, locations and the visual language travel safely between Episodes."
+                  ? "Inspect the exact active release and pins before creating the next Episode."
                   : view === "monica"
                     ? "Assigned reviews and machine-quality signals converge here."
                     : "Approved masters and exports will appear here once production is enabled."}
@@ -411,13 +571,15 @@ export function AuthenticatedStudio({
               className="create-button"
               onClick={() =>
                 openComposer(
-                  view === "series" || allSeries.length === 0 ? "series" : "episode",
+                  view === "series" || creatableSeries.length === 0
+                    ? "series"
+                    : "episode",
                 )
               }
               type="button"
             >
               <span aria-hidden="true">＋</span>
-              {view === "series" || allSeries.length === 0
+              {view === "series" || creatableSeries.length === 0
                 ? "Create Series"
                 : "Create Episode"}
             </button>
@@ -454,15 +616,18 @@ export function AuthenticatedStudio({
             </section>
             <div className="live-episode-layout">
               <EpisodeGallery
-                createKind={allSeries.length ? "episode" : "series"}
+                createKind={creatableSeries.length ? "episode" : "series"}
                 episodes={visibleEpisodes}
                 selectedId={selectedEpisode?.id ?? ""}
                 seriesById={seriesById}
-                onCreate={() => openComposer(allSeries.length ? "episode" : "series")}
-                onSelect={setSelectedEpisodeId}
+                onCreate={() =>
+                  openComposer(creatableSeries.length ? "episode" : "series")
+                }
+                onSelect={(id) => selectEpisode(id)}
               />
               <EpisodeFocus
                 episode={selectedEpisode}
+                focusRef={episodeFocusRef}
                 series={
                   selectedEpisode ? seriesById.get(selectedEpisode.seriesId) : undefined
                 }
@@ -475,7 +640,8 @@ export function AuthenticatedStudio({
           <SeriesWorlds
             episodes={allEpisodes}
             onArchive={archiveSeries}
-            onCreate={() => openComposer("series")}
+            onCreateEpisode={(seriesId) => openComposer("episode", seriesId)}
+            onCreateSeries={() => openComposer("series")}
             onSelect={setSelectedSeriesId}
             selectedId={selectedSeries?.id ?? ""}
             series={allSeries}
@@ -522,7 +688,11 @@ export function AuthenticatedStudio({
             type="search"
             value={query}
           />
-          <button onClick={() => searchRef.current?.close()} type="button">
+          <button
+            aria-label="Close global search"
+            onClick={() => searchRef.current?.close()}
+            type="button"
+          >
             Close
           </button>
         </div>
@@ -548,13 +718,9 @@ export function AuthenticatedStudio({
           </button>
         ) : null}
         {search.error ? <p role="alert">{search.error}</p> : null}
-        {search.loading && search.matches.length === 0 ? (
-          <p role="status">Searching authorized studio…</p>
-        ) : null}
-        {query && !search.queryReady ? <p>Type at least two characters.</p> : null}
-        {search.queryReady && !search.loading && search.matches.length === 0 ? (
-          <p>No authorized match found.</p>
-        ) : null}
+        <p aria-atomic="true" className="search-live-status" role="status">
+          {searchLiveStatus}
+        </p>
       </dialog>
 
       <dialog
@@ -574,7 +740,7 @@ export function AuthenticatedStudio({
         className="composer-dialog"
         ref={composerRef}
       >
-        <form onSubmit={createItem}>
+        <form key={composerDraftKey} onSubmit={createItem}>
           <header>
             <div>
               <span className="eyebrow">A new thread begins</span>
@@ -593,14 +759,22 @@ export function AuthenticatedStudio({
           {composerMode === "episode" ? (
             <label>
               Series
-              <select name="seriesId" required>
-                {allSeries
-                  .filter(({ state }) => state === "active")
-                  .map((series) => (
-                    <option key={series.id} value={series.id}>
-                      {series.title}
-                    </option>
-                  ))}
+              <select
+                name="seriesId"
+                onChange={(event) => {
+                  const nextSeriesId = event.target.value;
+                  setComposerSeriesId(nextSeriesId);
+                  setComposerDraftKey(`episode:${nextSeriesId}`);
+                  setCommandStatus("");
+                }}
+                required
+                value={composerSeriesId}
+              >
+                {creatableSeries.map((series) => (
+                  <option key={series.id} value={series.id}>
+                    {series.title}
+                  </option>
+                ))}
               </select>
             </label>
           ) : null}
@@ -743,73 +917,117 @@ function EpisodeGallery({
 
 function EpisodeFocus({
   episode,
+  focusRef,
   series,
 }: Readonly<{
   episode?: EpisodeSummary | undefined;
+  focusRef: RefObject<HTMLElement | null>;
   series?: SeriesSummary | undefined;
 }>) {
   if (!episode) return null;
   const state = episodeStatePresentation(episode.workflowState);
+  const creationAccess = creationAccessForEpisode(episode.workflowState);
+  const progress = episodeProgressThread(episode.workflowState);
+  const progressLabel =
+    episode.workflowState === "unavailable"
+      ? "Episode progress unavailable. No workflow stage completion is inferred."
+      : episode.workflowState === "canceled" || episode.workflowState === "abandoned"
+        ? `Episode progress. Workflow ${state.label.toLowerCase()}; later stage completion is not inferred.`
+        : `Episode progress. Current workflow state: ${state.label}.`;
   return (
-    <aside className="live-focus" aria-label={`${episode.title} Episode details`}>
-      <div className="focus-heading">
-        <span className={`state-chip ${state.tone}`}>
-          <span />
-          {state.label}
+    <aside
+      aria-label={`${episode.title} Episode details`}
+      className="live-focus"
+      ref={focusRef}
+      tabIndex={-1}
+    >
+      <span aria-live="polite" className="sr-only">
+        Selected {episode.title}. Episode details follow.
+      </span>
+      <div
+        aria-label={`${episode.title} Episode production details`}
+        className="episode-focus-scroll"
+        tabIndex={0}
+      >
+        <div className="focus-heading">
+          <span className={`state-chip ${state.tone}`}>
+            <span />
+            {state.label}
+          </span>
+          <button aria-label="Episode actions" disabled type="button">
+            ···
+          </button>
+        </div>
+        <span className="eyebrow">{series?.title ?? "Series"}</span>
+        <h2>{episode.title}</h2>
+        <p>Episode {String(episode.episodeNumber).padStart(2, "0")}</p>
+        <div className="live-stage-window">
+          <div aria-hidden="true">
+            <span />
+            <i />
+            <b />
+          </div>
+          <footer>
+            <span>Now</span>
+            <strong>{humanize(episode.workflowState)}</strong>
+          </footer>
+        </div>
+        <div className="episode-metrics">
+          <div>
+            <small>Progress</small>
+            <strong>{Math.round(episode.progressPercent)}%</strong>
+          </div>
+          <div>
+            <small>Cost signal</small>
+            <strong>
+              {episode.costEstimateMinor === null
+                ? "Not quoted"
+                : `${episode.currency ?? "USD"} ${(episode.costEstimateMinor / 100).toFixed(2)}`}
+            </strong>
+          </div>
+        </div>
+        <ol aria-label={progressLabel} className="live-thread">
+          {progress.map((step, index) => (
+            <li
+              aria-label={`${step.label}, ${
+                step.state === "complete"
+                  ? "completed"
+                  : step.state === "current"
+                    ? "current stage"
+                    : step.state === "stopped"
+                      ? "not inferred after workflow stopped"
+                      : "upcoming"
+              }`}
+              aria-current={step.state === "current" ? "step" : undefined}
+              className={`is-${step.state}`}
+              key={step.label}
+            >
+              <span aria-hidden="true">{index + 1}</span>
+              <strong aria-hidden="true">{step.label}</strong>
+            </li>
+          ))}
+        </ol>
+      </div>
+      {episode.workflowState === "unavailable" ? (
+        <span aria-disabled="true" className="primary-button full-width is-disabled">
+          Episode unavailable
         </span>
-        <button aria-label="Episode actions" disabled type="button">
-          ···
-        </button>
-      </div>
-      <span className="eyebrow">{series?.title ?? "Series"}</span>
-      <h2>{episode.title}</h2>
-      <p>Episode {String(episode.episodeNumber).padStart(2, "0")}</p>
-      <div className="live-stage-window">
-        <div aria-hidden="true">
-          <span />
-          <i />
-          <b />
-        </div>
-        <footer>
-          <span>Now</span>
-          <strong>{humanize(episode.workflowState)}</strong>
-        </footer>
-      </div>
-      <div className="episode-metrics">
-        <div>
-          <small>Progress</small>
-          <strong>{Math.round(episode.progressPercent)}%</strong>
-        </div>
-        <div>
-          <small>Cost signal</small>
-          <strong>
-            {episode.costEstimateMinor === null
-              ? "Not quoted"
-              : `${episode.currency ?? "USD"} ${(episode.costEstimateMinor / 100).toFixed(2)}`}
-          </strong>
-        </div>
-      </div>
-      <ol className="live-thread">
-        <li className="is-complete">
-          <span>1</span>
-          <strong>Episode organized</strong>
-        </li>
-        <li className={episode.workflowState !== "draft" ? "is-complete" : ""}>
-          <span>2</span>
-          <strong>World setup</strong>
-        </li>
-        <li>
-          <span>3</span>
-          <strong>Production engine</strong>
-        </li>
-        <li>
-          <span>4</span>
-          <strong>Monica &amp; release</strong>
-        </li>
-      </ol>
-      <button className="primary-button full-width" disabled type="button">
-        World setup arrives in Phase 2
-      </button>
+      ) : creationAccess === "closed" ? (
+        <span aria-disabled="true" className="primary-button full-width is-disabled">
+          Episode closed
+        </span>
+      ) : (
+        <Link
+          className="primary-button full-width"
+          href={`/episodes/${episode.id}/create?seriesId=${encodeURIComponent(episode.seriesId)}&episodeId=${encodeURIComponent(episode.id)}`}
+        >
+          {creationAccess === "read-only"
+            ? "View locked setup"
+            : episode.workflowState === "draft"
+              ? "Start world setup"
+              : "Continue world setup"}
+        </Link>
+      )}
     </aside>
   );
 }
@@ -817,14 +1035,16 @@ function EpisodeFocus({
 function SeriesWorlds({
   episodes,
   onArchive,
-  onCreate,
+  onCreateEpisode,
+  onCreateSeries,
   onSelect,
   selectedId,
   series,
 }: Readonly<{
   episodes: readonly EpisodeSummary[];
   onArchive: (series: SeriesSummary) => void;
-  onCreate: () => void;
+  onCreateEpisode: (seriesId: string) => void;
+  onCreateSeries: () => void;
   onSelect: (id: string) => void;
   selectedId: string;
   series: readonly SeriesSummary[];
@@ -834,61 +1054,216 @@ function SeriesWorlds({
       <section className="future-surface">
         <span>◫</span>
         <h2>No Series yet</h2>
-        <p>
-          A Series is the master world that carries approved characters, locations and
-          look between Episodes.
-        </p>
-        <button className="primary-button" onClick={onCreate}>
+        <p>A Series organizes Episodes and can later point to an approved release.</p>
+        <button className="primary-button" onClick={onCreateSeries}>
           Create the first Series
         </button>
       </section>
     );
   }
+  const selectedSeries = series.find(({ id }) => id === selectedId) ?? series[0]!;
+  const selectedEpisodes = episodes.filter(
+    ({ seriesId }) => seriesId === selectedSeries.id,
+  );
   return (
-    <section className="series-worlds">
-      {series.map((item, index) => {
-        const itemEpisodes = episodes.filter(({ seriesId }) => seriesId === item.id);
-        return (
-          <article
-            className={
-              selectedId === item.id ? "series-world is-selected" : "series-world"
-            }
-            key={item.id}
-          >
-            <button
-              className="series-world-main"
-              onClick={() => onSelect(item.id)}
-              type="button"
+    <section aria-labelledby="series-worlds-heading" className="series-catalog">
+      <h2 className="sr-only" id="series-worlds-heading">
+        Series worlds
+      </h2>
+      <div aria-label="Choose a Series" className="series-worlds" role="group">
+        {series.map((item, index) => {
+          const itemEpisodes = episodes.filter(({ seriesId }) => seriesId === item.id);
+          const selected = selectedSeries.id === item.id;
+          return (
+            <article
+              className={selected ? "series-world is-selected" : "series-world"}
+              key={item.id}
             >
-              <span className={`series-world-art art-${index % 4}`} aria-hidden="true">
-                <i />
-                <b />
-              </span>
-              <span>
-                <small>Series · {item.state}</small>
-                <strong>{item.title}</strong>
+              <button
+                aria-controls="selected-series-details"
+                aria-pressed={selected}
+                className="series-world-main"
+                id={`series-option-${item.id}`}
+                onClick={() => onSelect(item.id)}
+                type="button"
+              >
+                <span
+                  className={`series-world-art art-${index % 4}`}
+                  aria-hidden="true"
+                >
+                  <i />
+                  <b />
+                </span>
+                <span>
+                  <small>Series · {item.state}</small>
+                  <strong>{item.title}</strong>
+                  <p>
+                    {item.description ||
+                      "A new creative world, ready for its first story."}
+                  </p>
+                </span>
+              </button>
+              <footer>
+                <span>
+                  <strong>{itemEpisodes.length}</strong> Episodes
+                </span>
+                <span>
+                  <strong>{item.aggregateVersion}</strong> Record / CAS version
+                </span>
+                {canArchiveSeries(item) ? (
+                  <button onClick={() => onArchive(item)} type="button">
+                    Archive
+                  </button>
+                ) : null}
+              </footer>
+            </article>
+          );
+        })}
+      </div>
+      <aside
+        aria-labelledby="selected-series-heading"
+        className="selected-series-details"
+        id="selected-series-details"
+      >
+        <span aria-live="polite" className="sr-only">
+          Selected {selectedSeries.title}. Series details follow.
+        </span>
+        <header>
+          <div>
+            <span className="eyebrow">Selected Series</span>
+            <h2 id="selected-series-heading">{selectedSeries.title}</h2>
+          </div>
+          <span
+            className={`state-chip ${
+              selectedSeries.state === "unavailable" ? "attention" : "draft"
+            }`}
+          >
+            {humanize(selectedSeries.state)}
+          </span>
+        </header>
+        <p>
+          {selectedSeries.description ||
+            "A new creative world, ready for its first story."}
+        </p>
+        <div className="series-inheritance">
+          <section aria-labelledby="series-assets-heading">
+            {selectedSeries.activeRelease?.kind === "released" ? (
+              <>
+                <h3 id="series-assets-heading">
+                  Series Release {selectedSeries.activeRelease.releaseNumber}
+                </h3>
+                <p>Only the exact release pins below are presented for new Episodes.</p>
+                <ul>
+                  <li>
+                    <strong>Status</strong>
+                    <span className="series-pin-value">
+                      {humanize(selectedSeries.activeRelease.status)}
+                    </span>
+                  </li>
+                  <li>
+                    <strong>Release ID</strong>
+                    <span className="series-pin-value">
+                      <code>{selectedSeries.activeRelease.id}</code>
+                    </span>
+                  </li>
+                  <li>
+                    <strong>Look pin</strong>
+                    <span className="series-pin-value">
+                      {selectedSeries.activeRelease.look ? (
+                        <>
+                          {selectedSeries.activeRelease.look.name} (
+                          {selectedSeries.activeRelease.look.key}), ID{" "}
+                          <code>{selectedSeries.activeRelease.look.id}</code>,{" "}
+                          {humanize(
+                            selectedSeries.activeRelease.look.availabilityStatus,
+                          )}
+                        </>
+                      ) : (
+                        "Not pinned"
+                      )}
+                    </span>
+                  </li>
+                  <li>
+                    <strong>Voice pin</strong>
+                    <span className="series-pin-value">
+                      {humanize(selectedSeries.activeRelease.voice.gender)} narrator (
+                      {selectedSeries.activeRelease.voice.key}), ID{" "}
+                      <code>{selectedSeries.activeRelease.voice.id}</code>,{" "}
+                      {humanize(selectedSeries.activeRelease.voice.availabilityStatus)}
+                    </span>
+                  </li>
+                  <li>
+                    <strong>Continuity pin</strong>
+                    <span className="series-pin-value">
+                      {selectedSeries.activeRelease.continuity ? (
+                        <>
+                          Version{" "}
+                          {selectedSeries.activeRelease.continuity.versionNumber}, ID{" "}
+                          <code>{selectedSeries.activeRelease.continuity.id}</code>
+                        </>
+                      ) : (
+                        "Not pinned"
+                      )}
+                    </span>
+                  </li>
+                </ul>
+              </>
+            ) : selectedSeries.activeRelease?.kind === "unreleased" ? (
+              <>
+                <h3 id="series-assets-heading">No approved Series Release</h3>
                 <p>
-                  {item.description ||
-                    "A new creative world, ready for its first story."}
+                  This Series has no active release. No look, continuity, characters,
+                  locations, or visual language are claimed as inherited.
                 </p>
-              </span>
-            </button>
-            <footer>
-              <span>
-                <strong>{itemEpisodes.length}</strong> Episodes
-              </span>
-              <span>
-                <strong>{item.aggregateVersion}</strong> World version
-              </span>
-              {item.state === "active" ? (
-                <button onClick={() => onArchive(item)} type="button">
-                  Archive
-                </button>
-              ) : null}
-            </footer>
-          </article>
-        );
-      })}
+              </>
+            ) : (
+              <>
+                <h3 id="series-assets-heading">Series Release unavailable</h3>
+                <p>
+                  Release metadata is incomplete or unsupported. Inheritance is not
+                  inferred and Episode creation is read-only.
+                </p>
+              </>
+            )}
+          </section>
+          <section aria-labelledby="series-episodes-heading">
+            <h3 id="series-episodes-heading">
+              Episodes <span>{selectedEpisodes.length}</span>
+            </h3>
+            {selectedEpisodes.length > 0 ? (
+              <ul>
+                {selectedEpisodes.map((episode) => (
+                  <li key={episode.id}>
+                    <span>
+                      Episode {String(episode.episodeNumber).padStart(2, "0")}
+                    </span>
+                    <strong>{episode.title}</strong>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No Episodes in this Series yet.</p>
+            )}
+          </section>
+        </div>
+        {canCreateEpisodeInSeries(selectedSeries) ? (
+          <button
+            className="primary-button"
+            onClick={() => onCreateEpisode(selectedSeries.id)}
+            type="button"
+          >
+            Create Episode in {selectedSeries.title}
+          </button>
+        ) : selectedSeries.state === "archived" ? (
+          <span aria-disabled="true" className="primary-button is-disabled">
+            Archived Series
+          </span>
+        ) : (
+          <span aria-disabled="true" className="primary-button is-disabled">
+            {episodeCreationBlocker(selectedSeries) ?? "Series unavailable"}
+          </span>
+        )}
+      </aside>
     </section>
   );
 }

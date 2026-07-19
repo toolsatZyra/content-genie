@@ -13,13 +13,16 @@ import {
   deterministicEmptyStudioProjection,
   deterministicStateMatrixProjection,
   deterministicStudioProjection,
+  deterministicUnavailableStudioProjection,
 } from "@/test/fakes/studio";
 
 interface HomePageProps {
   readonly searchParams: Promise<{
     readonly auth?: string;
+    readonly episodeId?: string;
     readonly fixture?: string;
     readonly invite?: string;
+    readonly seriesId?: string;
     readonly workspace?: string;
   }>;
 }
@@ -39,14 +42,18 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         ? deterministicStudioProjection()
         : parameters.fixture === "phase1-states"
           ? deterministicStateMatrixProjection()
-          : parameters.fixture === "phase1-empty"
-            ? deterministicEmptyStudioProjection()
-            : undefined
+          : parameters.fixture === "phase1-unavailable"
+            ? deterministicUnavailableStudioProjection()
+            : parameters.fixture === "phase1-empty"
+              ? deterministicEmptyStudioProjection()
+              : undefined
       : undefined;
   if (fixtureProjection) {
     return (
       <div data-server-secret-boundary={canary}>
         <AuthenticatedStudio
+          initialEpisodeId={parameters.episodeId}
+          initialSeriesId={parameters.seriesId}
           key={fixtureProjection.workspace.id}
           projection={fixtureProjection}
           realtimeEnabled={false}
@@ -92,7 +99,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   return (
     <div data-server-secret-boundary={canary}>
-      <AuthenticatedStudio key={projection.workspace.id} projection={projection} />
+      <AuthenticatedStudio
+        initialEpisodeId={parameters.episodeId}
+        initialSeriesId={parameters.seriesId}
+        key={projection.workspace.id}
+        projection={projection}
+      />
     </div>
   );
 }

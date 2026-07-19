@@ -16,7 +16,18 @@ describe("environment contract", () => {
     expect(environment.enableFinalApproval).toBe(false);
     expect(environment.enableProviderSpend).toBe(false);
     expect(environment.enableRender).toBe(false);
+    expect(environment.commandHmacSecret).toBeNull();
     expect(environment.supabaseServiceRoleKey).toBeNull();
+  });
+
+  it("keeps the command HMAC authority separate from the Supabase authority", () => {
+    const environment = parseServerEnvironment({
+      GENIE_COMMAND_HMAC_SECRET: "dedicated-command-secret",
+      SUPABASE_SERVICE_ROLE_KEY: "database-authority",
+    });
+
+    expect(environment.commandHmacSecret).toBe("dedicated-command-secret");
+    expect(environment.supabaseServiceRoleKey).toBe("database-authority");
   });
 
   it("defaults NODE_ENV production to the production contract", () => {

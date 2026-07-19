@@ -9,7 +9,13 @@ import {
   parseIdempotencyKey,
 } from "@/security/command-envelope";
 import { isTrustedMutationOrigin } from "@/security/origin";
+import {
+  BoundedRequestBodyError,
+  declaredRequestBodyBytes,
+  readBoundedUtf8RequestBody,
+} from "@/server/bounded-request-body";
 import { executeCommand } from "@/server/execute-command";
+import { mutationRpcFailureStatus } from "@/server/script-lock";
 
 function response(
   body: Record<string, unknown>,
@@ -34,22 +40,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   ) {
     return response({ code: "ORIGIN_DENIED", ok: false }, 403, requestId);
   }
-  if (
-    !request.headers.get("content-type")?.toLowerCase().startsWith("application/json")
-  ) {
+  const mediaType =
+    request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+  if (mediaType !== "application/json") {
     return response({ code: "JSON_REQUIRED", ok: false }, 415, requestId);
-  }
-  const declaredLength = Number(request.headers.get("content-length") ?? 0);
-  if (declaredLength > MAX_COMMAND_BYTES) {
-    return response({ code: "COMMAND_TOO_LARGE", ok: false }, 413, requestId);
   }
 
   try {
-    const raw = await request.text();
-    if (Buffer.byteLength(raw, "utf8") > MAX_COMMAND_BYTES) {
-      return response({ code: "COMMAND_TOO_LARGE", ok: false }, 413, requestId);
-    }
-    const command = parseCommand(JSON.parse(raw) as unknown);
+    const declaredLength = declaredRequestBodyBytes(request.headers, MAX_COMMAND_BYTES);
     const idempotencyKey = parseIdempotencyKey(
       request.headers.get("x-idempotency-key"),
     );
@@ -61,10 +59,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (error || !user) {
       return response({ code: "AUTHENTICATION_REQUIRED", ok: false }, 401, requestId);
     }
+    const raw = await readBoundedUtf8RequestBody(
+      request,
+      MAX_COMMAND_BYTES,
+      declaredLength,
+    );
+    const command = parseCommand(JSON.parse(raw) as unknown);
     const result = await executeCommand(client, user, command, idempotencyKey);
     return response({ ...result, ok: true }, 200, requestId);
   } catch (error) {
-    if (error instanceof SyntaxError || error instanceof CommandValidationError) {
+    if (error instanceof BoundedRequestBodyError && error.failure === "too-large") {
+      return response({ code: "COMMAND_TOO_LARGE", ok: false }, 413, requestId);
+    }
+    if (
+      error instanceof SyntaxError ||
+      error instanceof CommandValidationError ||
+      error instanceof BoundedRequestBodyError
+    ) {
       return response(
         {
           code: "INVALID_COMMAND",
@@ -75,13 +86,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         requestId,
       );
     }
+    const status = mutationRpcFailureStatus(error);
     return response(
       {
-        code: "COMMAND_REJECTED",
-        message: "The command could not be committed. Refresh and try again.",
+        code: status === 503 ? "COMMAND_OUTCOME_UNKNOWN" : "COMMAND_REJECTED",
+        message:
+          status === 503
+            ? "The command outcome is unknown. Retry the same request safely."
+            : "The command could not be committed. Refresh and try again.",
         ok: false,
       },
-      409,
+      status,
       requestId,
     );
   }

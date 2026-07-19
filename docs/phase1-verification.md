@@ -13,12 +13,66 @@ $env:SUPABASE_PROJECT_REF = "<parent-project-ref>"
 pnpm test:live:phase1
 ```
 
-The command creates a fresh preview branch, resets it to the committed migration
-set, runs the three-step forward-rollback drill, runs the live authorization and
-browser probes, and deletes the branch in `finally`. Realtime is intentionally
+The command first requires a committed, published candidate that is byte-for-byte
+the independently approved production broker deployment. The local trusted
+controller creates a fresh preview branch by exact ID-and-name, while the
+production broker clones that same immutable commit into a Firecracker sandbox.
+The committed trusted-harness manifest pins the runner, strict artifact validator,
+pgTAP and hardened-query sources, migrations, predecessor fixture, live specs,
+lockfile, and package-manager version. The broker verifies those hashes before
+execution and validates the complete closed candidate artifact before signing it.
+Candidate code receives only disposable-branch credentials; the account
+management token and production database/service credentials never enter it.
+Immediately after branch creation or exact-name recovery, and before readiness
+or candidate execution, the trusted controller writes an exact cleanup lease to
+the production-private control plane. The lease binds the branch UUID, strict
+generated name, preview project ref, production parent ref, candidate commit and
+tree, a unique cleanup lease UUID, and a two-hour coordinator owner lease.
+Before creating another branch, every live-suite invocation reconciles its own
+same-owner lease immediately and may claim another coordinator's lease only
+after that lease expires. An unexpired active lease is never claimed or deleted
+by a scheduled reaper or concurrent live-suite invocation.
+Deletion is recorded only after the existing cleanup loop has observed three
+consecutive exact-identity absence snapshots.
+This is an exact-tree integrated proof with the reviewed broker tree in the
+trusted computing base. It is not evidence that an arbitrary hostile candidate
+was independently tested by a separate harness.
+Realtime is intentionally
 skipped on the new branch because a freshly reset preview branch may not have an
 attached replication tenant. The suite records cleanup and forward-rollback
-status in `.tmp/artifacts/phase1-live-suite.json`.
+status in the parent-owned, closed-schema
+`.tmp/artifacts/phase1-live-suite.json` artifact.
+
+## Scheduled crash recovery
+
+The `Trusted live branch reaper` GitHub workflow runs hourly. It intentionally
+has no manual GitHub dispatch surface; an authorized operator may instead run
+the repository's local `pnpm live-branch:reap` command when immediate recovery
+is required. The scheduled job receives `SUPABASE_ACCESS_TOKEN` and the exact
+20-character production `SUPABASE_PROJECT_REF` only from the protected
+`genie-production-control` GitHub environment, whose branch policy admits only
+`main`. The job is noninteractive and fails closed when either secret is absent.
+It first reconciles durable candidate cleanup leases, then inspects the exact
+production parent's branch list.
+
+To cover a coordinator crash after Supabase creates a branch but before lease
+registration commits, the scheduled job may adopt an unleased orphan only when
+all of these checks pass: its name exactly matches
+`genie-live-<8 lowercase hex>-<3 lowercase hex>`, its UUID and 20-character
+preview ref are valid, its parent ref exactly equals production, both
+`is_default` and `persistent` are explicitly false, and `created_at` is at least
+six hours old by default. Nonmatching, young, default, persistent, cross-parent,
+ambiguous, or partially colliding identities are never deleted. Orphan adoption
+is itself durably and exclusively claimed before deletion, so concurrent or
+restarted reapers remain idempotent.
+
+For an authorized one-off invocation using the same trusted credentials:
+
+```powershell
+$env:SUPABASE_ACCESS_TOKEN = "<management-token>"
+$env:SUPABASE_PROJECT_REF = "<exact-production-parent-ref>"
+pnpm live-branch:reap
+```
 
 The forward-rollback drill applies three distinct forward SQL steps to an
 isolated probe table: baseline, candidate change, and compensating change. A
@@ -32,9 +86,9 @@ The same drill runs in ordinary CI through:
 pnpm db:test:harness
 ```
 
-On GitHub's Docker runner this uses the isolated local Supabase stack. When
-Docker is unavailable, the harness requires `SUPABASE_ACCESS_TOKEN` and
-`SUPABASE_PROJECT_REF`, creates a disposable branch, and deletes it in `finally`.
+On GitHub's Docker runner this uses the isolated local Supabase stack. There is
+no managed-branch fallback in this command. When Docker is unavailable, managed
+proof must run through the exact-identity trusted live controller above.
 
 ## Persistent-preview Realtime reconciliation
 

@@ -36,6 +36,9 @@ const browserExtensions = new Set([
 ]);
 const forbidden = [
   "GENIE_SERVER_SECRET_CANARY_6f78ddf9f50c4e519a447fb713a4c476",
+  "b0oby86k6n7Uh5LZcOBR",
+  "GSdeLRB8detpjZjN63Wn",
+  "elevenlabs.primary",
   ...serverOnlyVariables,
 ];
 

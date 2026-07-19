@@ -20,6 +20,7 @@ const required = [
   "GENIE_LIVE_SUPABASE_ANON_KEY",
   "GENIE_LIVE_SUPABASE_SERVICE_ROLE_KEY",
   "GENIE_LIVE_TEST_EMAIL",
+  "GENIE_LIVE_TEST_EPISODE_ID",
   "GENIE_LIVE_TEST_OBJECT_PATH",
   "GENIE_LIVE_TEST_OUTSIDER_EMAIL",
   "GENIE_LIVE_TEST_PASSWORD",
@@ -53,16 +54,88 @@ const require = createRequire(import.meta.url);
 const nextExecutable = require.resolve("next/dist/bin/next");
 const playwrightExecutable = require.resolve("@playwright/test/cli");
 
-function cleanup() {
-  rmSync(runtimeDirectory, {
-    force: true,
-    maxRetries: 10,
-    recursive: true,
-    retryDelay: 200,
-  });
-  if (existsSync(runtimeDirectory)) {
-    throw new Error("The isolated Next runtime was not removed.");
+const inheritedRuntimeEnvironment = new Set([
+  "ALLUSERSPROFILE",
+  "APPDATA",
+  "CI",
+  "COMSPEC",
+  "FORCE_COLOR",
+  "HOME",
+  "HOMEDRIVE",
+  "HOMEPATH",
+  "LANG",
+  "LC_ALL",
+  "LOCALAPPDATA",
+  "LOGNAME",
+  "NODE_EXTRA_CA_CERTS",
+  "OS",
+  "PATH",
+  "PATHEXT",
+  "PROCESSOR_ARCHITECTURE",
+  "PROGRAMDATA",
+  "PROGRAMFILES",
+  "PROGRAMFILES(X86)",
+  "PROGRAMW6432",
+  "PUBLIC",
+  "SHELL",
+  "SYSTEMDRIVE",
+  "SYSTEMROOT",
+  "TEMP",
+  "TMP",
+  "TMPDIR",
+  "USER",
+  "USERDOMAIN",
+  "USERNAME",
+  "USERPROFILE",
+  "WINDIR",
+]);
+
+function operatingSystemEnvironment(source) {
+  return Object.fromEntries(
+    Object.entries(source).filter(
+      ([name, value]) =>
+        value !== undefined && inheritedRuntimeEnvironment.has(name.toUpperCase()),
+    ),
+  );
+}
+
+const playwrightEnvironmentNames = new Set([
+  "GENIE_LIVE_SUPABASE_ANON_KEY",
+  "GENIE_LIVE_SUPABASE_URL",
+  "GENIE_LIVE_TEST_EMAIL",
+  "GENIE_LIVE_TEST_EPISODE_ID",
+  "GENIE_LIVE_TEST_OBJECT_PATH",
+  "GENIE_LIVE_TEST_OUTSIDER_EMAIL",
+  "GENIE_LIVE_TEST_PASSWORD",
+]);
+
+function liveTestEnvironment(source) {
+  return Object.fromEntries(
+    Object.entries(source).filter(
+      ([name, value]) => value !== undefined && playwrightEnvironmentNames.has(name),
+    ),
+  );
+}
+
+async function cleanup() {
+  for (let attempt = 1; attempt <= 20; attempt += 1) {
+    try {
+      rmSync(runtimeDirectory, {
+        force: true,
+        recursive: true,
+      });
+      if (!existsSync(runtimeDirectory)) return;
+    } catch (error) {
+      const retryable =
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        ["EBUSY", "ENOTEMPTY", "EPERM"].includes(String(error.code));
+      if (!retryable || attempt === 20) throw error;
+    }
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 250));
   }
+  throw new Error("The isolated Next runtime was not removed.");
 }
 
 const baseUrl = `http://127.0.0.1:${port}`;
@@ -72,7 +145,7 @@ const server = spawn(
   {
     cwd: runtimeDirectory,
     env: {
-      ...process.env,
+      ...operatingSystemEnvironment(process.env),
       GENIE_ENABLE_EXPORT: "false",
       GENIE_ENABLE_FINAL_APPROVAL: "false",
       GENIE_ENABLE_PROVIDER_SPEND: "false",
@@ -133,7 +206,8 @@ function runPlaywright() {
       {
         cwd: root,
         env: {
-          ...process.env,
+          ...operatingSystemEnvironment(process.env),
+          ...liveTestEnvironment(process.env),
           GENIE_LIVE_BASE_URL: baseUrl,
         },
         shell: false,
@@ -160,5 +234,5 @@ try {
   await runPlaywright();
 } finally {
   stopServer();
-  cleanup();
+  await cleanup();
 }

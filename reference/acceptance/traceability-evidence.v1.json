@@ -9,10 +9,12 @@
           "sha256": "8846b013a1a87d78ddacc0a2f6be3039504f8d68e74760efce4b91c0061b3ab7"
         }
       ],
-      "obligationDefinitionHash": "ce85bee98cd672c4354bbf5e2348829369aead38d7480d5b47615c3ddfef88a1",
+      "obligationDefinitionHash": "c3d525df2595fd19b4afb60a4f249a047b50c74be7f28afd2cbdb579f61bb49f",
       "status": "verified",
       "verifiedAt": "2026-07-17T00:50:26.3682771Z",
-      "workPackages": ["P0-04"]
+      "workPackages": [
+        "P0-04"
+      ]
     },
     "TM-04@phase0": {
       "commit": "230913aea1aebcea1a6715db7c3715af1d6b239c",
@@ -22,10 +24,12 @@
           "sha256": "8846b013a1a87d78ddacc0a2f6be3039504f8d68e74760efce4b91c0061b3ab7"
         }
       ],
-      "obligationDefinitionHash": "6509b04b46f8b4de1ca4417fb1fdf57ccad8494802d68e0884f15f06dfd10108",
+      "obligationDefinitionHash": "f4723a99520ab94a2d68232c1c891f7f1f668536b98393d530e0d9523d31f83d",
       "status": "verified",
       "verifiedAt": "2026-07-17T00:50:26.3682771Z",
-      "workPackages": ["P0-02"]
+      "workPackages": [
+        "P0-02"
+      ]
     },
     "TM-25@phase0": {
       "commit": "230913aea1aebcea1a6715db7c3715af1d6b239c",
@@ -35,10 +39,13 @@
           "sha256": "8846b013a1a87d78ddacc0a2f6be3039504f8d68e74760efce4b91c0061b3ab7"
         }
       ],
-      "obligationDefinitionHash": "b4acdbd8c20fa2ada8d818c54519bb00b9de958bf5b2ff0b54f1c45169835509",
+      "obligationDefinitionHash": "a7021fe9008cb66dfdff05d60f61c1ffad78a3f2d2abe2cfe86da16ca7afad25",
       "status": "verified",
       "verifiedAt": "2026-07-17T00:50:26.3682771Z",
-      "workPackages": ["P0-02", "P0-04"]
+      "workPackages": [
+        "P0-02",
+        "P0-04"
+      ]
     },
     "TM-33@phase0": {
       "commit": "230913aea1aebcea1a6715db7c3715af1d6b239c",
@@ -48,10 +55,12 @@
           "sha256": "8846b013a1a87d78ddacc0a2f6be3039504f8d68e74760efce4b91c0061b3ab7"
         }
       ],
-      "obligationDefinitionHash": "ea6182a2328905a4494e4c4c5e44c5a2ff00d2f3a28395e806568fc88fbcbc42",
+      "obligationDefinitionHash": "0d80c9262aa80a459a5e83c93dfcda216ec0c4926454c10c41e4c5ce222de654",
       "status": "verified",
       "verifiedAt": "2026-07-17T00:50:26.3682771Z",
-      "workPackages": ["P0-02"]
+      "workPackages": [
+        "P0-02"
+      ]
     },
     "TM-34@phase0": {
       "commit": "230913aea1aebcea1a6715db7c3715af1d6b239c",
@@ -61,10 +70,12 @@
           "sha256": "8846b013a1a87d78ddacc0a2f6be3039504f8d68e74760efce4b91c0061b3ab7"
         }
       ],
-      "obligationDefinitionHash": "0441bef58a949f58fc3db44fba9df6c8a32e3d9aed868e85575035c670b3925b",
+      "obligationDefinitionHash": "acb7e835a53e5963e9bbc8dd24fe8fdeb959306c124f27a71d914d5f300810a8",
       "status": "verified",
       "verifiedAt": "2026-07-17T00:50:26.3682771Z",
-      "workPackages": ["P0-01"]
+      "workPackages": [
+        "P0-01"
+      ]
     },
     "TM-35@phase0": {
       "commit": "230913aea1aebcea1a6715db7c3715af1d6b239c",
@@ -74,10 +85,13 @@
           "sha256": "8846b013a1a87d78ddacc0a2f6be3039504f8d68e74760efce4b91c0061b3ab7"
         }
       ],
-      "obligationDefinitionHash": "9d277fd18a4601a2874c6d698deced7dcecf2e1bfe5869558874e0881968abc7",
+      "obligationDefinitionHash": "12393a79264d1e9cc35bdef9abac585610cfa0ad8b5c4175f95c476f6ecb04b1",
       "status": "verified",
       "verifiedAt": "2026-07-17T00:50:26.3682771Z",
-      "workPackages": ["P0-02", "P0-03"]
+      "workPackages": [
+        "P0-02",
+        "P0-03"
+      ]
     },
     "GEN-PROD-017@phase1": {
       "commit": "70119839059ea51427e97cb48d675569197484b1",
@@ -87,10 +101,12 @@
           "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
         }
       ],
-      "obligationDefinitionHash": "673dc58f6f44177d7e609538f1375b9fe3cb75dcd113d6031c9b1dbef4ebdc2c",
+      "obligationDefinitionHash": "9520206fc10e3bdb706d26594ddf456c77d086d6d4b53034e235e6b57f73ea71",
       "status": "verified",
       "verifiedAt": "2026-07-17T06:05:13.9246768Z",
-      "workPackages": ["P1-04"]
+      "workPackages": [
+        "P1-04"
+      ]
     },
     "GEN-PROD-018@phase1": {
       "commit": "70119839059ea51427e97cb48d675569197484b1",
@@ -100,10 +116,14 @@
           "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
         }
       ],
-      "obligationDefinitionHash": "db6db84e776dbdcd82adfe68bf524d02fd273b5c2b2d1fc504d9aefd823f220a",
+      "obligationDefinitionHash": "98557eb20ce941ba9917f6e8fb55d75ff721d8edc331b3edf73bd2905df51da4",
       "status": "verified",
       "verifiedAt": "2026-07-17T06:05:13.9246768Z",
-      "workPackages": ["P1-03", "P1-04", "P1-05"]
+      "workPackages": [
+        "P1-03",
+        "P1-04",
+        "P1-05"
+      ]
     },
     "GEN-PROD-019@phase1": {
       "commit": "70119839059ea51427e97cb48d675569197484b1",
@@ -113,10 +133,12 @@
           "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
         }
       ],
-      "obligationDefinitionHash": "9bc1bd68ad27b0f6dd9ae6c3c8e70a5f4f9d41c3cd7d8d5007b96799016447ea",
+      "obligationDefinitionHash": "bd4ba8125bab09528f4c4b196f6e503a5ebcb5ae6b3334a91090cea62610aafa",
       "status": "verified",
       "verifiedAt": "2026-07-17T06:05:13.9246768Z",
-      "workPackages": ["P1-04"]
+      "workPackages": [
+        "P1-04"
+      ]
     },
     "GEN-PROD-025@phase1": {
       "commit": "70119839059ea51427e97cb48d675569197484b1",
@@ -126,10 +148,12 @@
           "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
         }
       ],
-      "obligationDefinitionHash": "3e70b0d789fedaa1ee9a16827e3a82fd35fd084aad34f2914454128632e29aa6",
+      "obligationDefinitionHash": "595e46c390a405224be39a4687852040b15bdae90038b4bcab13157f3f51c36f",
       "status": "verified",
       "verifiedAt": "2026-07-17T06:05:13.9246768Z",
-      "workPackages": ["P1-03"]
+      "workPackages": [
+        "P1-03"
+      ]
     },
     "TM-01@phase1": {
       "commit": "70119839059ea51427e97cb48d675569197484b1",
@@ -139,10 +163,13 @@
           "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
         }
       ],
-      "obligationDefinitionHash": "4052b49dfdddfe4e07e13d8947fd7e3cc9db83d402329e0776ae0aeb50e69d56",
+      "obligationDefinitionHash": "157eeb1af03a3c9377f1440230c4e9784559c412147363a26946c95ce6d85427",
       "status": "verified",
       "verifiedAt": "2026-07-17T06:05:13.9246768Z",
-      "workPackages": ["P1-01", "P1-04"]
+      "workPackages": [
+        "P1-01",
+        "P1-04"
+      ]
     },
     "TM-02@phase1": {
       "commit": "70119839059ea51427e97cb48d675569197484b1",
@@ -152,10 +179,13 @@
           "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
         }
       ],
-      "obligationDefinitionHash": "d1441f3cb0347dd4703e173096824eaa25b5c8f9a37e26cf87b5b902d1e01b08",
+      "obligationDefinitionHash": "709a21b96161b1a6a521964702f3367e6ab2b2a62d6ea7cc86ddfa7b630d0f60",
       "status": "verified",
       "verifiedAt": "2026-07-17T06:05:13.9246768Z",
-      "workPackages": ["P1-01", "P1-02"]
+      "workPackages": [
+        "P1-01",
+        "P1-02"
+      ]
     },
     "TM-03@phase1": {
       "commit": "70119839059ea51427e97cb48d675569197484b1",
@@ -165,10 +195,12 @@
           "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
         }
       ],
-      "obligationDefinitionHash": "641282fd804744de2857bcbc2d0e5e5b3aeb5cfba76e4a947dd647aa16e5260b",
+      "obligationDefinitionHash": "fa93c55a5ef8142f55de83db218ad3095ef0d98f94fe99fe3afd1e394832efa3",
       "status": "verified",
       "verifiedAt": "2026-07-17T06:05:13.9246768Z",
-      "workPackages": ["P1-02"]
+      "workPackages": [
+        "P1-02"
+      ]
     },
     "TM-05@phase1": {
       "commit": "70119839059ea51427e97cb48d675569197484b1",
@@ -178,10 +210,12 @@
           "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
         }
       ],
-      "obligationDefinitionHash": "98ab53d74c6b7ec7a7fa2acac807403e392317deebb73ed761c734a3209f26e6",
+      "obligationDefinitionHash": "17cfd636d1194a8218da274e3b390862f38d09ff13aa7ea2b6cc73158e2b783a",
       "status": "verified",
       "verifiedAt": "2026-07-17T06:05:13.9246768Z",
-      "workPackages": ["P1-01"]
+      "workPackages": [
+        "P1-01"
+      ]
     },
     "TM-06@phase1": {
       "commit": "70119839059ea51427e97cb48d675569197484b1",
@@ -191,10 +225,12 @@
           "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
         }
       ],
-      "obligationDefinitionHash": "a29886b256d23487c25af639e36ed4cbf2d603d602de5b3fe83b53ce23bf31d7",
+      "obligationDefinitionHash": "b7ea0fa10ea67249119b5632d8c888d57ee06f05673eeac778b4b1c9ea0762fc",
       "status": "verified",
       "verifiedAt": "2026-07-17T06:05:13.9246768Z",
-      "workPackages": ["P1-01"]
+      "workPackages": [
+        "P1-01"
+      ]
     },
     "TM-07@phase1": {
       "commit": "70119839059ea51427e97cb48d675569197484b1",
@@ -204,10 +240,12 @@
           "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
         }
       ],
-      "obligationDefinitionHash": "1f476da9ce96ff3f0aefc39e96a5af6561ee489492700e948034b206380bb117",
+      "obligationDefinitionHash": "5e5c1994e503c88b66d6930c2853021985af226201a19e710db95ecfd5a64766",
       "status": "verified",
       "verifiedAt": "2026-07-17T06:05:13.9246768Z",
-      "workPackages": ["P1-01"]
+      "workPackages": [
+        "P1-01"
+      ]
     },
     "TM-08@phase1": {
       "commit": "70119839059ea51427e97cb48d675569197484b1",
@@ -217,10 +255,12 @@
           "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
         }
       ],
-      "obligationDefinitionHash": "8b6b325317150d4c1ddaad6fb540be3b0aa4cd2c1ebd018bd219a1b5d8db18ce",
+      "obligationDefinitionHash": "d38c84e3de1650307eb990c8e9dc0194a7e3ccbd84dd8d6a9744099fa1085e56",
       "status": "verified",
       "verifiedAt": "2026-07-17T06:05:13.9246768Z",
-      "workPackages": ["P1-01"]
+      "workPackages": [
+        "P1-01"
+      ]
     },
     "TM-09@phase1": {
       "commit": "70119839059ea51427e97cb48d675569197484b1",
@@ -230,10 +270,12 @@
           "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
         }
       ],
-      "obligationDefinitionHash": "62d65fab2c3c6bde60c41d25a994a14cf9b690603c57ec9aaac5d035ce65a490",
+      "obligationDefinitionHash": "17caef8ef840a40f487f3b78bf9e90029f40fe1e23ce6d0ce80cf3d6e2bf6628",
       "status": "verified",
       "verifiedAt": "2026-07-17T06:05:13.9246768Z",
-      "workPackages": ["P1-02"]
+      "workPackages": [
+        "P1-02"
+      ]
     },
     "TM-10@phase1": {
       "commit": "70119839059ea51427e97cb48d675569197484b1",
@@ -243,10 +285,12 @@
           "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
         }
       ],
-      "obligationDefinitionHash": "66d8325945fe86a4620f581dafce21512c636e4cb6429b493139f0af39a9c39b",
+      "obligationDefinitionHash": "1f8249d804af6e1012e255a02a2cb280852ce78f1aa7741d78349c74a1b9c6c8",
       "status": "verified",
       "verifiedAt": "2026-07-17T06:05:13.9246768Z",
-      "workPackages": ["P1-01"]
+      "workPackages": [
+        "P1-01"
+      ]
     },
     "TM-26@phase1": {
       "commit": "70119839059ea51427e97cb48d675569197484b1",
@@ -256,10 +300,12 @@
           "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
         }
       ],
-      "obligationDefinitionHash": "610bb1f99a04b3caca442f9d7a1fbcc63157d0ea6b4c7e577910c1c0f331e65d",
+      "obligationDefinitionHash": "2febf2b7e24a523de9c48c3302d42c28cd666c4f287197fded87c1fbecb930d3",
       "status": "verified",
       "verifiedAt": "2026-07-17T06:05:13.9246768Z",
-      "workPackages": ["P1-05"]
+      "workPackages": [
+        "P1-05"
+      ]
     },
     "TM-27@phase1": {
       "commit": "70119839059ea51427e97cb48d675569197484b1",
@@ -269,10 +315,12 @@
           "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
         }
       ],
-      "obligationDefinitionHash": "a1b2ccf3d6254b34999c31d380fe9e161b3f65058f35424ce954715c89fd0c05",
+      "obligationDefinitionHash": "a221dd21a0b2eb1faa94f4209d86ef5ce92f388262ed7f8933e9be3587f1044f",
       "status": "verified",
       "verifiedAt": "2026-07-17T06:05:13.9246768Z",
-      "workPackages": ["P1-05"]
+      "workPackages": [
+        "P1-05"
+      ]
     },
     "TM-32@phase1": {
       "commit": "70119839059ea51427e97cb48d675569197484b1",
@@ -282,10 +330,12 @@
           "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
         }
       ],
-      "obligationDefinitionHash": "6a859a0ca75c6ea1f9d135278828d862b786ef5d143ad5c4859626d62ec02d36",
+      "obligationDefinitionHash": "c0ad174fef04b0b413f6c8e06251427db1878861d79fc163edd9a86fbfd50219",
       "status": "verified",
       "verifiedAt": "2026-07-17T06:05:13.9246768Z",
-      "workPackages": ["P1-01"]
+      "workPackages": [
+        "P1-01"
+      ]
     },
     "TM-37@phase1": {
       "commit": "70119839059ea51427e97cb48d675569197484b1",
@@ -295,10 +345,12 @@
           "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
         }
       ],
-      "obligationDefinitionHash": "63c7c4c0d0a7e4af9cdbc57351d5e87e2eb25f68688050aa9d6aca07d9b6936f",
+      "obligationDefinitionHash": "0d6a513973967fa9e23412c1f93fca528db9accb1ce309ab6a23610962bc9bf1",
       "status": "verified",
       "verifiedAt": "2026-07-17T06:05:13.9246768Z",
-      "workPackages": ["P1-01"]
+      "workPackages": [
+        "P1-01"
+      ]
     },
     "TM-38@phase1": {
       "commit": "70119839059ea51427e97cb48d675569197484b1",
@@ -308,10 +360,13 @@
           "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
         }
       ],
-      "obligationDefinitionHash": "f6e108b77bfd8a30b8f11f7d9dd33bbd4914116ccfba6ea9e96d5a854bc4aeb7",
+      "obligationDefinitionHash": "511e61be930907ea205913569d1f6787dd879926b6bab7acb2eb57544f0d50c3",
       "status": "verified",
       "verifiedAt": "2026-07-17T06:05:13.9246768Z",
-      "workPackages": ["P1-02", "P1-05"]
+      "workPackages": [
+        "P1-02",
+        "P1-05"
+      ]
     },
     "TM-40@phase1": {
       "commit": "70119839059ea51427e97cb48d675569197484b1",
@@ -321,10 +376,12 @@
           "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
         }
       ],
-      "obligationDefinitionHash": "7679718cd319064a045949cf601a808db364e9067fda4e132109f1bea719eeb4",
+      "obligationDefinitionHash": "5eab29b5f734ab0fed2d1d864cfd2d09f0d02bcc198783d03ef843e69ae4eed0",
       "status": "verified",
       "verifiedAt": "2026-07-17T06:05:13.9246768Z",
-      "workPackages": ["P1-03"]
+      "workPackages": [
+        "P1-03"
+      ]
     },
     "TM-41@phase1": {
       "commit": "70119839059ea51427e97cb48d675569197484b1",
@@ -334,10 +391,12 @@
           "sha256": "04539b1ed8d8b026ac78ff4f56ef92e9eab69c19693e54148563b897a6fef54e"
         }
       ],
-      "obligationDefinitionHash": "fbe91dc820c7309820ce80ecc968a0d5e09f68de2908f70283af6bb74137297b",
+      "obligationDefinitionHash": "1190d095bdd16c894e0391e8748aa9442fc955a2d551514083cf01e644009c96",
       "status": "verified",
       "verifiedAt": "2026-07-17T06:05:13.9246768Z",
-      "workPackages": ["P1-02"]
+      "workPackages": [
+        "P1-02"
+      ]
     }
   }
 }
