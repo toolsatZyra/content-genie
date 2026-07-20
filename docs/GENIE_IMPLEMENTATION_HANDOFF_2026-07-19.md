@@ -995,3 +995,51 @@ production secretless/fail-closed boot, the Phase 2 database/provider policy
 checks, and canary build pass. Preview and production both have the three new
 migrations. Explicit GitHub push, automatic Vercel verification, and final Ep
 1 asset-promotion evidence remain the immediate next steps for this batch.
+
+## 20. 2026-07-20 Ep 1 private-preview and current-run projection proof
+
+The section 19 batch and its subsequent secure-ingest corrections were pushed
+to explicit GitHub `main`. All nine recovered FAL outputs are now atomically
+promoted: six `character_selections` and three location/prop selections are in
+`review_required`, with nine matching immutable `asset_versions` and nine
+matching current `storage.objects` receipts. The generated Shiva bow remains a
+story-prop projection; it is not renamed or treated as a place.
+
+The final blank-preview root cause was not Nano Banana latency. The promoted
+objects were present, but `workspace_media_member_select` allowed authenticated
+download/info operations and omitted Supabase Storage's current
+`storage.object.sign` operation. Storage therefore hid each signing request as
+`Object not found`, and the application correctly returned nine 503 preview
+responses. Migration `workspace_media_signed_preview` is applied to preview
+and production. It adds only `storage.object.sign` and
+`storage.object.sign_many`, while retaining the private bucket, authenticated
+role, exact workspace-path derivation, and active-membership predicate. A
+production test using the owner's normal authenticated session now creates the
+short-lived URL successfully; the same test also succeeds with service
+authority.
+
+The provider promotion caller is also hardened at the ambiguity boundary. Once
+the atomic promotion RPC has been attempted it no longer deletes the uploaded
+immutable object on a transport timeout. It first reconciles the exact asset
+ID, object path, quarantine source, and storage receipt. If that evidence is
+not available it retains a harmless unbound object for later evidence-aware
+cleanup rather than risking deletion after a committed transaction.
+
+World progress now queries only the newest fenced `world_anchor` preflight run.
+Historical failed attempts remain queryable as audit evidence but no longer
+inflate the current UI. Commit `020c289` is deployed READY as Vercel deployment
+`dpl_FozLPcZrndx3bhj7rET5SiQbqQqQ` and owns
+`content-genie-three.vercel.app`. Authenticated post-deploy browser evidence for
+Ep 1 shows exactly `0 of 9 world anchors accepted`, nine World cards, nine
+image elements, nine `Accept anchor` actions, zero unavailable previews, and
+zero stale progress cards. Opening Ep 1 resolves directly to World, its current
+authoritative chamber.
+
+The proportionate regression batch is green: type checking; lint; formatting;
+84 unit files / 502 tests; integration 5/5 with one intentional live-scanner
+skip; four focused Series/current-chamber/World browser tests; security; the
+Phase 2 database policy checks; and the production authenticated signing probe.
+No persistent test server remains. The owner workbook is still untracked and
+was not staged. Ep 1 is unblocked for human anchor review; the broader Phase 2,
+Phase 3, and Phase 4 gates remain active and must not be inferred complete from
+this recovery.
