@@ -8,7 +8,10 @@ vi.mock("@/server/ledgered-openai-agent", () => ({
   runLedgeredOpenAiStructuredAgent: mocks.agent,
 }));
 
-import { extractWorldFromLockedScript } from "./world-extraction-agent";
+import {
+  extractWorldFromLockedScript,
+  WORLD_EXTRACTION_JSON_SCHEMA,
+} from "./world-extraction-agent";
 
 const authority = {
   configurationCandidateId: "10000000-0000-4000-8000-000000000004",
@@ -142,5 +145,9 @@ describe("ledgered World Extraction", () => {
       }),
     ).rejects.toThrow("exact script bytes");
     expect(mocks.agent).not.toHaveBeenCalled();
+  });
+
+  it("uses only structured-output schema keywords accepted by the provider", () => {
+    expect(JSON.stringify(WORLD_EXTRACTION_JSON_SCHEMA)).not.toContain('"uniqueItems"');
   });
 });

@@ -21,7 +21,6 @@ const stringArray = (maximum: number) => ({
   items: nonEmptyString,
   maxItems: maximum,
   type: "array",
-  uniqueItems: true,
 });
 const exactObject = (
   properties: Readonly<Record<string, unknown>>,
@@ -74,7 +73,6 @@ export const WORLD_EXTRACTION_JSON_SCHEMA = exactObject(
             items: keyString,
             maxItems: 16,
             type: "array",
-            uniqueItems: true,
           },
           blocksGeneration: { type: "boolean" },
           description: nonEmptyString,
