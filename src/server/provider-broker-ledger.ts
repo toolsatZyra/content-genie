@@ -613,7 +613,6 @@ export async function promoteProviderWorldAnchor(input: {
   const receipt = await workspaceMedia.info(finalObjectName);
   if (
     receipt.error ||
-    receipt.data.id !== upload.data.id ||
     typeof receipt.data.version !== "string" ||
     receipt.data.version.length < 1
   ) {

@@ -146,6 +146,16 @@ export async function GET(request: Request) {
         completed += 1;
       } catch (error) {
         const disposition = failureDisposition(error);
+        console.error("Provider output candidate ingest failed safely", {
+          errorMessage:
+            error instanceof ProviderBrokerLedgerError ||
+            error instanceof RemoteFetchPolicyError ||
+            error instanceof SandboxMediaScannerError
+              ? error.message
+              : "Unexpected secure-ingest failure.",
+          errorName: error instanceof Error ? error.name : "UnknownError",
+          safeClass: disposition.safeClass,
+        });
         await failProviderOutputCandidate({
           candidateId: claim.candidateId,
           leaseToken: claim.leaseToken,
