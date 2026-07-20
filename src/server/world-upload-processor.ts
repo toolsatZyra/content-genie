@@ -111,13 +111,15 @@ async function uploadOrVerify(
   bytes: Buffer,
   contentType: string,
 ): Promise<string> {
+  const expectedHash = createHash("sha256").update(bytes).digest("hex");
   const upload = await client.storage.from(bucket).upload(objectName, bytes, {
     cacheControl: "0",
     contentType,
+    metadata: { sha256: expectedHash },
     upsert: false,
   });
   if (!upload.error) {
-    return upload.data.id ?? createHash("sha256").update(bytes).digest("hex");
+    return upload.data.id ?? expectedHash;
   }
   const existing = await client.storage.from(bucket).download(objectName);
   if (existing.error) {
@@ -127,7 +129,6 @@ async function uploadOrVerify(
     );
   }
   const existingBytes = Buffer.from(await existing.data.arrayBuffer());
-  const expectedHash = createHash("sha256").update(bytes).digest("hex");
   if (createHash("sha256").update(existingBytes).digest("hex") !== expectedHash) {
     throw new WorldUploadProcessingError(
       "An immutable media object conflicted with this upload.",

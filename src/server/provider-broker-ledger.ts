@@ -599,6 +599,7 @@ export async function promoteProviderWorldAnchor(input: {
     .upload(finalObjectName, input.scanned.outputBytes, {
       cacheControl: "0",
       contentType: input.scanned.magicMime,
+      metadata: { sha256: input.scanned.outputSha256 },
       upsert: false,
     });
   if (upload.error) {

@@ -427,12 +427,14 @@ async function uploadOrVerify(input: {
   objectName: string;
 }): Promise<string> {
   const storage = createAdminSupabaseClient().storage.from(input.bucket);
+  const contentSha256 = sha256(input.bytes);
   const upload = await storage.upload(input.objectName, input.bytes, {
     cacheControl: "0",
     contentType: input.contentType,
+    metadata: { sha256: contentSha256 },
     upsert: false,
   });
-  if (!upload.error) return upload.data.id ?? sha256(input.bytes);
+  if (!upload.error) return upload.data.id ?? contentSha256;
   const existing = await storage.download(input.objectName);
   if (existing.error) {
     throw new TempleResearchError(
@@ -441,10 +443,10 @@ async function uploadOrVerify(input: {
     );
   }
   const bytes = Buffer.from(await existing.data.arrayBuffer());
-  if (sha256(bytes) !== sha256(input.bytes)) {
+  if (sha256(bytes) !== contentSha256) {
     throw new TempleResearchError("Temple media storage replay conflicted.");
   }
-  return sha256(bytes);
+  return contentSha256;
 }
 
 async function findPromotedResearchAsset(
