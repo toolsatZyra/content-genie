@@ -887,3 +887,54 @@ identity, forbids invented proper names or iconography, and does not block only
 because the immutable script is less specific. The next live run must prove
 provider jobs are dispatched from that rule before this recovery is called
 complete.
+
+## 18. 2026-07-20 Ep 1 production dispatch proof
+
+The live recovery is now past the World blocker. The immutable Episode, Series,
+configuration candidate, and script revision remain:
+
+- Episode `6f6bdc23-8e54-4f41-b693-3f2e0a0d6852` (`Ep 1`)
+- Series `e8f6f4cf-4484-465b-8e85-fcdd8d962536`
+- configuration `830c078b-4aa3-4c02-a066-83f508ba8a49`
+- script revision `edeb0410-9720-479c-958d-a2294fdac72f`
+
+The live attempts exposed and closed four additional transaction/retry gaps:
+
+- `phase3_mvp_claimed_provider_authority` permits the compact inline worker to
+  consume exact provider authority while its live fenced attempt is `claimed`;
+  all quote, grant, manifest, expiry, epoch, and fence checks remain intact.
+- `phase3_preflight_world_intent_renewal` aligns the user-facing `Retry World`
+  route with the configuration ledger so an exact USD 5.00 bounded intent can
+  be renewed from `preflight` as well as `world_design`.
+- `phase3_claimed_preflight_dispatch_resume` lets the durable production worker
+  resume the same still-live claimed attempt after a local/inline worker exits.
+  It requeues only the mutable run-control row and refuses expired or mismatched
+  leases; it does not mutate the attempt, preparation, jobs, or script.
+- `phase3_world_preparation_total_disambiguation` qualifies the quote's
+  `total_minor` column in the immutable preparation replay branch. The prior
+  unqualified name collided with the PL/pgSQL variable and explained the
+  generic World ledger error before provider claims.
+
+Preview and production both have all four migrations. A rollback-only
+production probe proved the exact first job can be claimed and its bounded MVP
+provider authority consumed without committing a request. The final clean run
+`b92734c4-285a-45ba-99de-eeebb9635200` then completed the same narration-only
+extraction and prepared nine visual anchors: six character forms, two
+locations, and the script-faithful generic Shiva bow prop. It has no blocking
+ambiguity and does not invent the proper name Pinaka.
+
+The production-secret worker replayed the nine reserved claims and submitted
+them once. Current authoritative evidence is:
+
+- preflight run, root stage, and attempt: `waiting_external`
+- exact attempt lease: `consumed`
+- World jobs: 9 `waiting_output`
+- provider requests: 9 `accepted`
+- user-visible progress: 9 `generating` items plus the identified system row
+- primary requested amount: 9 x USD 0.12 = USD 1.08, within the unchanged
+  USD 3.84 World partition and USD 5.00 total developer-MVP ceiling
+
+The owner can refresh the deployed Episode and return to World; the Realtime
+progress rows now describe actual provider work. Do not call the whole project,
+Phase 2, Phase 3, or Phase 4 complete from this recovery. Secure ingest,
+candidate review/World Lock, and the remaining phase gates still apply.
