@@ -122,6 +122,10 @@ function successfulResults(
       data: null,
       error: null,
     },
+    world_build_progress_items: {
+      data: [],
+      error: null,
+    },
   };
 }
 
@@ -181,7 +185,7 @@ describe("the creation projection query", () => {
         quote: null,
         sourceReview: null,
       },
-      world: { characters: [], locations: [], referencePack: null },
+      world: { characters: [], locations: [], progress: [], referencePack: null },
     });
   });
 

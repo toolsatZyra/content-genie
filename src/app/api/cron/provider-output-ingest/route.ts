@@ -149,6 +149,7 @@ export async function GET(request: Request) {
         await failProviderOutputCandidate({
           candidateId: claim.candidateId,
           leaseToken: claim.leaseToken,
+          providerRequestId: claim.providerRequestId,
           retryable: disposition.retryable,
           safeErrorClass: disposition.safeClass,
         });

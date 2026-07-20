@@ -337,6 +337,13 @@ test("Phase 1 fixture organizes concurrent Episodes, Series and Monica work", as
     page.getByRole("heading", { level: 1, name: "Your films are in motion." }),
   ).toBeVisible();
   await expect(page.getByText("1 need you")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Series", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".atrium-series-grid > button")).toHaveCount(2);
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Episodes in progress" }),
+  ).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -518,8 +525,12 @@ test("composer isolates drafts by mode and Series and clears a committed draft",
   page,
 }) => {
   const projection = deterministicStudioProjection();
+  const createdEpisodeId = "10000000-0000-4000-8000-000000000099";
   await page.route("**/api/commands", async (route) => {
-    await route.fulfill({ json: { ok: true }, status: 200 });
+    await route.fulfill({
+      json: { ok: true, result: { episodeId: createdEpisodeId } },
+      status: 200,
+    });
   });
   await page.goto("/?fixture=phase1", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#main-content")).toHaveAttribute("data-hydrated", "true");
@@ -527,19 +538,10 @@ test("composer isolates drafts by mode and Series and clears a committed draft",
   await page.getByRole("button", { name: "Create Episode" }).click();
   let composer = page.getByRole("dialog", { name: "Create in Genie" });
   await composer.getByLabel("Episode title").fill("Draft for the first Series");
-  await composer.getByLabel("Story note").fill("First Series note");
   await composer.getByLabel("Series").selectOption(projection.series[1]!.id);
   await expect(composer.getByLabel("Episode title")).toHaveValue("");
-  await expect(composer.getByLabel("Story note")).toHaveValue("");
   await composer.getByLabel("Episode title").fill("Committed Episode");
-  await composer.getByLabel("Story note").fill("Committed note");
-  await composer.getByRole("button", { name: "Create Episode" }).click();
-  await expect(composer).toBeHidden();
-
-  await page.getByRole("button", { name: "Create Episode" }).click();
-  composer = page.getByRole("dialog", { name: "Create in Genie" });
-  await expect(composer.getByLabel("Episode title")).toHaveValue("");
-  await expect(composer.getByLabel("Story note")).toHaveValue("");
+  await expect(composer.getByLabel("Story note")).toHaveCount(0);
   await composer.getByRole("button", { name: "Close composer" }).click();
 
   await page.getByRole("button", { name: "Series", exact: true }).click();
@@ -547,6 +549,17 @@ test("composer isolates drafts by mode and Series and clears a committed draft",
   composer = page.getByRole("dialog", { name: "Create in Genie" });
   await expect(composer.getByLabel("Series title")).toHaveValue("");
   await expect(composer.getByLabel("World note")).toHaveValue("");
+  await composer.getByRole("button", { name: "Close composer" }).click();
+
+  await page.getByRole("button", { name: "Atrium", exact: true }).click();
+  await page.getByRole("button", { name: "Create Episode" }).click();
+  composer = page.getByRole("dialog", { name: "Create in Genie" });
+  await composer.getByLabel("Episode title").fill("Committed Episode");
+  const creationNavigation = page.waitForRequest((request) =>
+    request.url().includes(`/episodes/${createdEpisodeId}/create`),
+  );
+  await composer.getByRole("button", { name: "Create Episode" }).click();
+  await expect(creationNavigation).resolves.toBeDefined();
 });
 
 test("Phase 1 future and malformed lifecycle projections remain read-only", async ({

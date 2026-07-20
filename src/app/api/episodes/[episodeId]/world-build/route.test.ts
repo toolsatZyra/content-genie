@@ -4,9 +4,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   adminRpc: vi.fn(),
   adminSingle: vi.fn(),
+  advance: vi.fn(),
+  beginProgress: vi.fn(),
   getUser: vi.fn(),
   scopeMaybeSingle: vi.fn(),
   userRpc: vi.fn(),
+}));
+vi.mock("@/server/mvp-preflight-runner", () => ({
+  advanceNextMvpPreflight: mocks.advance,
+}));
+vi.mock("@/server/world-build-progress", () => ({
+  beginWorldBuildProgress: mocks.beginProgress,
 }));
 vi.mock("@/config/server-env", () => ({
   getServerEnvironment: () => ({
@@ -84,6 +92,8 @@ describe("world-build dispatch route", () => {
       },
       error: null,
     });
+    mocks.advance.mockResolvedValue({ advanced: false });
+    mocks.beginProgress.mockResolvedValue(undefined);
     mocks.userRpc.mockResolvedValue({
       data: {
         hardCeilingMinor: 500,
@@ -186,7 +196,7 @@ describe("world-build dispatch route", () => {
     expect(unconfirmed.status).toBe(403);
   });
 
-  it("fails closed when the actor has not elevated to AAL2", async () => {
+  it("fails closed when the bounded World authority is denied", async () => {
     mocks.userRpc.mockResolvedValueOnce({
       data: null,
       error: { code: "42501", message: "aal2 required" },
@@ -196,7 +206,7 @@ describe("world-build dispatch route", () => {
     });
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({
-      code: "AAL2_REQUIRED",
+      code: "WORLD_AUTHORITY_DENIED",
       ok: false,
     });
     expect(mocks.adminRpc).not.toHaveBeenCalled();

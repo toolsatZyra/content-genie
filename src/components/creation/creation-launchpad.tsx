@@ -81,7 +81,7 @@ export function CreationLaunchpad({
           className="creation-primary launchpad-production-link"
           href={`/episodes/${episodeId}/production`}
         >
-          Open production room <span aria-hidden="true">→</span>
+          Production
         </Link>
       </section>
     );

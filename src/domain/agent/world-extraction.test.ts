@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   compileCharacterAnchorPrompt,
   compileLocationAnchorPrompt,
+  compilePropAnchorPrompt,
   parseWorldExtraction,
   WORLD_EXTRACTION_SCHEMA_VERSION,
   WorldExtractionError,
@@ -57,6 +58,22 @@ const extraction = {
       timeAndAtmosphere: "still predawn air with subtle drifting mist",
     },
   ],
+  props: [
+    {
+      cameraAngle: "slightly low three-quarter object view",
+      canonicalKey: "shivas-pinaka-bow",
+      continuityDirectives: ["same bow silhouette", "same material and carvings"],
+      continuityRole: "primary",
+      culturalNotes: ["Treat Pinaka as Shiva's sacred bow, never generic weaponry."],
+      displayName: "Shiva's Pinaka bow",
+      environment: "neutral dark studio field",
+      framing: "complete isolated object reference",
+      lightingMode: "soft museum-style rim and fill light",
+      materialAndFinish: "ancient dark wood, sacred metal fittings",
+      sacredOrFunctionalDetails: ["distinctive recurved limbs", "Shaiva carvings"],
+      visualDescription: "monumental sacred bow with an unmistakable divine profile",
+    },
+  ],
   schemaVersion: WORLD_EXTRACTION_SCHEMA_VERSION,
   scopeSignals: {
     containsDialogue: false,
@@ -107,6 +124,15 @@ describe("world extraction contract", () => {
     expect(
       compileLocationAnchorPrompt(parsed.locations[0]!, look, true).prompt,
     ).toContain(look.lockedLookBlock);
+  });
+
+  it("extracts a story-significant sacred prop and compiles an isolated continuity anchor", () => {
+    const parsed = parseWorldExtraction(extraction);
+    const look = findLook(DEFAULT_LOOK_ID)!;
+    const prompt = compilePropAnchorPrompt(parsed.props[0]!, look);
+    expect(prompt.prompt).toContain("Shiva's Pinaka bow");
+    expect(prompt.prompt).toContain("without a person holding it");
+    expect(prompt.prompt.split("\n\n")[1]).toBe(look.lockedLookBlock);
   });
 
   it("requires public photographic evidence for named festivals and preserves people", () => {

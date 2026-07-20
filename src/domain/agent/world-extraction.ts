@@ -1,6 +1,6 @@
 import { compileImagePrompt, type LookDefinition } from "@/domain/look/look-registry";
 
-export const WORLD_EXTRACTION_SCHEMA_VERSION = "genie.world-extraction.v1";
+export const WORLD_EXTRACTION_SCHEMA_VERSION = "genie.world-extraction.v2";
 
 type ContinuityRole = "incidental" | "primary" | "supporting";
 export type RealWorldSubjectKind = "festival" | "none" | "ritual" | "temple";
@@ -48,16 +48,32 @@ export type ExtractedLocation = Readonly<{
   timeAndAtmosphere: string;
 }>;
 
+export type ExtractedProp = Readonly<{
+  cameraAngle: string;
+  canonicalKey: string;
+  continuityDirectives: readonly string[];
+  continuityRole: ContinuityRole;
+  culturalNotes: readonly string[];
+  displayName: string;
+  environment: string;
+  framing: string;
+  lightingMode: string;
+  materialAndFinish: string;
+  sacredOrFunctionalDetails: readonly string[];
+  visualDescription: string;
+}>;
+
 export type WorldExtraction = Readonly<{
   ambiguities: readonly Readonly<{
     affectedKeys: readonly string[];
     blocksGeneration: boolean;
     description: string;
-    kind: "cultural" | "identity" | "location" | "scope";
+    kind: "cultural" | "identity" | "location" | "prop" | "scope";
   }>[];
   characters: readonly ExtractedCharacter[];
   culturalReviewNotes: readonly string[];
   locations: readonly ExtractedLocation[];
+  props: readonly ExtractedProp[];
   schemaVersion: typeof WORLD_EXTRACTION_SCHEMA_VERSION;
   scopeSignals: Readonly<{
     containsDialogue: boolean;
@@ -299,12 +315,64 @@ function parseLocation(value: unknown, index: number): ExtractedLocation {
   });
 }
 
+function parseProp(value: unknown, index: number): ExtractedProp {
+  const label = `props[${index}]`;
+  const keys = [
+    "cameraAngle",
+    "canonicalKey",
+    "continuityDirectives",
+    "continuityRole",
+    "culturalNotes",
+    "displayName",
+    "environment",
+    "framing",
+    "lightingMode",
+    "materialAndFinish",
+    "sacredOrFunctionalDetails",
+    "visualDescription",
+  ] as const;
+  if (!exactObject(value, keys)) {
+    throw new WorldExtractionError(`${label} is not exact.`);
+  }
+  const input = value as Record<string, unknown>;
+  if (!["incidental", "primary", "supporting"].includes(String(input.continuityRole))) {
+    throw new WorldExtractionError(`${label}.continuityRole is invalid.`);
+  }
+  return Object.freeze({
+    cameraAngle: text(input.cameraAngle, `${label}.cameraAngle`, 240),
+    canonicalKey: key(input.canonicalKey, `${label}.canonicalKey`),
+    continuityDirectives: textArray(
+      input.continuityDirectives,
+      `${label}.continuityDirectives`,
+      12,
+    ),
+    continuityRole: input.continuityRole as ContinuityRole,
+    culturalNotes: textArray(input.culturalNotes, `${label}.culturalNotes`, 12),
+    displayName: text(input.displayName, `${label}.displayName`, 240),
+    environment: text(input.environment, `${label}.environment`, 400),
+    framing: text(input.framing, `${label}.framing`, 240),
+    lightingMode: text(input.lightingMode, `${label}.lightingMode`, 240),
+    materialAndFinish: text(input.materialAndFinish, `${label}.materialAndFinish`, 800),
+    sacredOrFunctionalDetails: textArray(
+      input.sacredOrFunctionalDetails,
+      `${label}.sacredOrFunctionalDetails`,
+      16,
+    ),
+    visualDescription: text(
+      input.visualDescription,
+      `${label}.visualDescription`,
+      1_000,
+    ),
+  });
+}
+
 export function parseWorldExtraction(value: unknown): WorldExtraction {
   const keys = [
     "ambiguities",
     "characters",
     "culturalReviewNotes",
     "locations",
+    "props",
     "schemaVersion",
     "scopeSignals",
     "storyContext",
@@ -330,11 +398,16 @@ export function parseWorldExtraction(value: unknown): WorldExtraction {
   ) {
     throw new WorldExtractionError("World extraction locations are invalid.");
   }
+  if (!Array.isArray(input.props) || input.props.length > 12) {
+    throw new WorldExtractionError("World extraction props are invalid.");
+  }
   const characters = input.characters.map(parseCharacter);
   const locations = input.locations.map(parseLocation);
+  const props = input.props.map(parseProp);
   const worldKeys = [
     ...characters.map((item) => item.canonicalKey),
     ...locations.map((item) => item.canonicalKey),
+    ...props.map((item) => item.canonicalKey),
   ];
   if (new Set(worldKeys).size !== worldKeys.length) {
     throw new WorldExtractionError("World extraction contains duplicate keys.");
@@ -362,7 +435,11 @@ export function parseWorldExtraction(value: unknown): WorldExtraction {
       throw new WorldExtractionError(`${label} is not exact.`);
     }
     const record = item as Record<string, unknown>;
-    if (!["cultural", "identity", "location", "scope"].includes(String(record.kind))) {
+    if (
+      !["cultural", "identity", "location", "prop", "scope"].includes(
+        String(record.kind),
+      )
+    ) {
       throw new WorldExtractionError(`${label}.kind is invalid.`);
     }
     const affectedKeys = textArray(
@@ -378,7 +455,7 @@ export function parseWorldExtraction(value: unknown): WorldExtraction {
       affectedKeys,
       blocksGeneration: boolean(record.blocksGeneration, `${label}.blocksGeneration`),
       description: text(record.description, `${label}.description`, 1_000),
-      kind: record.kind as "cultural" | "identity" | "location" | "scope",
+      kind: record.kind as "cultural" | "identity" | "location" | "prop" | "scope",
     });
   });
   return Object.freeze({
@@ -391,6 +468,7 @@ export function parseWorldExtraction(value: unknown): WorldExtraction {
       1_000,
     ),
     locations: Object.freeze(locations),
+    props: Object.freeze(props),
     schemaVersion: WORLD_EXTRACTION_SCHEMA_VERSION,
     scopeSignals: Object.freeze({
       containsDialogue: boolean(
@@ -464,6 +542,26 @@ export function compileLocationAnchorPrompt(
         ? `Use the supplied public photographs as factual visual evidence for the documented ${location.realWorldSubjectKind}; preserve authentic setting, actions, dress, objects, and spatial relationships while avoiding identifiable-face invention. `
         : "No people. ") +
       `Respectful Hindu devotional-film depiction, historically coherent, no typography, no watermark.`,
+  );
+  return Object.freeze({
+    negativePrompt: look.negativePolicy.promptTail,
+    prompt: compileImagePrompt(frame, look),
+  });
+}
+
+export function compilePropAnchorPrompt(
+  prop: ExtractedProp,
+  look: LookDefinition,
+): Readonly<{ negativePrompt: string; prompt: string }> {
+  const frame = promptText(
+    `Vertical 9:16 canonical prop anchor for ${prop.displayName}. ` +
+      `Object identity: ${prop.visualDescription}. Materials and finish: ${prop.materialAndFinish}. ` +
+      `Sacred or functional details: ${prop.sacredOrFunctionalDetails.join("; ") || "none specified"}. ` +
+      `Environment: ${prop.environment}. Framing: ${prop.framing}. Camera: ${prop.cameraAngle}. ` +
+      `Lighting: ${prop.lightingMode}. Continuity locks: ` +
+      `${prop.continuityDirectives.join("; ") || "preserve silhouette, scale, material and ornament exactly"}. ` +
+      `Show the object clearly without a person holding it. Respectful Hindu devotional-film depiction, ` +
+      `historically coherent, anatomically irrelevant, no typography, no watermark.`,
   );
   return Object.freeze({
     negativePrompt: look.negativePolicy.promptTail,

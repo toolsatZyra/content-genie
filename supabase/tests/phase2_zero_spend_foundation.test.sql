@@ -654,9 +654,12 @@ select is(
     'command_offboard_member',
     'command_prepare_world_upload',
     'command_register_broker_client',
+    'command_retry_mvp_production',
+    'command_review_mvp_master',
     'command_revoke_broker_client_key',
     'command_select_episode_look',
     'command_select_episode_voice',
+    'command_start_mvp_production',
     'command_submit_source_review',
     'prepare_first_episode_world_lock'
   ]::text[],

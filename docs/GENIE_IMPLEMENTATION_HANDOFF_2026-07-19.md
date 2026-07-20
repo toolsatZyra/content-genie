@@ -743,3 +743,58 @@ verified, a real Episode works end to end with complete lineage, and the
 remaining owner-supplied pilot/calibration work is clearly separated and ready.
 
 Until that evidence exists, keep the goal active and continue autonomously.
+
+## 16. 2026-07-20 developer-MVP World and studio release candidate
+
+Live state supersedes several older stopping-point statements above. Production
+already contains the compact Phase 2 MVP schema through the three-second visual
+coverage work; do not rely on the earlier claim that production has no Phase 2
+migrations. The owner explicitly prioritized a usable internal MVP and asked
+that routine deterministic checks be batched rather than expanded without a
+specific risk.
+
+The current candidate adds the following coherent product slice:
+
+- Atrium now exposes both the Series -> Episode hierarchy and an across-Series
+  queue of Episodes still in progress. Creating a Series opens that Series;
+  creating an Episode goes directly to its Script chamber. The unexplained
+  Episode story note is removed.
+- Login and creation surfaces accurately present fifteen specialist AI agents
+  coordinated by Monica. Every creation chamber has a compact current-agent
+  indicator. World shows real, database-backed handoffs among extraction,
+  research, prompting, provider queue/generation, secure ingest, review, and
+  failure; there are no fabricated percentages or ETAs.
+- World extraction schema v2 detects character forms, locations, and up to
+  twelve story-significant props such as Shiva's Pinaka. Real temples retain
+  the evidence-bound public-reference research path. Generated prop/location
+  anchors share the existing secure provider and quarantine boundary.
+- The exact USD 5.00 developer-MVP pre-lock pass may be authorized from an
+  active AAL1 or AAL2 session. Its existing USD 3.84 World plus USD 1.16
+  narration partition is unchanged. World Lock, production authority, cultural
+  authority, and higher-consequence commands remain AAL2-only. Micro authority
+  provenance is rebound transactionally from the exact spend intent named by
+  each World or narration preparation; no global inference trigger remains.
+- Transient success notices dismiss after one second. Rejected and unconfirmed
+  outcomes persist until dismissal or authoritative reconciliation.
+
+Preview `iuzijmzcimtwyowhwinu` has migrations
+`phase3_world_progress_props_and_mvp_authority` and
+`phase3_world_authority_and_progress_review_fixes`. The progress table forces
+RLS, is select-only for active members, and is in the Realtime publication.
+Live verification reports both exact-intent binding triggers present, the old
+global trigger absent, and zero mismatched World/narration authorizations.
+
+One context-minimized independent review reported two P1 and three P2 findings:
+broad AAL inference, terminal ingest progress, provider-queue wording, toast
+error persistence, and a false home empty state. All five are fixed. The
+affected frozen evidence is green: type checking; lint; 84 unit files / 498
+tests; integration 5/5 with one live scanner test intentionally skipped; the
+three focused browser journeys; security; bundle scan (70 browser files, 2,142
+build files); RLS/policy static checks; canary production build; and preview
+pgTAP at 178/178, 85/85, 57/57, and 45/45. The pgTAP authenticated-command
+allowlist now includes the already deployed compact MVP production commands.
+
+At the time this section was written, production migration, explicit GitHub
+push, automatic Vercel deployment, and post-deploy live Episode proof remained
+the immediate release steps. The larger Phase 3 and Phase 4 roadmap is still
+active and must not be called complete from this MVP slice.

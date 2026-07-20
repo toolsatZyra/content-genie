@@ -19,6 +19,10 @@ import {
   PreflightPlanAgentError,
 } from "@/server/preflight-plan-agent";
 import { ensureProductionQuote, ProductionQuoteError } from "@/server/production-quote";
+import {
+  failWorldBuildProgress,
+  projectWorldExtractionProgress,
+} from "@/server/world-build-progress";
 
 export type ClassifiedPreflightControlFailure = Readonly<{
   retryable: boolean;
@@ -173,6 +177,12 @@ export async function executePreflightControl(input: {
         providerResponseId: generated!.responseId,
         scriptSha256: executionInput.rawScriptSha256,
       });
+  await projectWorldExtractionProgress({
+    configurationCandidateId: executionInput.configurationCandidateId,
+    extraction: extracted,
+    preflightRunId: input.envelope.preflightRunId,
+    workspaceId: executionInput.workspaceId,
+  });
   const blockingAmbiguities = extracted.ambiguities.filter(
     ({ blocksGeneration }) => blocksGeneration,
   ).length;
@@ -182,11 +192,21 @@ export async function executePreflightControl(input: {
     !extracted.scopeSignals.requiresLipSync;
   const anchorCount =
     extracted.characters.reduce((sum, character) => sum + character.forms.length, 0) +
-    extracted.locations.length;
+    extracted.locations.length +
+    extracted.props.length;
   const namedTempleResearchRequired = extracted.locations.some(
     ({ researchRequired }) => researchRequired,
   );
   if (blockingAmbiguities > 0 || !launchScopePass || anchorCount > 32) {
+    await failWorldBuildProgress({
+      detail:
+        blockingAmbiguities > 0
+          ? "World generation needs clarification before images can be created"
+          : anchorCount > 32
+            ? "The script exceeds the 32-anchor MVP limit"
+            : "The script is outside the narration-only launch scope",
+      preflightRunId: input.envelope.preflightRunId,
+    });
     const result = await recordPreflightControlOutput({
       envelope: input.envelope,
       output: {
@@ -197,6 +217,7 @@ export async function executePreflightControl(input: {
         extractionResultId: recorded.resultId,
         launchScopePass,
         locationCount: extracted.locations.length,
+        propCount: extracted.props.length,
         namedTempleResearchRequired,
         schemaVersion: "genie.world-extraction-output.v1",
         worldGenerationBlocked: true,

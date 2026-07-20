@@ -12,6 +12,7 @@ import {
 import type {
   CreationWorldCharacter,
   CreationWorldLocation,
+  CreationWorldProgressItem,
   CreationWorldProjection,
   WorldSelectionState,
 } from "@/domain/creation-readiness";
@@ -25,11 +26,53 @@ interface WorldStudioProps {
   readonly canEdit: boolean;
   readonly onAccept: (entity: WorldEntity) => void;
   readonly onContinue: () => void;
+  readonly onStart: () => void;
   readonly onRegenerate: (entity: WorldEntity, revisedPromptText: string) => void;
   readonly onUpload: (entity: WorldEntity, file: File) => void;
   readonly projection: CreationWorldProjection;
   readonly stageHeadingRef: RefObject<HTMLHeadingElement | null>;
   readonly working: boolean;
+}
+
+const ACTIVE_PROGRESS_STATES = new Set([
+  "extracting",
+  "identified",
+  "researching",
+  "prompted",
+  "dispatched",
+  "generating",
+  "secure_ingest",
+]);
+
+function progressLabel(item: CreationWorldProgressItem): string {
+  switch (item.state) {
+    case "extracting":
+      return "Reading script";
+    case "identified":
+      return "Identified";
+    case "researching":
+      return "Researching references";
+    case "prompted":
+      return "Prompt ready";
+    case "dispatched":
+      return "Sent to Nano Banana";
+    case "generating":
+      return "Generating image";
+    case "secure_ingest":
+      return "Securing result";
+    case "review_ready":
+      return "Ready for review";
+    case "failed":
+      return "Needs attention";
+  }
+}
+
+function progressStep(state: CreationWorldProgressItem["state"]): number {
+  if (state === "extracting") return 0;
+  if (["identified", "researching", "prompted"].includes(state)) return 1;
+  if (["dispatched", "generating"].includes(state)) return 2;
+  if (state === "secure_ingest") return 3;
+  return 4;
 }
 
 function stateLabel(state: WorldSelectionState): string {
@@ -59,6 +102,7 @@ export function WorldStudio({
   canEdit,
   onAccept,
   onContinue,
+  onStart,
   onRegenerate,
   onUpload,
   projection,
@@ -70,6 +114,7 @@ export function WorldStudio({
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
   const [uploadTarget, setUploadTarget] = useState<WorldEntity | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const allEntities = useMemo<readonly WorldEntity[]>(
     () => [
       ...projection.characters.map((item) => ({
@@ -86,6 +131,66 @@ export function WorldStudio({
   const acceptedCount = allEntities.filter(
     ({ item }) => item.state === "accepted",
   ).length;
+  const completedWorldEntityIds = useMemo(
+    () =>
+      new Set(
+        allEntities.flatMap((entity) =>
+          entity.entityKind === "character"
+            ? [entity.item.entityId, entity.item.formId]
+            : [entity.item.entityId],
+        ),
+      ),
+    [allEntities],
+  );
+  const entityProgress = projection.progress.filter(
+    (item) =>
+      item.itemKind !== "system" &&
+      (item.worldEntityId === null || !completedWorldEntityIds.has(item.worldEntityId)),
+  );
+  const systemProgress = projection.progress.find((item) => item.itemKind === "system");
+  const activeProgress = projection.progress.filter(
+    (item) =>
+      ACTIVE_PROGRESS_STATES.has(item.state) &&
+      (item.itemKind !== "system" || item.state === "extracting"),
+  );
+  const focusedProgress =
+    activeProgress.find((item) => item.state === "secure_ingest") ??
+    activeProgress.find((item) => item.state === "generating") ??
+    activeProgress.find((item) => item.state === "dispatched") ??
+    activeProgress.find((item) => item.state === "prompted") ??
+    activeProgress.find((item) => item.state === "researching") ??
+    activeProgress.find((item) => item.state === "extracting") ??
+    activeProgress[0];
+  const focusedAgent = !focusedProgress
+    ? "Monica · Quality Director"
+    : focusedProgress.state === "researching"
+      ? "Source Keeper · Research Agent"
+      : focusedProgress.state === "prompted"
+        ? "Prompt Engine · Visual Prompt Agent"
+        : focusedProgress.state === "dispatched"
+          ? "Provider Queue · Nano Banana request sent"
+          : focusedProgress.state === "generating"
+            ? "Nano Banana · Image Generation AI"
+            : focusedProgress.state === "secure_ingest"
+              ? "Secure Media Worker"
+              : "Casting Director · World Agent";
+  const focusedSigil = focusedAgent.startsWith("Source")
+    ? "S"
+    : focusedAgent.startsWith("Prompt")
+      ? "P"
+      : focusedAgent.startsWith("Nano")
+        ? "N"
+        : focusedAgent.startsWith("Secure")
+          ? "S"
+          : focusedAgent.startsWith("Casting")
+            ? "C"
+            : "M";
+  const latestUpdate = projection.progress.reduce(
+    (latest, item) => Math.max(latest, Date.parse(item.updatedAt)),
+    0,
+  );
+  const stalled = activeProgress.length > 0 && now - latestUpdate > 90_000;
+  const visibleEntityCount = allEntities.length + entityProgress.length;
   const worldReady =
     allEntities.length > 0 &&
     acceptedCount === allEntities.length &&
@@ -95,6 +200,12 @@ export function WorldStudio({
     if (!editing) return;
     requestAnimationFrame(() => editorRef.current?.focus());
   }, [editing]);
+
+  useEffect(() => {
+    if (activeProgress.length === 0) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, [activeProgress.length]);
 
   function openEditor(entity: WorldEntity): void {
     setComposition(promptParts(entity.item.promptText).composition);
@@ -130,31 +241,98 @@ export function WorldStudio({
         </div>
         <div
           className="world-progress"
-          aria-label={`${acceptedCount} of ${allEntities.length} world anchors accepted`}
+          aria-label={`${acceptedCount} of ${visibleEntityCount} world anchors accepted`}
         >
           <strong>{acceptedCount.toString().padStart(2, "0")}</strong>
-          <span>of {allEntities.length.toString().padStart(2, "0")} anchored</span>
+          <span>of {visibleEntityCount.toString().padStart(2, "0")} anchored</span>
         </div>
       </header>
 
-      {allEntities.length === 0 ? (
+      {projection.progress.length > 0 ? (
+        <section className="world-workstream" aria-live="polite">
+          <div className="monica-orbit is-working" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+            <span>{focusedSigil}</span>
+          </div>
+          <div className="world-workstream-copy">
+            <small>{focusedAgent}</small>
+            <h2>
+              {focusedProgress
+                ? `${progressLabel(focusedProgress)} · ${focusedProgress.displayName}`
+                : (systemProgress?.displayName ?? "Building the visual world")}
+            </h2>
+            <p>
+              {focusedProgress?.safeDetail ??
+                systemProgress?.safeDetail ??
+                "The secure agentic AI crew is working."}
+            </p>
+            {stalled ? (
+              <p className="world-stalled" role="status">
+                This is taking longer than usual. Genie is still reconciling the run;
+                you can leave this Episode and return without losing work.
+              </p>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      {entityProgress.length > 0 ? (
+        <div className="world-progress-grid">
+          {entityProgress.map((item) => {
+            const step = progressStep(item.state);
+            return (
+              <article className={`world-progress-card is-${item.state}`} key={item.id}>
+                <header>
+                  <span>{item.itemKind}</span>
+                  <strong>{progressLabel(item)}</strong>
+                </header>
+                <h2>{item.displayName}</h2>
+                <p>{item.safeDetail}</p>
+                {item.promptText ? <blockquote>{item.promptText}</blockquote> : null}
+                <ol aria-label={`Progress for ${item.displayName}`}>
+                  {["Detected", "Prompt", "Generate", "Secure", "Review"].map(
+                    (label, index) => (
+                      <li className={index <= step ? "is-complete" : ""} key={label}>
+                        <i aria-hidden="true" />
+                        <span>{label}</span>
+                      </li>
+                    ),
+                  )}
+                </ol>
+              </article>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {allEntities.length === 0 && projection.progress.length === 0 ? (
         <div className="world-empty">
           <div className="monica-orbit" aria-hidden="true">
             <i />
             <i />
             <i />
-            <span>M</span>
+            <span>C</span>
           </div>
           <div>
-            <small>Monica · Casting Director</small>
+            <small>Casting Director · World Agent</small>
             <h2>The world is waiting for its first authenticated candidates.</h2>
             <p>
-              Generation remains fail-closed until the provider capability and secure
-              ingest workers return evidence-bound character and location anchors.
+              Genie will detect characters, locations and significant props, then show
+              each prompt and generation step here as it happens.
             </p>
+            <button
+              className="creation-primary"
+              disabled={!canEdit || working}
+              onClick={onStart}
+              type="button"
+            >
+              World
+            </button>
           </div>
         </div>
-      ) : (
+      ) : allEntities.length > 0 ? (
         <div className="world-constellation">
           {allEntities.map((entity, index) => {
             const item = entity.item;
@@ -162,6 +340,9 @@ export function WorldStudio({
               item.promptText,
             );
             const isCharacter = entity.entityKind === "character";
+            const isProp =
+              entity.entityKind === "location" &&
+              entity.item.worldObjectKind === "prop";
             return (
               <article
                 className={`world-card is-${item.state}${index % 3 === 1 ? " is-offset" : ""}`}
@@ -179,9 +360,11 @@ export function WorldStudio({
                   <small>
                     {entity.entityKind === "character"
                       ? "Character anchor"
-                      : entity.item.namedTemple
-                        ? "Verified temple world"
-                        : "Location anchor"}
+                      : isProp
+                        ? "Story prop anchor"
+                        : entity.item.namedTemple
+                          ? "Verified temple world"
+                          : "Location anchor"}
                   </small>
                 </div>
                 <div className="world-card-body">
@@ -250,7 +433,7 @@ export function WorldStudio({
             );
           })}
         </div>
-      )}
+      ) : null}
 
       <input
         accept="image/jpeg,image/png,image/webp"
@@ -281,7 +464,7 @@ export function WorldStudio({
           onClick={onContinue}
           type="button"
         >
-          Enter Monica’s preflight <span aria-hidden="true">→</span>
+          Preflight
         </button>
       </footer>
 

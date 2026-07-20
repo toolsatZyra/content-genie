@@ -199,7 +199,7 @@ export function AuthenticatedStudio({
     () => true,
     () => false,
   );
-  const [view, setView] = useState<StudioView>("atrium");
+  const [view, setView] = useState<StudioView>(initialSeriesId ? "series" : "atrium");
   const initialEpisode = projection.episodes.find(({ id }) => id === initialEpisodeId);
   const [selectedEpisodeId, setSelectedEpisodeId] = useState(
     initialEpisode?.id ?? projection.episodes[0]?.id ?? "",
@@ -265,10 +265,11 @@ export function AuthenticatedStudio({
     allEpisodes.find(({ id }) => id === selectedEpisodeId) ?? allEpisodes[0];
   const selectedSeries =
     allSeries.find(({ id }) => id === selectedSeriesId) ?? allSeries[0];
-  const visibleEpisodes =
-    view === "series" && selectedSeries
-      ? allEpisodes.filter(({ seriesId }) => seriesId === selectedSeries.id)
-      : allEpisodes;
+  const composerSeries = allSeries.find(({ id }) => id === composerSeriesId);
+  const inProgressEpisodes = allEpisodes.filter(
+    ({ workflowState }) =>
+      !["abandoned", "approved", "canceled", "delivered"].includes(workflowState),
+  );
   const search = useStudioSearch(query, projection.workspace.id);
   const searchLiveStatus = !query
     ? "Type at least two characters to search."
@@ -375,12 +376,26 @@ export function AuthenticatedStudio({
     try {
       if (composerMode === "series") {
         const title = String(form.get("title") ?? "");
-        await sendCommand("series.create", {
+        const response = await sendCommand("series.create", {
           description: String(form.get("description") ?? ""),
           slug: String(form.get("slug") ?? "") || slugify(title),
           title,
           workspaceId: projection.workspace.id,
         });
+        const seriesId =
+          response.result &&
+          typeof response.result === "object" &&
+          !Array.isArray(response.result) &&
+          typeof (response.result as Record<string, unknown>).seriesId === "string"
+            ? ((response.result as Record<string, unknown>).seriesId as string)
+            : null;
+        if (!seriesId) throw new Error("The new Series could not be opened.");
+        formElement.reset();
+        composerRef.current?.close();
+        setSelectedSeriesId(seriesId);
+        setView("series");
+        router.push(`/?seriesId=${encodeURIComponent(seriesId)}`);
+        return;
       } else {
         const seriesId = String(form.get("seriesId") ?? "");
         const series = allSeries.find(({ id }) => id === seriesId);
@@ -392,16 +407,27 @@ export function AuthenticatedStudio({
           );
           return;
         }
-        await sendCommand("episode.create", {
+        const response = await sendCommand("episode.create", {
           seriesId,
-          summary: String(form.get("summary") ?? ""),
+          summary: "",
           title: String(form.get("title") ?? ""),
           workspaceId: projection.workspace.id,
         });
+        const episodeId =
+          response.result &&
+          typeof response.result === "object" &&
+          !Array.isArray(response.result) &&
+          typeof (response.result as Record<string, unknown>).episodeId === "string"
+            ? ((response.result as Record<string, unknown>).episodeId as string)
+            : null;
+        if (!episodeId) throw new Error("The new Episode could not be opened.");
+        formElement.reset();
+        composerRef.current?.close();
+        router.push(
+          `/episodes/${encodeURIComponent(episodeId)}/create?seriesId=${encodeURIComponent(seriesId)}&episodeId=${encodeURIComponent(episodeId)}`,
+        );
+        return;
       }
-      formElement.reset();
-      composerRef.current?.close();
-      router.refresh();
     } catch (error) {
       setCommandStatus(
         error instanceof Error ? error.message : "The command was not committed.",
@@ -614,10 +640,20 @@ export function AuthenticatedStudio({
                 Open activity <span>→</span>
               </button>
             </section>
+            <SeriesShelf
+              episodes={allEpisodes}
+              onCreate={() => openComposer("series")}
+              onOpen={(seriesId) => {
+                setSelectedSeriesId(seriesId);
+                setView("series");
+              }}
+              series={allSeries}
+            />
             <div className="live-episode-layout">
               <EpisodeGallery
                 createKind={creatableSeries.length ? "episode" : "series"}
-                episodes={visibleEpisodes}
+                episodes={inProgressEpisodes}
+                hasEpisodes={allEpisodes.length > 0}
                 selectedId={selectedEpisode?.id ?? ""}
                 seriesById={seriesById}
                 onCreate={() =>
@@ -756,6 +792,11 @@ export function AuthenticatedStudio({
               ×
             </button>
           </header>
+          {composerMode === "episode" && composerSeries ? (
+            <p className="composer-context">
+              New Episode in <strong>{composerSeries.title}</strong>
+            </p>
+          ) : null}
           {composerMode === "episode" ? (
             <label>
               Series
@@ -798,17 +839,19 @@ export function AuthenticatedStudio({
               />
             </label>
           ) : null}
-          <label>
-            {composerMode === "series" ? "World note" : "Story note"}
-            <textarea
-              maxLength={4000}
-              name={composerMode === "series" ? "description" : "summary"}
-              rows={5}
-            />
-          </label>
+          {composerMode === "series" ? (
+            <label>
+              World note <span className="optional-label">Optional</span>
+              <textarea maxLength={4000} name="description" rows={4} />
+              <small>
+                A short creative premise for this Series. Episode scripts are added
+                separately and remain the production source of truth.
+              </small>
+            </label>
+          ) : null}
           <p>
             {composerMode === "episode"
-              ? "The script remains untouched. The next screen will begin immutable world setup."
+              ? "Next, add the exact narration script for this Episode."
               : "Future Episodes inherit this Series’ approved look and continuity."}
           </p>
           {commandStatus ? <p role="alert">{commandStatus}</p> : null}
@@ -838,9 +881,70 @@ export function AuthenticatedStudio({
   );
 }
 
+function SeriesShelf({
+  episodes,
+  onCreate,
+  onOpen,
+  series,
+}: Readonly<{
+  episodes: readonly EpisodeSummary[];
+  onCreate: () => void;
+  onOpen: (seriesId: string) => void;
+  series: readonly SeriesSummary[];
+}>) {
+  return (
+    <section className="atrium-series" aria-labelledby="atrium-series-heading">
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">Your studio hierarchy</span>
+          <h2 id="atrium-series-heading">Series</h2>
+        </div>
+        <button className="quiet-button" onClick={onCreate} type="button">
+          Create Series
+        </button>
+      </div>
+      {series.length > 0 ? (
+        <div className="atrium-series-grid">
+          {series.map((item) => {
+            const seriesEpisodes = episodes.filter(
+              ({ seriesId }) => seriesId === item.id,
+            );
+            const activeCount = seriesEpisodes.filter(
+              ({ workflowState }) =>
+                !["abandoned", "approved", "canceled", "delivered"].includes(
+                  workflowState,
+                ),
+            ).length;
+            return (
+              <button key={item.id} onClick={() => onOpen(item.id)} type="button">
+                <span aria-hidden="true">S</span>
+                <span>
+                  <small>Series</small>
+                  <strong>{item.title}</strong>
+                  <em>
+                    {seriesEpisodes.length}{" "}
+                    {seriesEpisodes.length === 1 ? "Episode" : "Episodes"}
+                    {activeCount > 0 ? ` · ${activeCount} in progress` : ""}
+                  </em>
+                </span>
+                <b aria-hidden="true">→</b>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="atrium-series-empty">
+          Create a Series to organize its Episodes, reusable world and continuity.
+        </p>
+      )}
+    </section>
+  );
+}
+
 function EpisodeGallery({
   createKind,
   episodes,
+  hasEpisodes,
   onCreate,
   onSelect,
   selectedId,
@@ -848,6 +952,7 @@ function EpisodeGallery({
 }: Readonly<{
   createKind: "episode" | "series";
   episodes: readonly EpisodeSummary[];
+  hasEpisodes: boolean;
   onCreate: () => void;
   onSelect: (id: string) => void;
   selectedId: string;
@@ -857,14 +962,20 @@ function EpisodeGallery({
     return (
       <section className="empty-film-strip">
         <span aria-hidden="true">✦</span>
-        <h2>The first frame is yours.</h2>
+        <h2>
+          {hasEpisodes ? "No Episodes are in progress." : "The first frame is yours."}
+        </h2>
         <p>
-          {createKind === "episode"
-            ? "Create an Episode and Genie will preserve its exact script as the production source of truth."
-            : "Create the first Series to establish the story world that its Episodes will inherit."}
+          {hasEpisodes
+            ? "Open a Series to revisit its completed Episodes, or begin a new Episode here."
+            : createKind === "episode"
+              ? "Create an Episode and Genie will preserve its exact script as the production source of truth."
+              : "Create the first Series to establish the story world that its Episodes will inherit."}
         </p>
         <button className="primary-button" onClick={onCreate} type="button">
-          Create the first {createKind === "episode" ? "Episode" : "Series"}
+          {hasEpisodes
+            ? "Create Episode"
+            : `Create the first ${createKind === "episode" ? "Episode" : "Series"}`}
         </button>
       </section>
     );
@@ -873,8 +984,8 @@ function EpisodeGallery({
     <section className="live-gallery" aria-labelledby="live-episodes-heading">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Concurrent productions</span>
-          <h2 id="live-episodes-heading">Episodes</h2>
+          <span className="eyebrow">Across every Series</span>
+          <h2 id="live-episodes-heading">Episodes in progress</h2>
         </div>
         <small>
           {episodes.length} {episodes.length === 1 ? "Episode" : "Episodes"} shown
@@ -1237,7 +1348,12 @@ function SeriesWorlds({
                     <span>
                       Episode {String(episode.episodeNumber).padStart(2, "0")}
                     </span>
-                    <strong>{episode.title}</strong>
+                    <Link
+                      href={`/episodes/${episode.id}/create?seriesId=${encodeURIComponent(selectedSeries.id)}&episodeId=${encodeURIComponent(episode.id)}`}
+                    >
+                      <strong>{episode.title}</strong>
+                      <span>Open Episode →</span>
+                    </Link>
                   </li>
                 ))}
               </ul>

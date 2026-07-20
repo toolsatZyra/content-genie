@@ -8,9 +8,17 @@ import {
 
 describe("creation readiness contract", () => {
   it("accepts the exact empty projection", () => {
-    expect(parseCreationReadinessProjection(emptyCreationReadinessProjection)).toEqual(
-      emptyCreationReadinessProjection,
-    );
+    const databaseWorld = {
+      characters: emptyCreationReadinessProjection.world.characters,
+      locations: emptyCreationReadinessProjection.world.locations,
+      referencePack: emptyCreationReadinessProjection.world.referencePack,
+    };
+    expect(
+      parseCreationReadinessProjection({
+        ...emptyCreationReadinessProjection,
+        world: databaseWorld,
+      }),
+    ).toEqual(emptyCreationReadinessProjection);
   });
 
   it.each([

@@ -24,6 +24,7 @@ import {
   quarantineImmediateProviderBytes,
   transitionProviderRequest,
 } from "@/server/provider-broker-ledger";
+import { failWorldBuildProgress } from "@/server/world-build-progress";
 
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -180,6 +181,12 @@ export async function advanceNextMvpPreflight(): Promise<
       safeErrorClass: classified?.safeErrorClass ?? "mvp-preflight-failed",
       taskId,
       triggerRunId,
+    }).catch(() => undefined);
+    await failWorldBuildProgress({
+      detail: classified?.retryable
+        ? "The worker paused safely and will retry"
+        : "World generation stopped safely and needs attention",
+      preflightRunId: run.id,
     }).catch(() => undefined);
     throw caught;
   }

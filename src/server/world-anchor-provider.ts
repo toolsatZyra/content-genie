@@ -7,6 +7,7 @@ import { getServerEnvironment } from "@/config/server-env";
 import {
   compileCharacterAnchorPrompt,
   compileLocationAnchorPrompt,
+  compilePropAnchorPrompt,
   type WorldExtraction,
 } from "@/domain/agent/world-extraction";
 import type { LookDefinition } from "@/domain/look/look-registry";
@@ -20,6 +21,7 @@ import {
   researchRealWorldSubject,
   type TempleResearchEvidence,
 } from "@/server/temple-research";
+import { worldProgressItemKey } from "@/server/world-build-progress";
 import type { PreflightTaskEnvelope } from "../../trigger/preflight-contract";
 
 const canarySummary = Object.freeze({
@@ -82,14 +84,6 @@ export function postgresJsonbText(value: unknown): string {
       .join(", ")}}`;
   }
   throw new WorldAnchorProviderError("World manifest is not JSON-compatible.");
-}
-
-function slotKey(prefix: "character" | "location", key: string): string {
-  const clean = key
-    .toLowerCase()
-    .replace(/[^a-z0-9_.-]/gu, "-")
-    .slice(0, 96);
-  return `${prefix}.${clean}.${sha256(`${prefix}:${key}`).slice(0, 12)}`;
 }
 
 async function rpc(name: string, parameters: Record<string, unknown>) {
@@ -255,7 +249,10 @@ function jobsForExtraction(input: {
       const formId = deterministicUuid(
         `series:${input.seriesId}:character:${character.canonicalKey}:form:${form.formKey}`,
       );
-      const slot = slotKey("character", `${character.canonicalKey}.${form.formKey}`);
+      const slot = worldProgressItemKey(
+        "character",
+        `${character.canonicalKey}.${form.formKey}`,
+      );
       const jobId = deterministicUuid(
         `run:${input.envelope.preflightRunId}:job:${slot}`,
       );
@@ -300,7 +297,7 @@ function jobsForExtraction(input: {
     const locationId = deterministicUuid(
       `series:${input.seriesId}:location:${location.canonicalKey}`,
     );
-    const slot = slotKey("location", location.canonicalKey);
+    const slot = worldProgressItemKey("location", location.canonicalKey);
     const jobId = deterministicUuid(`run:${input.envelope.preflightRunId}:job:${slot}`);
     const targetAssetId = deterministicUuid(`job:${jobId}:asset`);
     const templeEvidence = input.templeEvidenceByLocationKey.get(location.canonicalKey);
@@ -349,6 +346,47 @@ function jobsForExtraction(input: {
       worldManifestHash: sha256(postgresJsonbText(worldManifest)),
     });
   }
+  for (const prop of input.extraction.props) {
+    const locationKey = `prop.${prop.canonicalKey}`;
+    const locationId = deterministicUuid(
+      `series:${input.seriesId}:prop:${prop.canonicalKey}`,
+    );
+    const slot = worldProgressItemKey("prop", prop.canonicalKey);
+    const jobId = deterministicUuid(`run:${input.envelope.preflightRunId}:job:${slot}`);
+    const targetAssetId = deterministicUuid(`job:${jobId}:asset`);
+    const compiled = compilePropAnchorPrompt(prop, input.look);
+    const worldManifest = {
+      prop,
+      schemaVersion: "genie.prop-manifest.v1",
+      worldObjectKind: "prop",
+    };
+    jobs.push({
+      capabilityJti: deterministicUuid(`job:${jobId}:capability-jti`),
+      characterFormId: null,
+      characterId: null,
+      characterKey: null,
+      characterName: null,
+      entityKind: "location",
+      formKey: null,
+      formName: null,
+      jobId,
+      locationId,
+      locationKey,
+      locationName: prop.displayName,
+      namedTemple: false,
+      negativePromptText: compiled.negativePrompt,
+      operation: "gen_image",
+      promptText: compiled.prompt,
+      providerCapabilityId: input.generationCapabilityId,
+      providerPayload: providerPayload(compiled.prompt, targetAssetId),
+      realPlaceName: null,
+      slotKey: slot,
+      targetAssetId,
+      templeEvidenceSetHash: null,
+      worldManifest,
+      worldManifestHash: sha256(postgresJsonbText(worldManifest)),
+    });
+  }
   return Object.freeze(jobs);
 }
 
@@ -384,7 +422,9 @@ export async function prepareWorldAnchorProviderDispatches(
     input.extraction.characters.reduce(
       (sum, character) => sum + character.forms.length,
       0,
-    ) + input.extraction.locations.length;
+    ) +
+    input.extraction.locations.length +
+    input.extraction.props.length;
   if (anchorCount < 1 || anchorCount > 32) {
     throw new WorldAnchorProviderError(
       "World extraction exceeds the 32-anchor launch ceiling.",

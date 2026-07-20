@@ -44,6 +44,20 @@ function exactObject(value: unknown, keys: readonly string[]): value is object {
   );
 }
 
+async function markWorldProgressByProviderRequest(
+  providerRequestId: string,
+  state: "failed" | "review_ready" | "secure_ingest",
+  safeDetail: string,
+): Promise<void> {
+  const { error } = await createAdminSupabaseClient()
+    .from("world_build_progress_items")
+    .update({ safe_detail: safeDetail, state, updated_at: new Date().toISOString() })
+    .eq("provider_request_id", providerRequestId);
+  if (error) {
+    throw new ProviderBrokerLedgerError("World progress could not be reconciled.");
+  }
+}
+
 async function rpc(name: string, parameters: Record<string, unknown>) {
   const { data, error } = await createAdminSupabaseClient().rpc(name, parameters);
   if (error) {
@@ -434,6 +448,11 @@ export async function quarantineProviderOutputBytes(input: {
   remoteFetchRequestId: string;
   sha256: string;
 }): Promise<{ quarantineAssetVersionId: string; state: string }> {
+  await markWorldProgressByProviderRequest(
+    input.claim.providerRequestId,
+    "secure_ingest",
+    "Image returned; malware scan, metadata removal and safe re-encoding are running",
+  );
   const client = createAdminSupabaseClient();
   const quarantineAssetVersionId = randomUUID();
   const objectName = `${input.claim.workspaceId}/quarantine/${input.claim.targetAssetId}/${quarantineAssetVersionId}/source`;
@@ -607,6 +626,11 @@ export async function promoteProviderWorldAnchor(input: {
     ) {
       throw new ProviderBrokerLedgerError("Provider asset promotion is malformed.");
     }
+    await markWorldProgressByProviderRequest(
+      input.claim.providerRequestId,
+      "review_ready",
+      "Secure image is ready for your review",
+    );
     return Object.freeze({ assetVersionId, worldVersionId });
   } catch (error) {
     await client.storage
@@ -620,6 +644,7 @@ export async function promoteProviderWorldAnchor(input: {
 export async function failProviderOutputCandidate(input: {
   candidateId: string;
   leaseToken: string;
+  providerRequestId: string;
   retryable: boolean;
   safeErrorClass: string;
 }): Promise<void> {
@@ -634,6 +659,14 @@ export async function failProviderOutputCandidate(input: {
     (value as Record<string, unknown>).ok !== true
   ) {
     throw new ProviderBrokerLedgerError("Provider output failure result is malformed.");
+  }
+  const state = (value as Record<string, unknown>).state;
+  if (!input.retryable || state === "failed") {
+    await markWorldProgressByProviderRequest(
+      input.providerRequestId,
+      "failed",
+      "Secure ingest stopped safely. Retry this World image when you are ready.",
+    );
   }
 }
 

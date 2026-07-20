@@ -1654,6 +1654,11 @@ test.describe("Living Cinema creation flow", () => {
       page.getByRole("heading", { name: "Cast once. Keep forever." }),
     ).toBeFocused();
     await expect(page.locator(".world-card")).toHaveCount(2);
+    await expect(page.getByText("Shiva's Pinaka bow", { exact: true })).toBeVisible();
+    await expect(page.getByText("Nano Banana · Image Generation AI")).toBeVisible();
+    await expect(
+      page.getByRole("list", { name: /Progress for Shiva's Pinaka bow/ }),
+    ).toContainText("DetectedPromptGenerateSecureReview");
     await expect(page.getByText("Look tail cryptographically pinned")).toHaveCount(2);
     await page.getByRole("button", { name: "Accept anchor" }).click();
     await expect.poll(() => decisions.length).toBe(1);

@@ -59,13 +59,14 @@ export function AuthGateway({
         </div>
         <span className="eyebrow">The devotional film atelier</span>
         <h1 id="gateway-heading">
-          A whole cinema crew,
+          An agentic AI crew,
           <br />
           waiting inside.
         </h1>
         <p>
-          Script in. A cinematic Hindi devotional episode out. Monica guards every
-          frame, voice, note and cultural decision along the way.
+          Script in. A cinematic Hindi devotional episode out. Fifteen specialist AI
+          agents create it; Monica guards every frame, voice, note and cultural decision
+          along the way.
         </p>
         <div className="gateway-reel" aria-hidden="true">
           <span />

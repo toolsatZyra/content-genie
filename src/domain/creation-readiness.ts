@@ -34,11 +34,41 @@ export interface CreationWorldLocation {
   readonly selectionId: string;
   readonly state: WorldSelectionState;
   readonly templeEvidenceSetHash: string | null;
+  readonly worldObjectKind: "location" | "prop";
+}
+
+export type WorldBuildProgressState =
+  | "extracting"
+  | "identified"
+  | "researching"
+  | "prompted"
+  | "dispatched"
+  | "generating"
+  | "secure_ingest"
+  | "review_ready"
+  | "failed";
+
+export interface CreationWorldProgressItem {
+  readonly createdAt: string;
+  readonly displayName: string;
+  readonly id: string;
+  readonly itemKey: string;
+  readonly itemKind: "character" | "location" | "prop" | "system";
+  readonly promptText: string | null;
+  readonly providerModel: string | null;
+  readonly providerRequestId: string | null;
+  readonly safeDetail: string;
+  readonly sortOrder: number;
+  readonly sourceCount: number;
+  readonly state: WorldBuildProgressState;
+  readonly updatedAt: string;
+  readonly worldEntityId: string | null;
 }
 
 export interface CreationWorldProjection {
   readonly characters: readonly CreationWorldCharacter[];
   readonly locations: readonly CreationWorldLocation[];
+  readonly progress: readonly CreationWorldProgressItem[];
   readonly referencePack: {
     readonly id: string;
     readonly manifestHash: string;
@@ -334,6 +364,7 @@ function parseLocation(value: unknown): CreationWorldLocation {
       row.templeEvidenceSetHash,
       "location templeEvidenceSetHash",
     ),
+    worldObjectKind: "location",
   };
 }
 
@@ -563,6 +594,7 @@ export function parseCreationReadinessProjection(value: unknown): Readonly<{
     world: {
       characters: world.characters.map(parseCharacter),
       locations: world.locations.map(parseLocation),
+      progress: [],
       referencePack,
     },
     preflight: {
@@ -816,7 +848,7 @@ export const emptyCreationReadinessProjection: Readonly<{
   preflight: CreationPreflightProjection;
   world: CreationWorldProjection;
 }> = {
-  world: { characters: [], locations: [], referencePack: null },
+  world: { characters: [], locations: [], progress: [], referencePack: null },
   preflight: {
     sourceReview: null,
     audioIdentity: null,

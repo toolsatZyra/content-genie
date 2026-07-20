@@ -11,6 +11,8 @@ import {
 import {
   emptyCreationReadinessProjection,
   parseCreationReadinessProjection,
+  type CreationWorldProgressItem,
+  type WorldBuildProgressState,
 } from "@/domain/creation-readiness";
 import { LOOKS } from "@/domain/look/look-registry";
 import { parseEpisodeWorkflowState, type EpisodeWorkflowState } from "@/domain/studio";
@@ -45,6 +47,44 @@ interface ConfigurationRow {
   voice_confirmed_at: string | null;
   voice_confirmed_by: string | null;
   voice_version_id: string;
+}
+
+interface WorldProgressRow {
+  created_at: string;
+  display_name: string;
+  id: string;
+  item_key: string;
+  item_kind: "character" | "location" | "prop" | "system";
+  prompt_text: string | null;
+  provider_model: string | null;
+  provider_request_id: string | null;
+  safe_detail: string;
+  sort_order: number | string;
+  source_count: number | string;
+  state: WorldBuildProgressState;
+  updated_at: string;
+  world_entity_id: string | null;
+}
+
+function projectWorldProgress(
+  rows: readonly WorldProgressRow[],
+): readonly CreationWorldProgressItem[] {
+  return rows.map((row) => ({
+    createdAt: row.created_at,
+    displayName: row.display_name,
+    id: row.id,
+    itemKey: row.item_key,
+    itemKind: row.item_kind,
+    promptText: row.prompt_text,
+    providerModel: row.provider_model,
+    providerRequestId: row.provider_request_id,
+    safeDetail: row.safe_detail,
+    sortOrder: Number(row.sort_order),
+    sourceCount: Number(row.source_count),
+    state: row.state,
+    updatedAt: row.updated_at,
+    worldEntityId: row.world_entity_id,
+  }));
 }
 
 type VoiceAvailabilityStatus =
@@ -149,7 +189,7 @@ export async function loadCreationProjection(
         voiceVersionId: configuration.voice_version_id,
       }
     : null;
-  const [readinessResult, sourceReviewResult] = configuration
+  const [readinessResult, sourceReviewResult, worldProgressResult] = configuration
     ? await Promise.all([
         client
           .from("creation_readiness_projections")
@@ -163,14 +203,24 @@ export async function loadCreationProjection(
           .eq("workspace_id", episode.workspace_id)
           .eq("configuration_candidate_id", configuration.id)
           .maybeSingle(),
+        client
+          .from("world_build_progress_items")
+          .select(
+            "id,item_key,item_kind,world_entity_id,display_name,state,prompt_text,provider_model,provider_request_id,source_count,sort_order,safe_detail,created_at,updated_at",
+          )
+          .eq("workspace_id", episode.workspace_id)
+          .eq("configuration_candidate_id", configuration.id)
+          .order("sort_order", { ascending: true }),
       ])
     : [
+        { data: null, error: null },
         { data: null, error: null },
         { data: null, error: null },
       ];
   if (readinessResult.error) throw readinessResult.error;
   if (sourceReviewResult.error) throw sourceReviewResult.error;
-  const readiness = readinessResult.data
+  if (worldProgressResult.error) throw worldProgressResult.error;
+  const readinessBase = readinessResult.data
     ? parseCreationReadinessProjection({
         ...readinessResult.data,
         preflight: {
@@ -179,6 +229,32 @@ export async function loadCreationProjection(
         },
       })
     : emptyCreationReadinessProjection;
+  const progress = projectWorldProgress(
+    (worldProgressResult.data ?? []) as readonly WorldProgressRow[],
+  );
+  const objectKindByWorldEntityId = new Map(
+    progress
+      .filter(
+        (item) =>
+          item.worldEntityId !== null &&
+          (item.itemKind === "location" || item.itemKind === "prop"),
+      )
+      .map((item) => [item.worldEntityId as string, item.itemKind] as const),
+  );
+  const readiness = {
+    ...readinessBase,
+    world: {
+      ...readinessBase.world,
+      locations: readinessBase.world.locations.map((location) => ({
+        ...location,
+        worldObjectKind:
+          objectKindByWorldEntityId.get(location.entityId) === "prop"
+            ? ("prop" as const)
+            : ("location" as const),
+      })),
+      progress,
+    },
+  };
 
   return {
     configuration: projectedConfiguration,

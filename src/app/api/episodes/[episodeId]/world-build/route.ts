@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 
 import { getServerEnvironment } from "@/config/server-env";
 import {
@@ -20,6 +20,8 @@ import {
   declaredRequestBodyBytes,
   readBoundedUtf8RequestBody,
 } from "@/server/bounded-request-body";
+import { advanceNextMvpPreflight } from "@/server/mvp-preflight-runner";
+import { beginWorldBuildProgress } from "@/server/world-build-progress";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -165,8 +167,9 @@ export async function POST(
       if (intentError.code === "42501") {
         return reply(
           {
-            code: "AAL2_REQUIRED",
-            message: "Verify your secure session before authorizing World generation.",
+            code: "WORLD_AUTHORITY_DENIED",
+            message:
+              "This session cannot authorize the bounded World pass. Sign in again and retry.",
             ok: false,
           },
           403,
@@ -235,6 +238,30 @@ export async function POST(
       !["queued", "running", "waiting_external", "succeeded"].includes(current.state)
     ) {
       return reply({ code: "WORLD_BUILD_NOT_ACTIVE", ok: false }, 409, requestId);
+    }
+    await beginWorldBuildProgress({
+      configurationCandidateId: input.configurationCandidateId,
+      preflightRunId: created.preflightRunId,
+      workspaceId: input.workspaceId,
+    });
+    try {
+      after(async () => {
+        try {
+          await advanceNextMvpPreflight();
+        } catch (error) {
+          console.error(
+            "The immediate MVP World worker did not finish; the durable cron will reconcile it.",
+            error,
+          );
+        }
+      });
+    } catch (error) {
+      // Some non-Next test/runtime harnesses do not install a request work store.
+      // The queued run is durable and the minute cron remains the recovery owner.
+      console.error(
+        "The immediate MVP World worker could not be scheduled; the durable cron will reconcile it.",
+        error,
+      );
     }
     return reply(
       {

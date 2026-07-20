@@ -108,6 +108,44 @@ export function deterministicReadyCreationProjection(
       workflowState: stage === "running" ? "ready_to_produce" : "world_setup",
     },
     world: {
+      progress:
+        stage === "review"
+          ? [
+              {
+                createdAt: "2026-07-20T12:00:00.000Z",
+                displayName: "Script analysis complete",
+                id: "20000000-0000-4000-8000-000000000401",
+                itemKey: "system.extraction",
+                itemKind: "system",
+                promptText: null,
+                providerModel: null,
+                providerRequestId: null,
+                safeDetail: "Three visual anchors identified from the locked script",
+                sortOrder: 0,
+                sourceCount: 0,
+                state: "identified",
+                updatedAt: "2026-07-20T12:00:03.000Z",
+                worldEntityId: null,
+              },
+              {
+                createdAt: "2026-07-20T12:00:03.000Z",
+                displayName: "Shiva's Pinaka bow",
+                id: "20000000-0000-4000-8000-000000000402",
+                itemKey: "prop.shivas-pinaka-bow.abc123def456",
+                itemKind: "prop",
+                promptText:
+                  "Isolated sacred Pinaka bow, exact recurved silhouette and Shaiva carvings.",
+                providerModel: "fal-ai/nano-banana-2",
+                providerRequestId: "20000000-0000-4000-8000-000000000403",
+                safeDetail: "Nano Banana is generating this anchor",
+                sortOrder: 500,
+                sourceCount: 0,
+                state: "generating",
+                updatedAt: "2026-07-20T12:00:06.000Z",
+                worldEntityId: "20000000-0000-4000-8000-000000000404",
+              },
+            ]
+          : [],
       characters: [
         {
           aggregateVersion: accepted ? 3 : 2,
@@ -149,6 +187,7 @@ export function deterministicReadyCreationProjection(
           selectionId: "20000000-0000-4000-8000-000000000205",
           state: "accepted",
           templeEvidenceSetHash: null,
+          worldObjectKind: "location",
         },
       ],
       referencePack: {

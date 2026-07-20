@@ -535,7 +535,7 @@ export function PreflightStudio({
               onClick={onContinue}
               type="button"
             >
-              Review World Lock <span aria-hidden="true">→</span>
+              Create
             </button>
           )}
         </footer>

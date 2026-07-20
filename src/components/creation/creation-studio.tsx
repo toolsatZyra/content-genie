@@ -71,6 +71,8 @@ import {
 import { CreationLaunchpad } from "@/components/creation/creation-launchpad";
 import { PreflightStudio } from "@/components/creation/preflight-studio";
 import { WorldStudio, type WorldEntity } from "@/components/creation/world-studio";
+import { shouldReconcileRealtimeStatus } from "@/lib/realtime/reconciliation";
+import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 const chambers: readonly {
   readonly id: CreationChamber;
@@ -148,6 +150,132 @@ function uploadedBytesBase64(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return window.btoa(binary);
+}
+
+function agentActivityFor(
+  chamber: CreationChamber,
+  projection: CreationProjection,
+): Readonly<{ action: string; name: string; sequence: string }> {
+  if (chamber === "script") {
+    return {
+      action: projection.script
+        ? "Preserving the exact source and its immutable sidecars"
+        : "Waiting to read and seal the exact narration",
+      name: "Script Analyst",
+      sequence: "Agent 1 of 15",
+    };
+  }
+  if (chamber === "voice") {
+    return {
+      action: "Binding narrator identity, Hindi delivery and pronunciation",
+      name: "Voice + Pronunciation Directors",
+      sequence: "Agents 3–4 of 15",
+    };
+  }
+  if (chamber === "look") {
+    return {
+      action: "Pinning the selected visual physics without changing the script",
+      name: "Look Analyst",
+      sequence: "Agent 5 of 15",
+    };
+  }
+  if (chamber === "world") {
+    const progress = projection.world.progress.filter(
+      (item) => item.itemKind !== "system" || item.state === "extracting",
+    );
+    const current =
+      progress.find((item) => item.state === "secure_ingest") ??
+      progress.find((item) => item.state === "generating") ??
+      progress.find((item) => item.state === "dispatched") ??
+      progress.find((item) => item.state === "prompted") ??
+      progress.find((item) => item.state === "researching") ??
+      progress.find((item) => item.state === "extracting") ??
+      progress.find((item) => item.state === "identified") ??
+      progress.find((item) => item.state === "failed");
+    if (current?.state === "researching") {
+      return {
+        action: `Researching factual visual references for ${current.displayName}`,
+        name: "Source Keeper",
+        sequence: "World sequence · research",
+      };
+    }
+    if (current?.state === "prompted") {
+      return {
+        action: `Binding the exact look and identity prompt for ${current.displayName}`,
+        name: "Prompt Engine",
+        sequence: "World sequence · prompt",
+      };
+    }
+    if (current?.state === "dispatched") {
+      return {
+        action: `Image request sent for ${current.displayName}; awaiting Nano Banana`,
+        name: "Image Generation Worker",
+        sequence: "World sequence · provider queue",
+      };
+    }
+    if (current?.state === "generating") {
+      return {
+        action: `Nano Banana is generating ${current.displayName}`,
+        name: "Image Generation Worker",
+        sequence: "World sequence · generation",
+      };
+    }
+    if (current?.state === "secure_ingest") {
+      return {
+        action: `Scanning and safely ingesting ${current.displayName}`,
+        name: "Secure Media Worker",
+        sequence: "World sequence · secure ingest",
+      };
+    }
+    if (current?.state === "failed") {
+      return {
+        action: "Reconciling a safely stopped World task",
+        name: "Monica · Quality Director",
+        sequence: "World sequence · recovery",
+      };
+    }
+    if (
+      projection.world.referencePack?.state === "verified" &&
+      projection.world.characters.length + projection.world.locations.length > 0
+    ) {
+      return {
+        action: "Holding the versioned World for your final anchor decisions",
+        name: "Monica · Quality Director",
+        sequence: "World sequence · review",
+      };
+    }
+    return {
+      action: "Detecting characters, locations and story-significant props",
+      name: "Casting Director",
+      sequence: "World sequence · casting",
+    };
+  }
+  if (chamber === "preflight") {
+    if (!projection.preflight.sourceReview) {
+      return {
+        action: "Binding public sources, cultural claims and rights evidence",
+        name: "Source Keeper + Cultural Guardian",
+        sequence: "Preflight agent sequence",
+      };
+    }
+    if (!projection.preflight.plan) {
+      return {
+        action: "Designing the beat, shot and edit plan against the exact audio",
+        name: "Story + Shot Directors",
+        sequence: "Preflight agent sequence",
+      };
+    }
+    return {
+      action: "Evaluating cinematic readiness and the bounded production plan",
+      name: "Monica + QC Jury",
+      sequence: "Preflight agent sequence",
+    };
+  }
+  return {
+    action: "Preparing the autonomous production baton and final human review path",
+    name: "Monica · Quality Director",
+    sequence: "15 specialist agents coordinated",
+  };
 }
 
 export function CreationStudio({
@@ -307,6 +435,7 @@ export function CreationStudio({
     lookAvailabilityCanBeSelected(lookAvailabilityForVersion(look.versionId)),
   );
   const currentIndex = chambers.findIndex(({ id }) => id === chamber);
+  const agentActivity = agentActivityFor(chamber, projection);
   const creationAccess = creationAccessForEpisode(projection.episode.workflowState);
   const canEditCreation = creationAccess === "editable";
   const configurationReady = Boolean(projection.configuration);
@@ -329,6 +458,19 @@ export function CreationStudio({
     lookHumanConfirmed &&
     voiceHumanConfirmed;
   const worldEntities = [...projection.world.characters, ...projection.world.locations];
+  const activeWorldProgress = projection.world.progress.some((item) =>
+    item.itemKind === "system"
+      ? item.state === "extracting"
+      : [
+          "extracting",
+          "identified",
+          "researching",
+          "prompted",
+          "dispatched",
+          "generating",
+          "secure_ingest",
+        ].includes(item.state),
+  );
   const worldReady =
     worldEntities.length > 0 &&
     worldEntities.every(({ state }) => state === "accepted") &&
@@ -347,7 +489,8 @@ export function CreationStudio({
   const asyncCreationPending =
     !projection.preflight.productionRun &&
     projection.preflight.failure === null &&
-    (worldEntities.length === 0 ||
+    (activeWorldProgress ||
+      worldEntities.length === 0 ||
       worldEntities.some(({ state }) => state === "generating") ||
       (worldReady && !preflightReady));
   const emptyLookResults = visibleLooks.length === 0;
@@ -532,6 +675,12 @@ export function CreationStudio({
   }, [chamber, notice, pendingLookId, selectedLookId]);
 
   useEffect(() => {
+    if (!notice || saveState === "rejected" || saveState === "unconfirmed") return;
+    const timeout = window.setTimeout(() => setNotice(""), 1_000);
+    return () => window.clearTimeout(timeout);
+  }, [notice, saveState]);
+
+  useEffect(() => {
     if (!scriptLocked || configurationReady || projectionRefreshAttempts >= 3) {
       return;
     }
@@ -554,7 +703,10 @@ export function CreationStudio({
     const reconcile = (): void => {
       if (document.visibilityState === "visible") router.refresh();
     };
-    const timeout = window.setTimeout(reconcile, worldReady ? 4_000 : 6_000);
+    const timeout = window.setTimeout(
+      reconcile,
+      activeWorldProgress ? 2_000 : worldReady ? 4_000 : 6_000,
+    );
     const onVisible = (): void => {
       if (document.visibilityState === "visible") reconcile();
     };
@@ -565,7 +717,31 @@ export function CreationStudio({
       window.removeEventListener("online", reconcile);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [asyncCreationPending, chamber, router, working, worldReady]);
+  }, [activeWorldProgress, asyncCreationPending, chamber, router, working, worldReady]);
+
+  useEffect(() => {
+    const configurationId = projection.configuration?.id;
+    if (!configurationId) return;
+    const supabase = getBrowserSupabaseClient();
+    const channel = supabase
+      .channel(`world-progress:${configurationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          filter: `configuration_candidate_id=eq.${configurationId}`,
+          schema: "public",
+          table: "world_build_progress_items",
+        },
+        () => router.refresh(),
+      )
+      .subscribe((status) => {
+        if (shouldReconcileRealtimeStatus(status)) router.refresh();
+      });
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [projection.configuration?.id, router]);
 
   async function lockScript(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -664,6 +840,7 @@ export function CreationStudio({
       );
     } catch (error) {
       setUploadedScript(null);
+      setSaveState("rejected");
       setNotice(
         error instanceof Error
           ? error.message
@@ -1683,6 +1860,22 @@ export function CreationStudio({
         })}
       </nav>
 
+      <aside
+        aria-live="polite"
+        className={`agent-activity${working || activeWorldProgress ? " is-working" : ""}`}
+      >
+        <span className="agent-activity-orbit" aria-hidden="true">
+          <i />
+          <i />
+          <strong>AI</strong>
+        </span>
+        <span>
+          <small>{agentActivity.sequence}</small>
+          <strong>{agentActivity.name}</strong>
+          <em>{agentActivity.action}</em>
+        </span>
+      </aside>
+
       <section className="creation-stage">
         <div className="creation-aura" aria-hidden="true" />
         {chamber === "script" ? (
@@ -1720,7 +1913,6 @@ export function CreationStudio({
             <label className="script-canvas">
               <span>Hindi background narration</span>
               <textarea
-                aria-describedby="script-integrity-note"
                 className={scriptLocked ? "is-visually-replaced" : undefined}
                 disabled={!hydrated}
                 lang="hi"
@@ -1739,7 +1931,6 @@ export function CreationStudio({
               />
               {scriptLocked ? (
                 <pre
-                  aria-describedby="script-integrity-note"
                   aria-label="Sealed Hindi background narration"
                   lang="hi"
                   tabIndex={0}
@@ -1781,19 +1972,6 @@ export function CreationStudio({
                 {MAX_BROWSER_SCRIPT_UTF8_BYTES.toLocaleString()} bytes.
               </p>
             ) : null}
-            <div className="integrity-ribbon" id="script-integrity-note">
-              <span aria-hidden="true">◇</span>
-              <div>
-                <strong>Immutable means immutable</strong>
-                <p>
-                  After sealing, nobody—including you—can edit, unseal, or replace this
-                  Episode&apos;s words. A different script requires a new Episode.
-                </p>
-              </div>
-              {projection.script ? (
-                <code>{projection.script.rawUtf8Sha256.slice(0, 12)}…</code>
-              ) : null}
-            </div>
             {needsAcknowledgement && !scriptLocked ? (
               <label className="duration-acknowledgement">
                 <input
@@ -1829,6 +2007,7 @@ export function CreationStudio({
               </label>
             ) : null}
             <button
+              aria-busy={working}
               className="creation-primary"
               disabled={
                 working ||
@@ -1840,8 +2019,7 @@ export function CreationStudio({
                 (needsAcknowledgement && !durationAcknowledged)
               }
             >
-              {working ? "Sealing script..." : "Seal exact script permanently"}{" "}
-              <span aria-hidden="true">→</span>
+              Voice
             </button>
           </form>
         ) : null}
@@ -1976,7 +2154,7 @@ export function CreationStudio({
               onClick={() => setChamber("look")}
               type="button"
             >
-              Enter the look vault <span aria-hidden="true">→</span>
+              Look
             </button>
           </section>
         ) : null}
@@ -2181,6 +2359,7 @@ export function CreationStudio({
                       : "Use this look"}
                 </button>
                 <button
+                  aria-busy={working}
                   className="creation-secondary"
                   disabled={
                     working ||
@@ -2192,9 +2371,7 @@ export function CreationStudio({
                   ref={worldActionRef}
                   type="button"
                 >
-                  {working
-                    ? "Casting the world…"
-                    : "Build world + preflight · max $5.00 →"}
+                  World
                 </button>
               </footer>
             </div>
@@ -2219,6 +2396,7 @@ export function CreationStudio({
             canEdit={canEditCreation}
             onAccept={(entity) => void decideWorldCandidate(entity, "accept", null)}
             onContinue={() => setChamber("preflight")}
+            onStart={() => void beginWorldBuild()}
             onRegenerate={(entity, revisedPromptText) =>
               void decideWorldCandidate(entity, "regenerate", revisedPromptText)
             }
