@@ -122,6 +122,10 @@ function successfulResults(
       data: null,
       error: null,
     },
+    preflight_runs: {
+      data: { id: "10000000-0000-4000-8000-000000000099" },
+      error: null,
+    },
     world_build_progress_items: {
       data: [],
       error: null,

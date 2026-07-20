@@ -189,36 +189,51 @@ export async function loadCreationProjection(
         voiceVersionId: configuration.voice_version_id,
       }
     : null;
-  const [readinessResult, sourceReviewResult, worldProgressResult] = configuration
-    ? await Promise.all([
-        client
-          .from("creation_readiness_projections")
-          .select("world,preflight")
-          .eq("workspace_id", episode.workspace_id)
-          .eq("configuration_candidate_id", configuration.id)
-          .maybeSingle(),
-        client
-          .from("source_review_readiness_projections")
-          .select("source_review")
-          .eq("workspace_id", episode.workspace_id)
-          .eq("configuration_candidate_id", configuration.id)
-          .maybeSingle(),
-        client
-          .from("world_build_progress_items")
-          .select(
-            "id,item_key,item_kind,world_entity_id,display_name,state,prompt_text,provider_model,provider_request_id,source_count,sort_order,safe_detail,created_at,updated_at",
-          )
-          .eq("workspace_id", episode.workspace_id)
-          .eq("configuration_candidate_id", configuration.id)
-          .order("sort_order", { ascending: true }),
-      ])
-    : [
-        { data: null, error: null },
-        { data: null, error: null },
-        { data: null, error: null },
-      ];
+  const configurationCandidateId = configuration?.id;
+  const [readinessResult, sourceReviewResult, latestWorldRunResult] =
+    configurationCandidateId
+      ? await Promise.all([
+          client
+            .from("creation_readiness_projections")
+            .select("world,preflight")
+            .eq("workspace_id", episode.workspace_id)
+            .eq("configuration_candidate_id", configurationCandidateId)
+            .maybeSingle(),
+          client
+            .from("source_review_readiness_projections")
+            .select("source_review")
+            .eq("workspace_id", episode.workspace_id)
+            .eq("configuration_candidate_id", configurationCandidateId)
+            .maybeSingle(),
+          client
+            .from("preflight_runs")
+            .select("id")
+            .eq("workspace_id", episode.workspace_id)
+            .eq("configuration_candidate_id", configurationCandidateId)
+            .eq("kind", "world_anchor")
+            .order("run_number", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        ])
+      : [
+          { data: null, error: null },
+          { data: null, error: null },
+          { data: null, error: null },
+        ];
   if (readinessResult.error) throw readinessResult.error;
   if (sourceReviewResult.error) throw sourceReviewResult.error;
+  if (latestWorldRunResult.error) throw latestWorldRunResult.error;
+  const worldProgressResult = latestWorldRunResult.data
+    ? await client
+        .from("world_build_progress_items")
+        .select(
+          "id,item_key,item_kind,world_entity_id,display_name,state,prompt_text,provider_model,provider_request_id,source_count,sort_order,safe_detail,created_at,updated_at",
+        )
+        .eq("workspace_id", episode.workspace_id)
+        .eq("configuration_candidate_id", configurationCandidateId)
+        .eq("preflight_run_id", latestWorldRunResult.data.id)
+        .order("sort_order", { ascending: true })
+    : { data: null, error: null };
   if (worldProgressResult.error) throw worldProgressResult.error;
   const readinessBase = readinessResult.data
     ? parseCreationReadinessProjection({

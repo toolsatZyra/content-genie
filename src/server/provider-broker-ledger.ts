@@ -627,8 +627,9 @@ export async function promoteProviderWorldAnchor(input: {
     );
   }
   const storageVersion = receipt.data.version;
+  let promotion: unknown;
   try {
-    const promotion = await rpc("command_promote_world_anchor_quarantine", {
+    promotion = await rpc("command_promote_world_anchor_quarantine", {
       p_asset_kind: context.assetKind,
       p_asset_version_id: assetVersionId,
       p_final_object_name: finalObjectName,
@@ -639,23 +640,40 @@ export async function promoteProviderWorldAnchor(input: {
       p_world_version_id: worldVersionId,
       p_workspace_id: input.claim.workspaceId,
     });
-    if (
-      !promotion ||
-      typeof promotion !== "object" ||
-      (promotion as Record<string, unknown>).assetVersionId !== assetVersionId
-    ) {
-      throw new ProviderBrokerLedgerError("Provider asset promotion is malformed.");
-    }
-    await markWorldProgressByProviderRequest(
-      input.claim.providerRequestId,
-      "review_ready",
-      "Secure image is ready for your review",
-    );
-    return Object.freeze({ assetVersionId, worldVersionId });
   } catch (error) {
-    await workspaceMedia.remove([finalObjectName]).catch(() => undefined);
-    throw error;
+    // A network timeout can arrive after Postgres has committed the promotion.
+    // Never delete an immutable object once the authority-boundary RPC has been
+    // attempted. Reconcile the exact receipt; otherwise retain a harmless orphan
+    // for later evidence-aware cleanup and let the retry path recover safely.
+    const { data: committed, error: reconcileError } = await client
+      .from("asset_versions")
+      .select("id,object_name,source_quarantine_version_id,storage_version")
+      .eq("id", assetVersionId)
+      .maybeSingle();
+    if (
+      reconcileError ||
+      !committed ||
+      committed.object_name !== finalObjectName ||
+      committed.source_quarantine_version_id !== input.quarantineAssetVersionId ||
+      committed.storage_version !== storageVersion
+    ) {
+      throw error;
+    }
+    promotion = { assetVersionId };
   }
+  if (
+    !promotion ||
+    typeof promotion !== "object" ||
+    (promotion as Record<string, unknown>).assetVersionId !== assetVersionId
+  ) {
+    throw new ProviderBrokerLedgerError("Provider asset promotion is malformed.");
+  }
+  await markWorldProgressByProviderRequest(
+    input.claim.providerRequestId,
+    "review_ready",
+    "Secure image is ready for your review",
+  );
+  return Object.freeze({ assetVersionId, worldVersionId });
 }
 
 export async function failProviderOutputCandidate(input: {
