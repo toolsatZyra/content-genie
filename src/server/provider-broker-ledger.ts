@@ -61,6 +61,11 @@ async function markWorldProgressByProviderRequest(
 async function rpc(name: string, parameters: Record<string, unknown>) {
   const { data, error } = await createAdminSupabaseClient().rpc(name, parameters);
   if (error) {
+    console.error("Provider broker ledger RPC rejected safely", {
+      code: error.code ?? "unknown",
+      message: error.message,
+      rpc: name,
+    });
     throw new ProviderBrokerLedgerError(
       "Provider broker ledger rejected the operation.",
       ["23505", "40001", "54000"].includes(error.code ?? ""),
