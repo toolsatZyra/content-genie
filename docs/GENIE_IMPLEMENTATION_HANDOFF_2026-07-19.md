@@ -3,10 +3,9 @@
 **Snapshot date:** 2026-07-19
 **Workspace:** `C:\Work\Code\zyrastudio`
 **Git branch:** `main`
-**Deployed implementation checkpoint:** `2164fc776ceb7cd87f7db5f4b485f942538c7e1c`
-**Goal status:** active — the generic festival/ritual implementation is in the
-working tree and both databases; deploy it, then obtain owner-observable real
-Episode proof
+**Deployed implementation checkpoint:** `098a89cfe0f62e0f963143735002fa8436800b13`
+**Goal status:** active — the grounded real-world visual pipeline is deployed;
+obtain owner-observable real Episode proof and iterate from that MVP test
 **Current phase:** deployed developer-MVP completion
 **Status vocabulary:** work described below is either committed, implemented in
 the working tree, or externally verified. Those states are deliberately not
@@ -29,9 +28,9 @@ not verified and must remain labelled honestly.
 
 ### Live deployed checkpoint
 
-- GitHub `main` contains checkpoint
-  `2164fc776ceb7cd87f7db5f4b485f942538c7e1c`.
-- Git-connected Vercel deployment `dpl_DN5S8Bqtkz4mVoZVGK14ExrJUF86` reached
+- GitHub `main` contains implementation checkpoint
+  `098a89cfe0f62e0f963143735002fa8436800b13`.
+- Git-connected Vercel deployment `dpl_zyyzJTWM3KF2Kq4Dh2d9Vhe6eg8X` reached
   `READY` and aliased `https://content-genie-three.vercel.app/`.
 - The public runtime probe returned HTTP 200 with
   `{"environment":"production","ok":true}`; the two MVP cron routes returned
@@ -55,7 +54,8 @@ not verified and must remain labelled honestly.
   window only when both identities match. Focused lint, types, and 26 tests
   pass. Anonymous execution is explicitly removed from the
   three owner-facing MVP SECURITY DEFINER commands. The complete lean candidate
-  gate passes; commit/push and deployment verification remain.
+  gate passed, the implementation was committed and pushed explicitly, and the
+  automatic production deployment was verified.
 - The independent context-minimized review found three issues: incidental
   explicit names could be skipped, duplicate image content could survive page
   de-duplication, and the EDD photo was not in the executable graph. All three
@@ -696,8 +696,8 @@ git diff --stat
 Then verify:
 
 - branch is `main`;
-- HEAD is at or beyond deployed checkpoint
-  `2164fc776ceb7cd87f7db5f4b485f942538c7e1c`;
+- HEAD is at or beyond deployed implementation checkpoint
+  `098a89cfe0f62e0f963143735002fa8436800b13`;
 - no persistent `origin` has been added;
 - `.env.local` and `docs/Provider and Infrastructure Inventory.xlsx` are not
   staged;
@@ -716,7 +716,8 @@ before proceeding.
 ## 14. Known risks and prohibited shortcuts
 
 - Do not commit the current tree merely to make it easier to hand off; `main`
-  triggers deployment and Phase 2 is not gated.
+  triggers deployment. Commit only coherent, gated application or handoff
+  updates.
 - Do not promote Phase 2 preview migrations to production early.
 - Do not use passing structural tests as proof of transaction/runtime behavior.
 - Do not relax quote, World Lock, RLS, cultural, secure-ingest, or exact-script
