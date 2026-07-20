@@ -567,7 +567,9 @@ export async function promoteProviderWorldAnchor(input: {
   const attestationValue = await rpc("command_record_ingest_attestation", {
     p_decompressed_bytes: input.scanned.decompressedBytes,
     p_duration_ms: null,
-    p_frame_count: 1,
+    // The ingest-attestation schema reserves frame counts for video; a still
+    // image is represented by dimensions with a null duration/frame count.
+    p_frame_count: null,
     p_height: input.scanned.height,
     p_magic_mime: input.scanned.magicMime,
     p_malware_status: "clean",

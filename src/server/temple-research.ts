@@ -542,7 +542,8 @@ async function promoteReference(input: {
   const attestationId = await rpc("command_record_ingest_attestation", {
     p_decompressed_bytes: scanned.decompressedBytes,
     p_duration_ms: null,
-    p_frame_count: 1,
+    // Still-image attestations use dimensions and leave video frame count null.
+    p_frame_count: null,
     p_height: scanned.height,
     p_magic_mime: scanned.magicMime,
     p_malware_status: "clean",
