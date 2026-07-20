@@ -589,6 +589,60 @@ test.describe("Living Cinema creation flow", () => {
     await expect.poll(() => lockedRawText).toBe(exact);
   });
 
+  test("preserves uploaded source bytes and clears the binding after an edit", async ({
+    page,
+  }) => {
+    let postedPayload: Record<string, unknown> | undefined;
+    await page.route(`**/api/episodes/${episodeId}/script-lock`, async (route) => {
+      postedPayload = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        json: { ok: true, result: { aggregateVersion: 2 } },
+        status: 200,
+      });
+    });
+    await page.goto(`/episodes/${episodeId}/create?fixture=phase2-empty`);
+
+    const upload = page.getByLabel("Upload .txt");
+    const utf16Source = Buffer.from([0xff, 0xfe, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00]);
+    const file = {
+      buffer: utf16Source,
+      mimeType: "text/plain",
+      name: "utf16-script.txt",
+    };
+    await upload.setInputFiles(file);
+
+    const scriptInput = page.getByRole("textbox", {
+      name: "Hindi background narration",
+    });
+    await expect(scriptInput).toHaveValue("abc");
+    await expect(page.getByText(/utf16-script\.txt loaded/)).toBeVisible();
+    await expect(
+      page.getByText("8 original source bytes; 3 decoded UTF-8 bytes"),
+    ).toBeVisible();
+
+    await scriptInput.fill("abcd");
+    await expect(page.getByText(/utf16-script\.txt loaded/)).toHaveCount(0);
+    await expect(page.getByText("4 / 8,192 exact UTF-8 bytes")).toBeVisible();
+
+    await upload.setInputFiles(file);
+    await expect(scriptInput).toHaveValue("abc");
+    await page
+      .getByRole("checkbox", {
+        name: /I understand the estimated narration is outside/,
+      })
+      .check();
+    await acknowledgePermanentSeal(page);
+    await page.getByRole("button", { name: /Seal exact script/ }).click();
+
+    await expect.poll(() => postedPayload?.sourceKind).toBe("uploaded_text");
+    expect(postedPayload).toMatchObject({
+      durationAcknowledged: true,
+      originalBytesBase64: "//5hAGIAYwA=",
+      sourceKind: "uploaded_text",
+    });
+    expect(postedPayload).not.toHaveProperty("rawText");
+  });
+
   test("keeps exact dropped and cut CRLF bytes in application-owned history", async ({
     page,
   }) => {
@@ -915,7 +969,9 @@ test.describe("Living Cinema creation flow", () => {
         .getByRole("status")
         .filter({ hasText: "Divine Fury pinned to this Episode." }),
     ).toHaveCount(1);
-    await expect(page.getByRole("button", { name: "Build the world →" })).toBeFocused();
+    await expect(
+      page.getByRole("button", { name: /Build world \+ preflight/ }),
+    ).toBeFocused();
 
     await search.fill("");
     const familyNames = await page.locator(".look-families button").allTextContents();
@@ -990,7 +1046,9 @@ test.describe("Living Cinema creation flow", () => {
     await useDefault.click();
     expect(commands).toEqual(["episode.voice.select", "episode.look.select"]);
     await expect(page.getByRole("button", { name: "Look confirmed" })).toBeDisabled();
-    await expect(page.getByRole("button", { name: "Build the world →" })).toBeEnabled();
+    await expect(
+      page.getByRole("button", { name: /Build world \+ preflight/ }),
+    ).toBeEnabled();
   });
 
   test("never commits a pending look hidden by search or family filters", async ({
@@ -1197,7 +1255,9 @@ test.describe("Living Cinema creation flow", () => {
     await expect(
       page.getByRole("button", { name: /Glowing Divine Realism/ }),
     ).toHaveAttribute("aria-pressed", "false");
-    await expect(page.getByRole("button", { name: /Build the world/ })).toBeDisabled();
+    await expect(
+      page.getByRole("button", { name: /Build world \+ preflight/ }),
+    ).toBeDisabled();
 
     await page.goto(`/episodes/${episodeId}/create?fixture=phase2-withdrawn-look`);
     await page.getByRole("button", { name: /Enter the look vault/ }).click();
@@ -1275,7 +1335,7 @@ test.describe("Living Cinema creation flow", () => {
       .fill("no-such-visual-world-zyra");
     await expect(page.locator(".look-empty")).toContainText("No visual worlds match");
     await expect(
-      page.getByRole("button", { name: "Build the world →" }),
+      page.getByRole("button", { name: /Build world \+ preflight/ }),
     ).toBeDisabled();
     // Conflict reconciliation performs an RSC navigation. Wait for the
     // streamed document head to settle before auditing the complete document.
@@ -1568,5 +1628,140 @@ test.describe("Living Cinema creation flow", () => {
         width,
       });
     }
+  });
+
+  test("reviews, accepts, and composition-recasts real World anchors", async ({
+    page,
+  }) => {
+    await page.route("**/api/assets/**/sign", async (route) => {
+      await route.fulfill({
+        json: {
+          ok: true,
+          signedUrl:
+            "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+        },
+        status: 200,
+      });
+    });
+    const decisions: Record<string, unknown>[] = [];
+    await page.route(`**/api/episodes/${episodeId}/world-decision`, async (route) => {
+      decisions.push(route.request().postDataJSON() as Record<string, unknown>);
+      await route.fulfill({ json: { ok: true, result: {} }, status: 200 });
+    });
+
+    await page.goto(`/episodes/${episodeId}/create?fixture=phase2-world`);
+    await expect(
+      page.getByRole("heading", { name: "Cast once. Keep forever." }),
+    ).toBeFocused();
+    await expect(page.locator(".world-card")).toHaveCount(2);
+    await expect(page.getByText("Look tail cryptographically pinned")).toHaveCount(2);
+    await page.getByRole("button", { name: "Accept anchor" }).click();
+    await expect.poll(() => decisions.length).toBe(1);
+    expect(decisions[0]).toMatchObject({
+      decision: "accept",
+      entityKind: "character",
+      revisedPromptText: null,
+    });
+
+    await page.getByRole("button", { name: "Edit prompt · recast" }).first().click();
+    const editor = page.getByRole("dialog", { name: /Direct the composition/ });
+    await expect(editor).toBeVisible();
+    const revisedComposition =
+      "Mahadev opens his eyes in a silent close portrait as a soft dawn catches the sacred ash.";
+    await editor
+      .getByRole("textbox", { name: /Scene composition/ })
+      .fill(revisedComposition);
+    await editor.getByRole("button", { name: "Regenerate this anchor" }).click();
+    await expect.poll(() => decisions.length).toBe(2);
+    expect(decisions[1]).toMatchObject({
+      decision: "regenerate",
+      entityKind: "character",
+    });
+    expect(String(decisions[1]?.revisedPromptText)).toBe(
+      `${revisedComposition}\n\nGlowing divine realism, devotional Indian epic scale, sculpted light, sacred atmosphere, cinematic vertical composition.`,
+    );
+  });
+
+  test("shows Monica's evidence and confirms only the exact quote ceiling", async ({
+    page,
+  }) => {
+    let confirmation: Record<string, unknown> | null = null;
+    await page.route(`**/api/episodes/${episodeId}/quote-confirm`, async (route) => {
+      confirmation = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({ json: { ok: true, result: {} }, status: 200 });
+    });
+
+    await page.goto(`/episodes/${episodeId}/create?fixture=phase2-preflight`);
+    await expect(
+      page.getByRole("heading", {
+        name: "The film exists here before a frame is spent.",
+      }),
+    ).toBeFocused();
+    await expect(page.getByLabel("Exact production quote")).toContainText("$32.60");
+    await expect(page.getByText("No unresolved deterministic gates.")).toBeVisible();
+    await page.getByRole("button", { name: "Confirm exact ceiling" }).click();
+    await expect.poll(() => confirmation).not.toBeNull();
+    expect(confirmation).toEqual({
+      episodeId,
+      hardCeilingMicrousd: 45_000_000,
+      quoteHash: "8888888888888888888888888888888888888888888888888888888888888888",
+      quoteId: "30000000-0000-4000-8000-000000000105",
+      workspaceId: "10000000-0000-4000-8000-000000000101",
+    });
+  });
+
+  test("surfaces sealed plan-repair exhaustion instead of waiting or authorizing spend", async ({
+    page,
+  }) => {
+    await page.goto(`/episodes/${episodeId}/create?fixture=phase2-preflight-blocked`);
+    await expect(
+      page.getByRole("heading", {
+        name: "The cinematic plan did not clear Monica’s quality floor",
+      }),
+    ).toBeVisible();
+    await expect(page.getByText("No spend", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Confirm exact ceiling" }),
+    ).toBeDisabled();
+    await expect(page.getByRole("button", { name: /Confirm World Lock/ })).toHaveCount(
+      0,
+    );
+  });
+
+  test("posts one exact atomic World Lock envelope", async ({ page }) => {
+    let worldLock: Record<string, unknown> | null = null;
+    await page.route(`**/api/episodes/${episodeId}/world-lock`, async (route) => {
+      worldLock = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({ json: { ok: true, result: {} }, status: 200 });
+    });
+
+    await page.goto(`/episodes/${episodeId}/create?fixture=phase2-world-lock`);
+    await expect(
+      page.getByRole("heading", { name: "Lock the world. Release the crew." }),
+    ).toBeFocused();
+    await page.getByRole("button", { name: /Confirm World Lock/ }).click();
+    await expect.poll(() => worldLock).not.toBeNull();
+    expect(worldLock).toEqual({
+      configurationCandidateId: "10000000-0000-4000-8000-000000000120",
+      episodeId,
+      expectedConfigurationVersion: 6,
+      expectedEpisodeVersion: 8,
+      quoteId: "30000000-0000-4000-8000-000000000105",
+      workspaceId: "10000000-0000-4000-8000-000000000101",
+    });
+  });
+
+  test("surfaces an immutable asynchronous run without another start gate", async ({
+    page,
+  }) => {
+    await page.goto(`/episodes/${episodeId}/create?fixture=phase2-running`);
+    await expect(
+      page.getByRole("heading", { name: "Monica has the baton." }),
+    ).toBeFocused();
+    await expect(page.getByText("queued", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Confirm World Lock/ })).toHaveCount(
+      0,
+    );
+    await expectActionTargetsAtLeast44(page);
   });
 });

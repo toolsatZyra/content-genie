@@ -9,9 +9,20 @@ work. A green unit-test suite is necessary but cannot prove the product works.
 Delivery therefore uses traceable requirements, cold reviews, runtime evidence,
 and phased GitHub checkpoints.
 
+## Developer-MVP operating profile
+
+For the first owner-operated deployment, the owner-approved profile in
+`docs/MVP_DELIVERY_PROFILE_2026-07-20.md` supersedes mandatory per-phase cold
+reviews and exhaustive phase matrices. Use focused checks for changed behavior,
+one end-to-end happy path, essential integrity/access/secret/spend controls, and
+an observable deployment smoke. Keep deferred work explicit rather than
+inflating the MVP gate or calling untested behavior verified.
+
 ## 1. Delivery loop
 
-Every material phase follows:
+Every material phase follows. Routine deterministic checks are batched after
+coherent implementation slices; the independent adversarial review runs once at
+the end of the phase, not after each slice or test batch:
 
 1. **Think:** restate user outcome, constraints, risk, and evidence required.
 2. **Specify:** assign stable requirement IDs and write acceptance examples.
@@ -19,12 +30,15 @@ Every material phase follows:
    rollout gates.
 4. **Build:** implement the smallest coherent vertical slices, not disconnected
    layers.
-5. **Review:** run an independent, context-minimized adversarial design/code
-   review against the requirement set.
-6. **Test:** execute the full relevant pyramid and record artifacts.
-7. **Repair:** resolve findings or document an explicit owner-accepted risk.
-8. **Checkpoint:** commit and push a self-describing GitHub checkpoint.
-9. **Reflect:** update project state, decisions, residual risks, and the next
+5. **Batch-check:** run focused deterministic checks after coherent batches.
+6. **Gate:** execute the complete relevant pyramid and record artifacts once the
+   phase implementation is ready to close.
+7. **Review:** run one independent, context-minimized adversarial design/code/
+   runtime review against the phase requirement set and frozen evidence.
+8. **Repair and re-gate:** resolve findings or document an explicit
+   owner-accepted risk, then rerun the complete affected gate.
+9. **Checkpoint:** commit and push a self-describing GitHub checkpoint.
+10. **Reflect:** update project state, decisions, residual risks, and the next
    evidence target.
 
 ## 2. Traceability
@@ -48,7 +62,8 @@ cover the actual scope of the claim.
 ## 3. Independent adversarial review
 
 The builder does not perform the only review of its own work. At each mandatory
-gate, a cold reviewer receives:
+phase boundary, after the deterministic phase gate is ready, one cold reviewer
+receives:
 
 - the original requirement and current artifact/code;
 - relevant contracts and tests;
@@ -70,6 +85,9 @@ The reviewer attacks:
 
 Findings are severity-labelled P0–P3. P0/P1 findings block a phase checkpoint
 unless resolved or explicitly accepted by the owner with evidence and scope.
+Do not invoke a new adversarial reviewer for every implementation batch or
+granular fix; keep the review independent by running it once against the
+phase-ready candidate, then repair and re-gate.
 
 ## 4. Test pyramid
 
@@ -215,7 +233,8 @@ risk” without checking the actual diff.
 
 ## 8. Context-degradation protection
 
-`docs/project-state.md` is updated after every checkpoint with:
+`docs/GENIE_IMPLEMENTATION_HANDOFF_2026-07-19.md` is the current continuation
+snapshot. It, or its dated successor, is updated after every checkpoint with:
 
 - objective and non-negotiable decisions;
 - current branch and pushed SHA;

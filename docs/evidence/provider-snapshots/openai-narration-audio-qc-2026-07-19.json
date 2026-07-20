@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "genie.openai-narration-audio-qc-evidence.v1",
+  "checkedAtDate": "2026-07-19",
+  "provider": "openai",
+  "authenticatedModelAvailability": [
+    "gpt-4o-transcribe",
+    "gpt-audio-mini",
+    "gpt-audio-1.5"
+  ],
+  "asrCanary": {
+    "endpoint": "https://api.openai.com/v1/audio/transcriptions",
+    "model": "gpt-4o-transcribe",
+    "language": "hi",
+    "status": 200,
+    "exactTranscriptMatch": true
+  },
+  "audioJudgeCanary": {
+    "endpoint": "https://api.openai.com/v1/chat/completions",
+    "model": "gpt-audio-mini",
+    "status": 200,
+    "acceptedInputFormat": "mp3",
+    "exactResultKeys": [
+      "schemaVersion",
+      "intelligibilityPass",
+      "expressiveHindiPass",
+      "requestedGenderPass",
+      "delhiAccentPass",
+      "glitchFreePass",
+      "pronunciationConcerns",
+      "safeSummary"
+    ],
+    "strictJsonParsed": true
+  },
+  "policy": {
+    "independentFromSpeechProvider": true,
+    "asrMaximumRequestMinor": 3,
+    "audioJudgeMaximumRequestMinor": 25,
+    "automaticRetryAfterUnknownBillableSubmission": false,
+    "additionalRawAudioCopyPersistedByGenie": false,
+    "providerRetentionRequiresAccountPolicyVerification": true,
+    "maximumAudioBytes": 26214400,
+    "maximumProviderResponseBytes": 262144
+  }
+}

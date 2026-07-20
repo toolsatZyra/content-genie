@@ -46,6 +46,20 @@
       "verification_state": "official_documentation_observed_with_discrepancy"
     },
     {
+      "capability": "gen_image",
+      "provider": "fal.ai",
+      "endpoint": "fal-ai/nano-banana-2",
+      "source_url": "https://fal.ai/models/fal-ai/nano-banana-2",
+      "observed_billing": {
+        "unit": "image",
+        "usd_per_unit_standard": 0.08,
+        "two_k_multiplier": 1.5,
+        "four_k_multiplier": 2.0,
+        "web_search_surcharge_usd": 0.015
+      },
+      "verification_state": "official_documentation_observed"
+    },
+    {
       "capability": "edit_image",
       "provider": "fal.ai",
       "endpoint": "fal-ai/nano-banana-2/edit",

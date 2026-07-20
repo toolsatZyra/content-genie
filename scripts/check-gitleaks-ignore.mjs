@@ -13,7 +13,7 @@ if (entries.length !== 1 || entries[0] !== expected) {
 
 const prose = readFileSync("docs/implementation-plan.md", "utf8")
   .split(/\r?\n/)
-  .slice(490, 500)
+  .slice(498, 508)
   .join(" ");
 if (!prose.includes("wrong-project keys") || !prose.includes("wrong audience")) {
   throw new Error(

@@ -1,4 +1,4 @@
-const expectedMigrationSuffixes = [
+export const expectedMigrationSuffixes = [
   "phase2_scripts_and_sidecars.sql",
   "phase2_script_coordinate_hardening.sql",
   "phase2_looks_voices_and_config.sql",
@@ -14,6 +14,9 @@ const expectedMigrationSuffixes = [
   "phase2_episode_release_eligibility.sql",
   "phase2_checkpoint_adversarial_hardening.sql",
   "phase2_release_creative_identity_truth.sql",
+  "phase2_uploaded_script_and_rubric_foundation.sql",
+  "phase2_script_rubric_foundation.sql",
+  "phase2_script_rubric_fk_index.sql",
 ];
 
 const expectedTables = [
@@ -24,6 +27,7 @@ const expectedTables = [
   "script_annotations",
   "script_lock_events",
   "script_revisions",
+  "script_rubric_runs",
   "voice_version_availability",
   "voice_versions",
 ];
@@ -168,6 +172,10 @@ export function analyzePhase2Migrations(sources) {
       "create policy script_annotations_read_active_workspace on public.script_annotations for select to authenticated using (private.is_current_session_allowed(workspace_id));",
     ],
     [
+      "script_rubric_runs",
+      "create policy script_rubric_runs_read_active_workspace on public.script_rubric_runs for select to authenticated using (private.is_current_session_allowed(workspace_id));",
+    ],
+    [
       "voice_versions",
       "create policy voice_versions_read_active_member on public.voice_versions for select to authenticated using (private.has_current_active_membership());",
     ],
@@ -212,6 +220,8 @@ export function analyzePhase2Migrations(sources) {
     "attest_script_coordinate_map",
     "revoke_script_coordinate_attestation",
     "command_lock_episode_script",
+    "command_lock_episode_script_v2",
+    "command_record_script_rubric_run",
     "command_select_episode_voice",
     "command_select_episode_look",
     "command_set_voice_version_availability",
@@ -266,6 +276,25 @@ export function analyzePhase2Migrations(sources) {
     "coordinate_map_verifier = 'postgres-structural-v2'",
     "coordinate_map ?& array['v','c','r','p','s']",
     "octet_length(p_raw_utf8) > 8192",
+    "create or replace function private.decode_uploaded_script_source_v1(",
+    "add column if not exists original_source_bytes bytea",
+    "add constraint script_revisions_source_envelope_v1_check",
+    "create trigger script_revisions_uploaded_source",
+    "genie-uploaded-script-decoder.v1",
+    "uploaded script source does not match decoded text",
+    "octet_length(original_source_bytes) between 1 and 24576",
+    "original_source_sha256 = encode(extensions.digest(original_source_bytes, 'sha256'), 'hex')",
+    "perform pg_catalog.set_config('genie.uploaded_script_source', '', true)",
+    "script_rubric_runs_source_unchanged_ck",
+    "script_rubric_runs_immutable",
+    "genie.script-rubric-run.v1",
+    "advisory_only boolean not null default true check (advisory_only)",
+    "create or replace function private.validate_script_rubric_payload_v1(",
+    "gate ->> 'effect' <> 'advisory'",
+    "completed advisory script rubric is required before planning",
+    "add column script_rubric_run_id uuid",
+    "create trigger preflight_runs_bind_script_rubric",
+    "create index preflight_runs_script_rubric_run_fk_idx",
     "script_size_policy_version = 1",
     "octet_length(raw_utf8) between 8193 and 65536",
     "pg_column_size(p_coordinate_map) > 8388608",

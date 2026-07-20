@@ -187,7 +187,7 @@ describe("trusted script-lock route", () => {
       }),
     );
     expect(mocks.authenticatedRpc).toHaveBeenCalledWith(
-      "command_lock_episode_script",
+      "command_lock_episode_script_v2",
       expect.objectContaining({
         p_coordinate_attestation_id: attestationId,
         p_episode_id: episodeId,
@@ -202,6 +202,71 @@ describe("trusted script-lock route", () => {
         p_request_hash: expect.stringMatching(/^[a-f0-9]{64}$/),
       }),
     );
+  });
+
+  it("derives uploaded text from preserved UTF-16 source bytes before authority", async () => {
+    mocks.getUser.mockResolvedValue({
+      data: { user: { id: userId } },
+      error: null,
+    });
+    mocks.adminRpc
+      .mockResolvedValueOnce({ data: attestationId, error: null })
+      .mockResolvedValueOnce({ data: true, error: null });
+    mocks.authenticatedRpc.mockResolvedValue({
+      data: { aggregateVersion: 2, ok: true },
+      error: null,
+    });
+    const original = Uint8Array.from([0xff, 0xfe, 0x15, 0x09, 0x25, 0x09]);
+
+    const response = await POST(
+      request({
+        durationAcknowledged: true,
+        episodeId,
+        expectedEpisodeVersion: 1,
+        originalBytesBase64: Buffer.from(original).toString("base64"),
+        sourceKind: "uploaded_text",
+        workspaceId,
+      }),
+      { params: Promise.resolve({ episodeId }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.authenticatedRpc).toHaveBeenCalledWith(
+      "command_lock_episode_script_v2",
+      expect.objectContaining({
+        p_original_source_bytes: "\\xfffe15092509",
+        p_raw_text: "\u0915\u0925",
+        p_source_encoding_evidence: expect.objectContaining({
+          bom: "utf-16le",
+          encoding: "utf-16le",
+        }),
+        p_source_kind: "uploaded_text",
+      }),
+    );
+  });
+
+  it("rejects malformed uploaded bytes before creating coordinate authority", async () => {
+    mocks.getUser.mockResolvedValue({
+      data: { user: { id: userId } },
+      error: null,
+    });
+    const response = await POST(
+      request({
+        durationAcknowledged: true,
+        episodeId,
+        expectedEpisodeVersion: 1,
+        originalBytesBase64: Buffer.from([0xc3, 0x28]).toString("base64"),
+        sourceKind: "uploaded_text",
+        workspaceId,
+      }),
+      { params: Promise.resolve({ episodeId }) },
+    );
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "SCRIPT_UPLOAD_MALFORMED_TEXT",
+      ok: false,
+    });
+    expect(mocks.adminRpc).not.toHaveBeenCalled();
   });
 
   it("maps a compare-and-swap loss to a refreshable conflict", async () => {

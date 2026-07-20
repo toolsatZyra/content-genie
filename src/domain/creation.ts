@@ -1,4 +1,8 @@
 import type { EpisodeWorkflowState } from "@/domain/studio";
+import type {
+  CreationPreflightProjection,
+  CreationWorldProjection,
+} from "@/domain/creation-readiness";
 
 export type CreationChamber =
   "script" | "voice" | "look" | "world" | "preflight" | "create";
@@ -60,6 +64,8 @@ export interface CreationProjection {
     readonly rawUtf8Sha256: string;
     readonly revisionNumber: number;
   } | null;
+  readonly preflight: CreationPreflightProjection;
+  readonly world: CreationWorldProjection;
 }
 
 export type CreationAccess = "editable" | "read-only" | "closed";

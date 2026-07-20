@@ -28,6 +28,16 @@ assert.deepEqual(evaluateProductionLicenses({ Unlicense: [{ name: "postgres" }] 
   packages: 1,
   rejected: [],
 });
+assert.deepEqual(
+  evaluateProductionLicenses({
+    "(Apache-2.0 AND BSD-3-Clause)": [{ name: "@protobuf-ts/runtime" }],
+    Unlicense: [{ name: "humanize-duration" }],
+  }),
+  {
+    packages: 2,
+    rejected: [],
+  },
+);
 assert.equal(
   evaluateProductionLicenses({
     Unlicense: [{ name: "unrelated-unlicensed-package" }],

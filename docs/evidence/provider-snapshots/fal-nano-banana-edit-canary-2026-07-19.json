@@ -1,0 +1,29 @@
+{
+  "schema_version": "genie.provider-canary.v1",
+  "provider": "fal",
+  "endpoint": "fal-ai/nano-banana-2/edit",
+  "payload_schema_version": "genie.fal-nano-banana-2-edit.v1",
+  "profile": "nano-banana-2-edit.1ref.9x16.2k.high.png.v1",
+  "retrieved_at": "2026-07-19T00:00:00.000Z",
+  "expires_at": "2026-10-17T00:00:00.000Z",
+  "input": {
+    "reference_count": 1,
+    "reference_source": "Wikimedia Commons photograph promoted to fal.media for the canary only",
+    "aspect_ratio": "9:16",
+    "resolution": "2K",
+    "thinking_level": "high",
+    "output_format": "png",
+    "num_images": 1,
+    "limit_generations": true,
+    "enable_web_search": false,
+    "safety_tolerance": "2"
+  },
+  "result": {
+    "content_type": "image/png",
+    "byte_length": 7759270,
+    "width": 1536,
+    "height": 2752,
+    "content_sha256": "f11af2f635c6309d0c4dfe27383a77d0eaf89175fcc066ff68ea997ffd90ca01",
+    "request_id_sha256": "30f96eeed04bccd136db062bd71d5d1043247b566d3b3aee8862aa96c504ab9a"
+  }
+}

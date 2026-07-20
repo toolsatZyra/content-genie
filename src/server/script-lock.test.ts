@@ -30,6 +30,9 @@ describe("the exact script-lock command", () => {
       rawText: "  शिव कथा\r\nसमाप्त  ",
       workspaceId,
     });
+    if (request.sourceKind !== "browser_text") {
+      throw new Error("Expected a browser-text request.");
+    }
     const command = prepareScriptLockCommand(request, "script-lock-0001");
 
     expect(command.parameters).toMatchObject({
@@ -86,6 +89,61 @@ describe("the exact script-lock command", () => {
     expect(left.requestHash).not.toBe(right.requestHash);
     expect(left.requestHash).not.toBe(differentKey.requestHash);
   });
+
+  it("derives uploaded text on the server and binds the preserved source bytes", () => {
+    const original = Uint8Array.from([0xff, 0xfe, 0x15, 0x09, 0x25, 0x09]);
+    const request = parseScriptLockRequest({
+      durationAcknowledged: true,
+      episodeId,
+      expectedEpisodeVersion: 4,
+      originalBytesBase64: Buffer.from(original).toString("base64"),
+      sourceKind: "uploaded_text",
+      workspaceId,
+    });
+    const command = prepareScriptLockCommand(request, "script-lock-upload-0001");
+
+    expect(command.parameters).toMatchObject({
+      p_original_source_bytes: `\\x${Buffer.from(original).toString("hex")}`,
+      p_original_source_sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+      p_raw_text: "\u0915\u0925",
+      p_source_encoding_evidence: {
+        bom: "utf-16le",
+        byteLength: original.byteLength,
+        decoderProfile: "genie-uploaded-script-decoder.v1",
+        encoding: "utf-16le",
+        originalSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+      },
+      p_source_kind: "uploaded_text",
+    });
+  });
+
+  it("rejects mixed uploaded/browser payloads and malformed upload bytes", () => {
+    expect(() =>
+      parseScriptLockRequest({
+        durationAcknowledged: true,
+        episodeId,
+        expectedEpisodeVersion: 4,
+        originalBytesBase64: Buffer.from("\u0915\u0925\u093e").toString("base64"),
+        rawText: "different",
+        sourceKind: "uploaded_text",
+        workspaceId,
+      }),
+    ).toThrow("exactly");
+    expect(() =>
+      prepareScriptLockCommand(
+        parseScriptLockRequest({
+          durationAcknowledged: true,
+          episodeId,
+          expectedEpisodeVersion: 4,
+          originalBytesBase64: "not base64",
+          sourceKind: "uploaded_text",
+          workspaceId,
+        }),
+        "script-lock-upload-0002",
+      ),
+    ).toThrow("canonical base64");
+  });
+
   it.each([null, [], "text"])("rejects a non-object request body %j", (body) => {
     expect(() => parseScriptLockRequest(body)).toThrow(
       "Script lock body must be an object.",

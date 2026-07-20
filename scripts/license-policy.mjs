@@ -1,6 +1,8 @@
 const allowedProductionLicenses = new Set([
   "0BSD",
   "Apache-2.0",
+  "(Apache-2.0 AND BSD-3-Clause)",
+  "Apache-2.0 AND BSD-3-Clause",
   "Apache-2.0 AND LGPL-3.0-or-later",
   "BSD-3-Clause",
   "CC-BY-4.0",
@@ -18,6 +20,9 @@ const packageScopedLicenseExceptions = new Map([
   // package metadata declares the permissive public-domain Unlicense; keep the
   // exception package-scoped so no unrelated dependency inherits it.
   ["postgres", new Set(["Unlicense"])],
+  // Trigger.dev depends on humanize-duration, whose package metadata uses the
+  // permissive public-domain Unlicense. Keep the exception exact and scoped.
+  ["humanize-duration", new Set(["Unlicense"])],
 ]);
 
 function isAllowedPackageLicense(license, packageName) {

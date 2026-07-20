@@ -14,6 +14,7 @@ describe("environment contract", () => {
 
     expect(environment.enableExport).toBe(false);
     expect(environment.enableFinalApproval).toBe(false);
+    expect(environment.enableMvpInlinePreflight).toBe(false);
     expect(environment.enableProviderSpend).toBe(false);
     expect(environment.enableRender).toBe(false);
     expect(environment.commandHmacSecret).toBeNull();
@@ -127,6 +128,22 @@ describe("environment contract", () => {
       enableProviderSpend: true,
       enableRender: true,
       environment: "production",
+    });
+  });
+
+  it("accepts the developer-MVP inline preflight runner without Trigger Cloud", () => {
+    expect(
+      parseServerEnvironment({
+        GENIE_ENABLE_PROVIDER_SPEND: "true",
+        GENIE_ENABLE_RENDER: "true",
+        GENIE_MVP_INLINE_PREFLIGHT: "true",
+        SUPABASE_SERVICE_ROLE_KEY: "server-authority",
+      }),
+    ).toMatchObject({
+      enableMvpInlinePreflight: true,
+      enableProviderSpend: true,
+      enableRender: true,
+      triggerSecretKey: null,
     });
   });
 });

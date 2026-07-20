@@ -44,7 +44,10 @@ import {
   textareaDisplayText,
   undoExactTextareaEdit,
 } from "@/domain/script/exact-textarea";
-import { MAX_BROWSER_SCRIPT_UTF8_BYTES } from "@/domain/script/limits";
+import {
+  MAX_BROWSER_SCRIPT_UTF8_BYTES,
+  MAX_UPLOADED_SCRIPT_SOURCE_BYTES,
+} from "@/domain/script/limits";
 import {
   DEFAULT_LOOK_ID,
   LOOKS,
@@ -65,6 +68,9 @@ import {
   readCommandResponse,
   sendCommand,
 } from "@/lib/commands/client";
+import { CreationLaunchpad } from "@/components/creation/creation-launchpad";
+import { PreflightStudio } from "@/components/creation/preflight-studio";
+import { WorldStudio, type WorldEntity } from "@/components/creation/world-studio";
 
 const chambers: readonly {
   readonly id: CreationChamber;
@@ -84,6 +90,12 @@ interface MutationResult {
   readonly episodeVersion?: number;
 }
 
+interface PendingUploadedScript {
+  readonly fileName: string;
+  readonly originalBytesBase64: string;
+  readonly sourceByteLength: number;
+}
+
 type SaveState = "idle" | "rejected" | "saved" | "saving" | "unconfirmed";
 type DraftStorageState = "available" | "checking" | "unavailable";
 const LOOK_PAGE_SIZE = 24;
@@ -96,6 +108,46 @@ function voiceAvailabilityCanBeSelected(
   status: "pending_authenticated_canary" | "verified" | "withdrawn" | undefined,
 ): boolean {
   return status === "pending_authenticated_canary" || status === "verified";
+}
+
+function decodeUploadedScriptPreview(bytes: Uint8Array): string {
+  if (bytes.byteLength === 0) throw new Error("The selected script file is empty.");
+  if (bytes.byteLength > MAX_UPLOADED_SCRIPT_SOURCE_BYTES) {
+    throw new Error(
+      `The selected file exceeds ${MAX_UPLOADED_SCRIPT_SOURCE_BYTES.toLocaleString()} source bytes.`,
+    );
+  }
+  let encoding: "utf-16be" | "utf-16le" | "utf-8" = "utf-8";
+  let offset = 0;
+  if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+    offset = 3;
+  } else if (bytes[0] === 0xff && bytes[1] === 0xfe) {
+    encoding = "utf-16le";
+    offset = 2;
+  } else if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+    encoding = "utf-16be";
+    offset = 2;
+  }
+  if (encoding !== "utf-8" && (bytes.byteLength - offset) % 2 !== 0) {
+    throw new Error(
+      `The selected file is not well-formed ${encoding.toUpperCase()} text.`,
+    );
+  }
+  try {
+    return new TextDecoder(encoding, { fatal: true, ignoreBOM: true }).decode(
+      bytes.subarray(offset),
+    );
+  } catch {
+    throw new Error(
+      `The selected file is not well-formed ${encoding.toUpperCase()} text.`,
+    );
+  }
+}
+
+function uploadedBytesBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return window.btoa(binary);
 }
 
 export function CreationStudio({
@@ -173,12 +225,26 @@ export function CreationStudio({
   const historyBeforeInput = useRef<"historyRedo" | "historyUndo" | null>(null);
   const voiceIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
   const lookIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
+  const worldBuildIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
+  const worldIdempotencyKeys = useRef(new Map<string, RetainedIdempotencyAttempt>());
+  const worldUploadIdempotencyKeys = useRef(
+    new Map<string, RetainedIdempotencyAttempt>(),
+  );
+  const sourceAppointmentIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(
+    null,
+  );
+  const sourceDecisionIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
+  const quoteIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
+  const worldLockIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
   const [chamber, setChamber] = useState<CreationChamber>(
     guardedInitialChamber ?? (projection.script ? "voice" : "script"),
   );
   const [scriptLocked, setScriptLocked] = useState(Boolean(projection.script));
   const [rawText, setRawText] = useState(projection.script?.rawText ?? "");
   const rawTextRef = useRef(rawText);
+  const [uploadedScript, setUploadedScript] = useState<PendingUploadedScript | null>(
+    null,
+  );
   const [acknowledgedRawText, setAcknowledgedRawText] = useState<string | null>(null);
   const [sealAcknowledgedRawText, setSealAcknowledgedRawText] = useState<string | null>(
     null,
@@ -262,6 +328,28 @@ export function CreationStudio({
     effectiveVoicePinReconciled &&
     lookHumanConfirmed &&
     voiceHumanConfirmed;
+  const worldEntities = [...projection.world.characters, ...projection.world.locations];
+  const worldReady =
+    worldEntities.length > 0 &&
+    worldEntities.every(({ state }) => state === "accepted") &&
+    projection.world.referencePack?.state === "verified";
+  const preflightReady =
+    projection.preflight.failure === null &&
+    projection.preflight.sourceReview?.status === "approved" &&
+    projection.preflight.audioIdentity?.state === "verified" &&
+    projection.preflight.masterClock?.state === "verified" &&
+    projection.preflight.plan?.state === "qc_passed" &&
+    projection.preflight.qc?.verdict === "pass" &&
+    projection.preflight.quote?.expired === false;
+  const quoteConfirmed =
+    projection.preflight.quote?.confirmed === true &&
+    projection.preflight.quote.expired === false;
+  const asyncCreationPending =
+    !projection.preflight.productionRun &&
+    projection.preflight.failure === null &&
+    (worldEntities.length === 0 ||
+      worldEntities.some(({ state }) => state === "generating") ||
+      (worldReady && !preflightReady));
   const emptyLookResults = visibleLooks.length === 0;
   const moreLooksAvailable = visibleLooks.length < filteredLooks.length;
   const activeLookTabId = selectableVisibleLooks.some(({ id }) => id === pendingLookId)
@@ -455,17 +543,50 @@ export function CreationStudio({
     return () => window.clearTimeout(timeout);
   }, [configurationReady, projectionRefreshAttempts, router, scriptLocked]);
 
+  useEffect(() => {
+    if (
+      !asyncCreationPending ||
+      working ||
+      !["world", "preflight", "create"].includes(chamber)
+    ) {
+      return;
+    }
+    const reconcile = (): void => {
+      if (document.visibilityState === "visible") router.refresh();
+    };
+    const timeout = window.setTimeout(reconcile, worldReady ? 4_000 : 6_000);
+    const onVisible = (): void => {
+      if (document.visibilityState === "visible") reconcile();
+    };
+    window.addEventListener("online", reconcile);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearTimeout(timeout);
+      window.removeEventListener("online", reconcile);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [asyncCreationPending, chamber, router, working, worldReady]);
+
   async function lockScript(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!canEditCreation || projection.episode.workflowState !== "draft") return;
     const submittedRawText = rawText;
-    const payload = {
-      durationAcknowledged,
-      episodeId: projection.episode.id,
-      expectedEpisodeVersion: episodeVersion,
-      rawText: submittedRawText,
-      workspaceId: projection.episode.workspaceId,
-    };
+    const payload = uploadedScript
+      ? {
+          durationAcknowledged,
+          episodeId: projection.episode.id,
+          expectedEpisodeVersion: episodeVersion,
+          originalBytesBase64: uploadedScript.originalBytesBase64,
+          sourceKind: "uploaded_text" as const,
+          workspaceId: projection.episode.workspaceId,
+        }
+      : {
+          durationAcknowledged,
+          episodeId: projection.episode.id,
+          expectedEpisodeVersion: episodeVersion,
+          rawText: submittedRawText,
+          workspaceId: projection.episode.workspaceId,
+        };
     const requestBody = JSON.stringify(payload);
     const attempt = retainIdempotencyAttempt(
       scriptLockIdempotencyKey.current,
@@ -519,6 +640,39 @@ export function CreationStudio({
     }
   }
 
+  async function loadUploadedScript(
+    event: ChangeEvent<HTMLInputElement>,
+  ): Promise<void> {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file || !canEditCreation || scriptLocked || working) return;
+    setNotice("");
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const decodedText = decodeUploadedScriptPreview(bytes);
+      commitDraftText(decodedText);
+      setUploadedScript({
+        fileName: file.name,
+        originalBytesBase64: uploadedBytesBase64(bytes),
+        sourceByteLength: bytes.byteLength,
+      });
+      setAcknowledgedRawText(null);
+      setSealAcknowledgedRawText(null);
+      setNotice(
+        "Original file bytes loaded and retained. Any text edit switches this draft back to browser text.",
+      );
+    } catch (error) {
+      setUploadedScript(null);
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : "The selected script file could not be decoded safely.",
+      );
+      setSaveState("rejected");
+    }
+  }
+
   function commitDraftText(nextExactText: string): void {
     if (
       !canEditCreation ||
@@ -527,6 +681,7 @@ export function CreationStudio({
       nextExactText === rawTextRef.current
     )
       return;
+    setUploadedScript(null);
     exactTextHistory.current = recordExactTextareaEdit(
       exactTextHistory.current,
       rawTextRef.current,
@@ -542,6 +697,7 @@ export function CreationStudio({
       inputType === "historyUndo"
         ? undoExactTextareaEdit(exactTextHistory.current, rawTextRef.current)
         : redoExactTextareaEdit(exactTextHistory.current, rawTextRef.current);
+    setUploadedScript(null);
     exactTextHistory.current = transition.history;
     rawTextRef.current = transition.text;
     setRawText(transition.text);
@@ -951,6 +1107,499 @@ export function CreationStudio({
     }
   }
 
+  async function beginWorldBuild(): Promise<void> {
+    if (
+      !canEditCreation ||
+      !projection.configuration ||
+      !worldConfigurationReady ||
+      working
+    ) {
+      return;
+    }
+    if (worldEntities.length > 0) {
+      setChamber("world");
+      return;
+    }
+    const payload = {
+      configurationCandidateId: projection.configuration.id,
+      episodeId: projection.episode.id,
+      workspaceId: projection.episode.workspaceId,
+    };
+    const requestBody = JSON.stringify(payload);
+    const attempt = retainIdempotencyAttempt(
+      worldBuildIdempotencyKey.current,
+      requestBody,
+    );
+    worldBuildIdempotencyKey.current = attempt;
+    setChamber("world");
+    setWorking(true);
+    setSaveState("saving");
+    setNotice("Monica is reading the sealed script and casting its visual world.");
+    try {
+      const response = await fetch(
+        `/api/episodes/${encodeURIComponent(projection.episode.id)}/world-build`,
+        {
+          body: requestBody,
+          cache: "no-store",
+          headers: {
+            "content-type": "application/json",
+            "x-idempotency-key": attempt.key,
+          },
+          method: "POST",
+        },
+      );
+      await readCommandResponse(response, "The world build could not be dispatched.");
+      worldBuildIdempotencyKey.current = null;
+      setSaveState("saved");
+      setNotice(
+        "Monica is extracting identities and locations. You can leave this Episode while the crew works.",
+      );
+      refreshIntoChamber("world");
+    } catch (error) {
+      if (error instanceof CommandMutationError && error.definitive) {
+        worldBuildIdempotencyKey.current = null;
+        setSaveState("rejected");
+        setNotice(error.message);
+      } else {
+        setSaveState("unconfirmed");
+        setNotice(
+          "The world-build dispatch is unconfirmed. Monica will reconcile it; retrying the unchanged request is safe.",
+        );
+      }
+      refreshIntoChamber("world");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function decideWorldCandidate(
+    entity: WorldEntity,
+    decision: "accept" | "regenerate",
+    revisedPromptText: string | null,
+  ): Promise<void> {
+    if (!canEditCreation || !projection.configuration || working) return;
+    const decisionEntityId =
+      entity.entityKind === "character" ? entity.item.formId : entity.item.entityId;
+    const payload = {
+      candidateVersionId: entity.item.candidateVersionId,
+      configurationCandidateId: projection.configuration.id,
+      decision,
+      entityId: decisionEntityId,
+      entityKind: entity.entityKind,
+      episodeId: projection.episode.id,
+      expectedSelectionVersion: entity.item.aggregateVersion,
+      revisedPromptText,
+      workspaceId: projection.episode.workspaceId,
+    };
+    const fingerprint = JSON.stringify(payload);
+    const attemptKey = `${entity.entityKind}:${decisionEntityId}`;
+    const attempt = retainIdempotencyAttempt(
+      worldIdempotencyKeys.current.get(attemptKey) ?? null,
+      fingerprint,
+    );
+    worldIdempotencyKeys.current.set(attemptKey, attempt);
+    setWorking(true);
+    setSaveState("saving");
+    setNotice("");
+    try {
+      const response = await fetch(
+        `/api/episodes/${encodeURIComponent(projection.episode.id)}/world-decision`,
+        {
+          body: fingerprint,
+          cache: "no-store",
+          headers: {
+            "content-type": "application/json",
+            "x-idempotency-key": attempt.key,
+          },
+          method: "POST",
+        },
+      );
+      await readCommandResponse(
+        response,
+        decision === "accept"
+          ? "The world anchor could not be accepted."
+          : "The replacement could not be requested.",
+      );
+      worldIdempotencyKeys.current.delete(attemptKey);
+      setSaveState("saved");
+      setNotice(
+        decision === "accept"
+          ? `${entity.item.name} is now a versioned world anchor.`
+          : `Monica is recasting ${entity.item.name} from your revised composition.`,
+      );
+      refreshIntoChamber("world");
+    } catch (error) {
+      if (error instanceof CommandMutationError && error.definitive) {
+        worldIdempotencyKeys.current.delete(attemptKey);
+        setSaveState("rejected");
+        setNotice(error.message);
+      } else {
+        setSaveState("unconfirmed");
+        setNotice(
+          "The world-decision outcome is unconfirmed. Monica is reconciling the authoritative version; retrying the unchanged decision is safe.",
+        );
+      }
+      refreshIntoChamber("world");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function uploadWorldCandidate(entity: WorldEntity, file: File): Promise<void> {
+    const supported = ["image/jpeg", "image/png", "image/webp"].includes(file.type);
+    if (!supported || file.size <= 0 || file.size > 25 * 1024 * 1024) {
+      setSaveState("rejected");
+      setNotice(
+        "Choose a JPEG, PNG or WebP image no larger than 25 MB. Nothing was uploaded.",
+      );
+      return;
+    }
+    if (!canEditCreation || !projection.configuration || working) return;
+    const entityId =
+      entity.entityKind === "character" ? entity.item.formId : entity.item.entityId;
+    const attemptKey = `${entity.entityKind}:${entityId}`;
+    const fingerprint = JSON.stringify({
+      candidateVersionId: entity.item.candidateVersionId,
+      entityId,
+      fileLastModified: file.lastModified,
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+      selectionVersion: entity.item.aggregateVersion,
+    });
+    const attempt = retainIdempotencyAttempt(
+      worldUploadIdempotencyKeys.current.get(attemptKey) ?? null,
+      fingerprint,
+    );
+    worldUploadIdempotencyKeys.current.set(attemptKey, attempt);
+    let encodedFilename: string;
+    try {
+      encodedFilename = encodeURIComponent(file.name);
+    } catch {
+      worldUploadIdempotencyKeys.current.delete(attemptKey);
+      setSaveState("rejected");
+      setNotice("That filename cannot be represented safely. Rename it and try again.");
+      return;
+    }
+    setWorking(true);
+    setSaveState("saving");
+    setNotice(`Monica is inspecting ${file.name} in an isolated media chamber.`);
+    try {
+      const response = await fetch(
+        `/api/episodes/${encodeURIComponent(projection.episode.id)}/world-upload`,
+        {
+          body: file,
+          cache: "no-store",
+          headers: {
+            "content-type": file.type,
+            "x-genie-candidate-version-id": entity.item.candidateVersionId,
+            "x-genie-configuration-id": projection.configuration.id,
+            "x-genie-entity-id": entityId,
+            "x-genie-entity-kind": entity.entityKind,
+            "x-genie-selection-version": String(entity.item.aggregateVersion),
+            "x-genie-upload-name": encodedFilename,
+            "x-genie-workspace-id": projection.episode.workspaceId,
+            "x-idempotency-key": attempt.key,
+          },
+          method: "POST",
+        },
+      );
+      await readCommandResponse(
+        response,
+        "The replacement image could not pass secure intake.",
+      );
+      worldUploadIdempotencyKeys.current.delete(attemptKey);
+      setSaveState("saved");
+      setNotice(
+        `${entity.item.name} passed isolated inspection and is ready for your review.`,
+      );
+      refreshIntoChamber("world");
+    } catch (error) {
+      if (error instanceof CommandMutationError && error.definitive) {
+        worldUploadIdempotencyKeys.current.delete(attemptKey);
+        setSaveState("rejected");
+        setNotice(error.message);
+      } else {
+        setSaveState("unconfirmed");
+        setNotice(
+          "The secure-upload outcome is unconfirmed. Keep this page open or refresh; Monica will reconcile the immutable intake before retrying.",
+        );
+      }
+      refreshIntoChamber("world");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function appointCulturalReviewer(): Promise<void> {
+    const sourceReview = projection.preflight.sourceReview;
+    if (
+      !canEditCreation ||
+      !sourceReview ||
+      sourceReview.competencies.length > 0 ||
+      working
+    ) {
+      return;
+    }
+    const payload = {
+      episodeId: projection.episode.id,
+      packetId: sourceReview.packetId,
+      workspaceId: projection.episode.workspaceId,
+    };
+    const requestBody = JSON.stringify(payload);
+    const attempt = retainIdempotencyAttempt(
+      sourceAppointmentIdempotencyKey.current,
+      requestBody,
+    );
+    sourceAppointmentIdempotencyKey.current = attempt;
+    setWorking(true);
+    setSaveState("saving");
+    setNotice("");
+    try {
+      const response = await fetch(
+        `/api/episodes/${encodeURIComponent(projection.episode.id)}/source-review/appointment`,
+        {
+          body: requestBody,
+          cache: "no-store",
+          headers: {
+            "content-type": "application/json",
+            "x-idempotency-key": attempt.key,
+          },
+          method: "POST",
+        },
+      );
+      await readCommandResponse(
+        response,
+        "The cultural-review appointment could not be activated.",
+      );
+      sourceAppointmentIdempotencyKey.current = null;
+      setSaveState("saved");
+      setNotice(
+        "Reviewer responsibility activated. Inspect the exact evidence before deciding.",
+      );
+      refreshIntoChamber("preflight");
+    } catch (error) {
+      if (error instanceof CommandMutationError && error.definitive) {
+        sourceAppointmentIdempotencyKey.current = null;
+        setSaveState("rejected");
+        setNotice(error.message);
+      } else {
+        setSaveState("unconfirmed");
+        setNotice(
+          "The appointment outcome is unconfirmed. Refresh before submitting a cultural decision.",
+        );
+      }
+      refreshIntoChamber("preflight");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function decideSourceReview(
+    decision: "approve" | "block",
+    rationale: string,
+  ): Promise<void> {
+    const sourceReview = projection.preflight.sourceReview;
+    const competency = sourceReview?.competencies[0];
+    if (
+      !canEditCreation ||
+      !sourceReview ||
+      !competency ||
+      sourceReview.status !== "pending_qualified_review" ||
+      rationale.trim().length < 2 ||
+      working
+    ) {
+      return;
+    }
+    const payload = {
+      competencyScopeHash: competency.scopeHash,
+      competencyVersionId: competency.competencyVersionId,
+      decision,
+      episodeId: projection.episode.id,
+      expectedStatusVersion: sourceReview.statusVersion,
+      packetId: sourceReview.packetId,
+      rationale: rationale.trim(),
+      workspaceId: projection.episode.workspaceId,
+    };
+    const requestBody = JSON.stringify(payload);
+    const attempt = retainIdempotencyAttempt(
+      sourceDecisionIdempotencyKey.current,
+      requestBody,
+    );
+    sourceDecisionIdempotencyKey.current = attempt;
+    setWorking(true);
+    setSaveState("saving");
+    setNotice("");
+    try {
+      const response = await fetch(
+        `/api/episodes/${encodeURIComponent(projection.episode.id)}/source-review/decision`,
+        {
+          body: requestBody,
+          cache: "no-store",
+          headers: {
+            "content-type": "application/json",
+            "x-idempotency-key": attempt.key,
+          },
+          method: "POST",
+        },
+      );
+      await readCommandResponse(
+        response,
+        "The qualified cultural decision could not be recorded.",
+      );
+      sourceDecisionIdempotencyKey.current = null;
+      setSaveState("saved");
+      setNotice(
+        decision === "approve"
+          ? "Exact cultural evidence approved. Monica can continue autonomous preflight."
+          : "Cultural evidence blocked. Monica will not authorize production.",
+      );
+      refreshIntoChamber("preflight");
+    } catch (error) {
+      if (error instanceof CommandMutationError && error.definitive) {
+        sourceDecisionIdempotencyKey.current = null;
+        setSaveState("rejected");
+        setNotice(error.message);
+      } else {
+        setSaveState("unconfirmed");
+        setNotice(
+          "The cultural-review outcome is unconfirmed. Monica will reconcile it before continuing.",
+        );
+      }
+      refreshIntoChamber("preflight");
+    } finally {
+      setWorking(false);
+    }
+  }
+  async function confirmProductionQuote(): Promise<void> {
+    const quote = projection.preflight.quote;
+    if (
+      !canEditCreation ||
+      !quote ||
+      quote.confirmed ||
+      quote.expired ||
+      !preflightReady ||
+      working
+    )
+      return;
+    const payload = {
+      episodeId: projection.episode.id,
+      hardCeilingMicrousd: quote.hardCeilingMicrousd,
+      quoteHash: quote.quoteHash,
+      quoteId: quote.id,
+      workspaceId: projection.episode.workspaceId,
+    };
+    const requestBody = JSON.stringify(payload);
+    const attempt = retainIdempotencyAttempt(quoteIdempotencyKey.current, requestBody);
+    quoteIdempotencyKey.current = attempt;
+    setWorking(true);
+    setSaveState("saving");
+    setNotice("");
+    try {
+      const response = await fetch(
+        `/api/episodes/${encodeURIComponent(projection.episode.id)}/quote-confirm`,
+        {
+          body: requestBody,
+          cache: "no-store",
+          headers: {
+            "content-type": "application/json",
+            "x-idempotency-key": attempt.key,
+          },
+          method: "POST",
+        },
+      );
+      await readCommandResponse(response, "The exact ceiling could not be confirmed.");
+      quoteIdempotencyKey.current = null;
+      setSaveState("saved");
+      setNotice("Exact production ceiling confirmed. No agent may spend beyond it.");
+      refreshIntoChamber("preflight");
+    } catch (error) {
+      if (error instanceof CommandMutationError && error.definitive) {
+        quoteIdempotencyKey.current = null;
+        setSaveState("rejected");
+        setNotice(error.message);
+      } else {
+        setSaveState("unconfirmed");
+        setNotice(
+          "The ceiling-confirmation outcome is unconfirmed. Monica is reconciling it before any production authority exists.",
+        );
+      }
+      refreshIntoChamber("preflight");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function lockWorld(): Promise<void> {
+    const quote = projection.preflight.quote;
+    if (
+      !canEditCreation ||
+      !projection.configuration ||
+      !worldReady ||
+      !preflightReady ||
+      !quote?.confirmed ||
+      quote.expired ||
+      working
+    )
+      return;
+    const payload = {
+      configurationCandidateId: projection.configuration.id,
+      episodeId: projection.episode.id,
+      expectedConfigurationVersion: Math.max(
+        configurationVersion,
+        projection.configuration.aggregateVersion,
+      ),
+      expectedEpisodeVersion: Math.max(
+        episodeVersion,
+        projection.episode.aggregateVersion,
+      ),
+      quoteId: quote.id,
+      workspaceId: projection.episode.workspaceId,
+    };
+    const requestBody = JSON.stringify(payload);
+    const attempt = retainIdempotencyAttempt(
+      worldLockIdempotencyKey.current,
+      requestBody,
+    );
+    worldLockIdempotencyKey.current = attempt;
+    setWorking(true);
+    setSaveState("saving");
+    setNotice("");
+    try {
+      const response = await fetch(
+        `/api/episodes/${encodeURIComponent(projection.episode.id)}/world-lock`,
+        {
+          body: requestBody,
+          cache: "no-store",
+          headers: {
+            "content-type": "application/json",
+            "x-idempotency-key": attempt.key,
+          },
+          method: "POST",
+        },
+      );
+      await readCommandResponse(response, "The World Lock could not be sealed.");
+      worldLockIdempotencyKey.current = null;
+      setSaveState("saved");
+      setNotice("World Lock sealed atomically. Monica now has the production baton.");
+      refreshIntoChamber("create");
+    } catch (error) {
+      if (error instanceof CommandMutationError && error.definitive) {
+        worldLockIdempotencyKey.current = null;
+        setSaveState("rejected");
+        setNotice(error.message);
+      } else {
+        setSaveState("unconfirmed");
+        setNotice(
+          "The World Lock outcome is unconfirmed. Production remains fail-closed while Monica reconciles the immutable run record.",
+        );
+      }
+      refreshIntoChamber("create");
+    } finally {
+      setWorking(false);
+    }
+  }
+
   function guardAtriumExit(event: MouseEvent<HTMLAnchorElement>): void {
     if (working || saveState === "unconfirmed") {
       event.preventDefault();
@@ -1007,7 +1656,13 @@ export function CreationStudio({
           const reachable =
             item.id === "look"
               ? configurationReady && effectiveVoicePinReconciled
-              : index <= currentIndex || (scriptLocked && item.id === "voice");
+              : item.id === "world"
+                ? worldConfigurationReady
+                : item.id === "preflight"
+                  ? worldReady
+                  : item.id === "create"
+                    ? quoteConfirmed && preflightReady
+                    : index <= currentIndex || (scriptLocked && item.id === "voice");
           return (
             <button
               aria-current={item.id === chamber ? "step" : undefined}
@@ -1042,6 +1697,26 @@ export function CreationStudio({
                 preserved. Genie can annotate your script, never rewrite it.
               </p>
             </header>
+            {!scriptLocked ? (
+              <div className="script-source-choice">
+                <span>Paste or type below, or load an exact text file.</span>
+                <label>
+                  <span>Upload .txt</span>
+                  <input
+                    accept=".txt,text/plain"
+                    disabled={working || !canEditCreation}
+                    onChange={(event) => void loadUploadedScript(event)}
+                    type="file"
+                  />
+                </label>
+                {uploadedScript ? (
+                  <strong title={uploadedScript.fileName}>
+                    {uploadedScript.fileName} loaded (
+                    {uploadedScript.sourceByteLength.toLocaleString()} source bytes)
+                  </strong>
+                ) : null}
+              </div>
+            ) : null}
             <label className="script-canvas">
               <span>Hindi background narration</span>
               <textarea
@@ -1074,8 +1749,9 @@ export function CreationStudio({
               ) : null}
               <footer>
                 <span>
-                  {scriptByteLength} / {MAX_BROWSER_SCRIPT_UTF8_BYTES.toLocaleString()}{" "}
-                  exact UTF-8 bytes
+                  {uploadedScript
+                    ? `${uploadedScript.sourceByteLength.toLocaleString()} original source bytes; ${scriptByteLength.toLocaleString()} decoded UTF-8 bytes`
+                    : `${scriptByteLength.toLocaleString()} / ${MAX_BROWSER_SCRIPT_UTF8_BYTES.toLocaleString()} exact UTF-8 bytes`}
                 </span>
                 <span>≈ {Math.round(estimate)} sec</span>
               </footer>
@@ -1512,11 +2188,13 @@ export function CreationStudio({
                     emptyLookResults ||
                     pendingLookId !== selectedLookId
                   }
-                  onClick={() => setChamber("world")}
+                  onClick={() => void beginWorldBuild()}
                   ref={worldActionRef}
                   type="button"
                 >
-                  Build the world →
+                  {working
+                    ? "Casting the world…"
+                    : "Build world + preflight · max $5.00 →"}
                 </button>
               </footer>
             </div>
@@ -1537,52 +2215,45 @@ export function CreationStudio({
         ) : null}
 
         {chamber === "world" ? (
-          <section className="future-chamber">
-            <span aria-hidden="true">✦</span>
-            <small>Next autonomous foundation</small>
-            <h1 ref={stageHeadingRef} tabIndex={-1}>
-              Characters and locations become a reusable world.
-            </h1>
-            <p>
-              Candidate generation, prompt editing, upload quarantine, acceptance,
-              version history and automatic character sheets land in the next Phase 2
-              work package. No provider call is enabled yet.
-            </p>
-            <button disabled type="button">
-              World engine safely gated
-            </button>
-          </section>
+          <WorldStudio
+            canEdit={canEditCreation}
+            onAccept={(entity) => void decideWorldCandidate(entity, "accept", null)}
+            onContinue={() => setChamber("preflight")}
+            onRegenerate={(entity, revisedPromptText) =>
+              void decideWorldCandidate(entity, "regenerate", revisedPromptText)
+            }
+            onUpload={(entity, file) => void uploadWorldCandidate(entity, file)}
+            projection={projection.world}
+            stageHeadingRef={stageHeadingRef}
+            working={working}
+          />
         ) : null}
 
         {chamber === "preflight" ? (
-          <section className="future-chamber">
-            <span aria-hidden="true">◉</span>
-            <small>Automated readiness surface</small>
-            <h1 ref={stageHeadingRef} tabIndex={-1}>
-              Preflight is not another creative approval gate.
-            </h1>
-            <p>
-              Monica’s specialists will validate culture, pronunciation, references,
-              master-clock timing, provider feasibility and the exact quote. You only
-              intervene when evidence is missing or the final World Lock needs your
-              authorization.
-            </p>
-          </section>
+          <PreflightStudio
+            canEdit={canEditCreation}
+            onAppointReviewer={() => void appointCulturalReviewer()}
+            onConfirmQuote={() => void confirmProductionQuote()}
+            onContinue={() => setChamber("create")}
+            onSourceReview={(decision, rationale) =>
+              void decideSourceReview(decision, rationale)
+            }
+            projection={projection.preflight}
+            stageHeadingRef={stageHeadingRef}
+            working={working}
+          />
         ) : null}
 
         {chamber === "create" ? (
-          <section className="future-chamber">
-            <span aria-hidden="true">◇</span>
-            <small>Autonomous production</small>
-            <h1 ref={stageHeadingRef} tabIndex={-1}>
-              One World Lock, then the crew takes over.
-            </h1>
-            <p>
-              Production video dispatch remains structurally disabled in this slice. It
-              will unlock only after secure media, provider, quote and World Lock
-              adversarial gates pass.
-            </p>
-          </section>
+          <CreationLaunchpad
+            canEdit={canEditCreation}
+            episodeId={projection.episode.id}
+            onLock={() => void lockWorld()}
+            preflight={projection.preflight}
+            stageHeadingRef={stageHeadingRef}
+            working={working}
+            worldReady={worldReady}
+          />
         ) : null}
       </section>
 

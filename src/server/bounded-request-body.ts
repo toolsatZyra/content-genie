@@ -58,6 +58,32 @@ export async function readBoundedUtf8RequestBody(
   maximumBytes: number,
   declaredBytes = declaredRequestBodyBytes(request.headers, maximumBytes),
 ): Promise<string> {
+  const bytes = await readBoundedRequestBody(request, maximumBytes, declaredBytes);
+  try {
+    const body = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
+      bytes,
+    );
+    const encoded = new TextEncoder().encode(body);
+    if (
+      encoded.byteLength !== bytes.byteLength ||
+      encoded.some((value, index) => value !== bytes[index])
+    ) {
+      throw new TypeError("UTF-8 round trip mismatch.");
+    }
+    return body;
+  } catch {
+    throw new BoundedRequestBodyError(
+      "invalid-utf8",
+      "Request body is not valid UTF-8.",
+    );
+  }
+}
+
+export async function readBoundedRequestBody(
+  request: Request,
+  maximumBytes: number,
+  declaredBytes = declaredRequestBodyBytes(request.headers, maximumBytes),
+): Promise<Uint8Array> {
   assertMaximumBytes(maximumBytes);
   if (!request.body) {
     if (declaredBytes !== null && declaredBytes !== 0) {
@@ -66,7 +92,7 @@ export async function readBoundedUtf8RequestBody(
         "Request content length did not match the body.",
       );
     }
-    return "";
+    return new Uint8Array();
   }
 
   const reader = request.body.getReader();
@@ -123,22 +149,5 @@ export async function readBoundedUtf8RequestBody(
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  try {
-    const body = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
-      bytes,
-    );
-    const encoded = new TextEncoder().encode(body);
-    if (
-      encoded.byteLength !== bytes.byteLength ||
-      encoded.some((value, index) => value !== bytes[index])
-    ) {
-      throw new TypeError("UTF-8 round trip mismatch.");
-    }
-    return body;
-  } catch {
-    throw new BoundedRequestBodyError(
-      "invalid-utf8",
-      "Request body is not valid UTF-8.",
-    );
-  }
+  return bytes;
 }

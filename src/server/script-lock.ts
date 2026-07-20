@@ -4,6 +4,10 @@ import { createHash } from "node:crypto";
 
 import { ScriptIntegrityError, prepareBrowserScript } from "@/domain/script/integrity";
 import {
+  UploadedScriptError,
+  decodeUploadedScriptBase64,
+} from "@/domain/script/uploaded-text";
+import {
   CommandValidationError,
   assertExactPayloadKeys,
   integerValue,
@@ -11,13 +15,24 @@ import {
   uuidValue,
 } from "@/security/command-envelope";
 
-export interface ScriptLockRequest {
+interface ScriptLockRequestBase {
   readonly durationAcknowledged: boolean;
   readonly episodeId: string;
   readonly expectedEpisodeVersion: number;
-  readonly rawText: string;
   readonly workspaceId: string;
 }
+
+export interface BrowserScriptLockRequest extends ScriptLockRequestBase {
+  readonly rawText: string;
+  readonly sourceKind: "browser_text";
+}
+
+export interface UploadedScriptLockRequest extends ScriptLockRequestBase {
+  readonly originalBytesBase64: string;
+  readonly sourceKind: "uploaded_text";
+}
+
+export type ScriptLockRequest = BrowserScriptLockRequest | UploadedScriptLockRequest;
 
 export interface PreparedScriptLockCommand {
   readonly parameters: Record<string, unknown>;
@@ -49,20 +64,35 @@ export function parseScriptLockRequest(value: unknown): ScriptLockRequest {
     throw new CommandValidationError("Script lock body must be an object.");
   }
   const payload = value as Record<string, unknown>;
-  assertExactPayloadKeys(payload, [
-    "durationAcknowledged",
-    "episodeId",
-    "expectedEpisodeVersion",
-    "rawText",
-    "workspaceId",
-  ]);
-  if (typeof payload.rawText !== "string") {
-    throw new CommandValidationError("rawText must be an exact string.");
+  const sourceKind = payload.sourceKind ?? "browser_text";
+  if (sourceKind !== "browser_text" && sourceKind !== "uploaded_text") {
+    throw new CommandValidationError(
+      "sourceKind must identify a supported script source.",
+    );
   }
+  assertExactPayloadKeys(
+    payload,
+    sourceKind === "uploaded_text"
+      ? [
+          "durationAcknowledged",
+          "episodeId",
+          "expectedEpisodeVersion",
+          "originalBytesBase64",
+          "sourceKind",
+          "workspaceId",
+        ]
+      : [
+          "durationAcknowledged",
+          "episodeId",
+          "expectedEpisodeVersion",
+          "rawText",
+          "workspaceId",
+        ],
+  );
   if (typeof payload.durationAcknowledged !== "boolean") {
     throw new CommandValidationError("durationAcknowledged must be boolean.");
   }
-  return {
+  const common = {
     durationAcknowledged: payload.durationAcknowledged,
     episodeId: uuidValue(payload, "episodeId"),
     expectedEpisodeVersion: integerValue(
@@ -71,14 +101,24 @@ export function parseScriptLockRequest(value: unknown): ScriptLockRequest {
       1,
       Number.MAX_SAFE_INTEGER,
     ),
-    rawText: payload.rawText,
     workspaceId: uuidValue(payload, "workspaceId"),
   };
+  if (sourceKind === "uploaded_text") {
+    if (typeof payload.originalBytesBase64 !== "string") {
+      throw new CommandValidationError("originalBytesBase64 must be an exact string.");
+    }
+    return { ...common, originalBytesBase64: payload.originalBytesBase64, sourceKind };
+  }
+  if (typeof payload.rawText !== "string") {
+    throw new CommandValidationError("rawText must be an exact string.");
+  }
+  return { ...common, rawText: payload.rawText, sourceKind };
 }
 
 function hashScriptLockRequest(
   request: ScriptLockRequest,
   rawUtf8: Uint8Array,
+  originalSourceBytes: Uint8Array | null,
   idempotencyKey: string,
 ): string {
   const hash = createHash("sha256");
@@ -88,12 +128,15 @@ function hashScriptLockRequest(
     request.episodeId,
     String(request.expectedEpisodeVersion),
     request.durationAcknowledged ? "acknowledged" : "not-acknowledged",
+    request.sourceKind,
     idempotencyKey,
   ]) {
     hash.update(value, "utf8");
     hash.update("\0", "utf8");
   }
   hash.update(rawUtf8);
+  hash.update("\0", "utf8");
+  if (originalSourceBytes) hash.update(originalSourceBytes);
   return hash.digest("hex");
 }
 
@@ -101,9 +144,20 @@ export function prepareScriptLockCommand(
   request: ScriptLockRequest,
   idempotencyKey: string,
 ): PreparedScriptLockCommand {
-  const prepared = prepareBrowserScript(request.rawText);
+  const uploaded =
+    request.sourceKind === "uploaded_text"
+      ? decodeUploadedScriptBase64(request.originalBytesBase64)
+      : null;
+  const prepared = prepareBrowserScript(
+    request.sourceKind === "uploaded_text" ? uploaded!.text : request.rawText,
+  );
   const identity = newCommandIdentity();
-  const requestHash = hashScriptLockRequest(request, prepared.rawUtf8, idempotencyKey);
+  const requestHash = hashScriptLockRequest(
+    request,
+    prepared.rawUtf8,
+    uploaded?.originalBytes ?? null,
+    idempotencyKey,
+  );
   return {
     parameters: {
       p_command_id: identity.commandId,
@@ -113,6 +167,10 @@ export function prepareScriptLockCommand(
       p_episode_id: request.episodeId,
       p_expected_episode_version: request.expectedEpisodeVersion,
       p_idempotency_key: idempotencyKey,
+      p_original_source_bytes: uploaded
+        ? `\\x${Buffer.from(uploaded.originalBytes).toString("hex")}`
+        : null,
+      p_original_source_sha256: uploaded?.encodingEvidence.originalSha256 ?? null,
       p_processing_grapheme_count: prepared.coordinateMap.p[2].length,
       p_processing_profile: prepared.processingProfile,
       p_processing_scalar_count: prepared.coordinateMap.p[0].length - 1,
@@ -127,10 +185,13 @@ export function prepareScriptLockCommand(
       p_raw_utf8_sha256: prepared.rawUtf8Sha256,
       p_request_hash: requestHash,
       p_runtime_evidence: prepared.runtimeEvidence,
+      p_source_encoding_evidence:
+        uploaded?.encodingEvidence ?? ({ kind: "browser-utf16" } as const),
+      p_source_kind: request.sourceKind,
       p_workspace_id: request.workspaceId,
     },
     requestHash,
   };
 }
 
-export { ScriptIntegrityError };
+export { ScriptIntegrityError, UploadedScriptError };

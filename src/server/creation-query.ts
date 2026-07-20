@@ -8,6 +8,10 @@ import {
   type CreationProjection,
   type LookAvailabilityStatus,
 } from "@/domain/creation";
+import {
+  emptyCreationReadinessProjection,
+  parseCreationReadinessProjection,
+} from "@/domain/creation-readiness";
 import { LOOKS } from "@/domain/look/look-registry";
 import { parseEpisodeWorkflowState, type EpisodeWorkflowState } from "@/domain/studio";
 
@@ -83,7 +87,7 @@ export async function loadCreationProjection(
       )
       .eq("workspace_id", episode.workspace_id)
       .eq("episode_id", episode.id)
-      .in("state", ["world_design", "preflight", "ready_to_lock"])
+      .in("state", ["world_design", "preflight", "ready_to_lock", "locked"])
       .maybeSingle(),
   ]);
   if (scriptResult.error) throw scriptResult.error;
@@ -145,6 +149,36 @@ export async function loadCreationProjection(
         voiceVersionId: configuration.voice_version_id,
       }
     : null;
+  const [readinessResult, sourceReviewResult] = configuration
+    ? await Promise.all([
+        client
+          .from("creation_readiness_projections")
+          .select("world,preflight")
+          .eq("workspace_id", episode.workspace_id)
+          .eq("configuration_candidate_id", configuration.id)
+          .maybeSingle(),
+        client
+          .from("source_review_readiness_projections")
+          .select("source_review")
+          .eq("workspace_id", episode.workspace_id)
+          .eq("configuration_candidate_id", configuration.id)
+          .maybeSingle(),
+      ])
+    : [
+        { data: null, error: null },
+        { data: null, error: null },
+      ];
+  if (readinessResult.error) throw readinessResult.error;
+  if (sourceReviewResult.error) throw sourceReviewResult.error;
+  const readiness = readinessResult.data
+    ? parseCreationReadinessProjection({
+        ...readinessResult.data,
+        preflight: {
+          ...(readinessResult.data.preflight as Record<string, unknown>),
+          sourceReview: sourceReviewResult.data?.source_review ?? null,
+        },
+      })
+    : emptyCreationReadinessProjection;
 
   return {
     configuration: projectedConfiguration,
@@ -167,5 +201,7 @@ export async function loadCreationProjection(
           revisionNumber: script.revision_number,
         }
       : null,
+    preflight: readiness.preflight,
+    world: readiness.world,
   };
 }

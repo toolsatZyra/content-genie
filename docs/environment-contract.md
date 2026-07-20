@@ -50,8 +50,10 @@ Sentry variables remain unused and must not be added to runtime imports.
 | `GENIE_LIVE_BROKER_SIGNING_PRIVATE_KEY_PKCS8_BASE64` | Protected local/CI environment only | dedicated Ed25519 request authority for the live-proof broker; independently generated and never derived from the Supabase management token |
 | `GENIE_COMMAND_HMAC_SECRET` | Vercel server-only | dedicated invitation/command HMAC authority; must be independent of the Supabase service-role key |
 | `GENIE_CAPABILITY_SIGNING_PRIVATE_KEY` | Vercel issuer only | sign short-lived per-attempt capability tokens |
+| `GENIE_CAPABILITY_SIGNING_KID` | Vercel issuer and verifier configuration | active registered Ed25519 capability-key version identifier |
 | `GENIE_CAPABILITY_VERIFY_PUBLIC_KEY` | Vercel/Trigger verifier | verify tokens; cannot mint |
 | `GENIE_BROKER_CLIENT_ID` | Each Trigger project only | stable, environment-scoped service identity; unique per Trigger project |
+| `GENIE_BROKER_CLIENT_KID` | Each Trigger project only | active registered Ed25519 key-version identifier used in broker assertion headers |
 | `GENIE_BROKER_CLIENT_SIGNING_PRIVATE_KEY` | Each Trigger project only | sign short-lived broker-client assertions; unique Ed25519 key per project/environment |
 | `GENIE_BROKER_CLIENT_PUBLIC_KEYS_JSON` | Vercel provider broker only | allowlisted `client_id`/`kid`/public-key registry during bootstrap; database registry is authoritative after bootstrap |
 | `GENIE_BROKER_AUDIENCE` | Vercel broker + each Trigger project | exact provider-broker audience string |
@@ -65,6 +67,7 @@ Sentry variables remain unused and must not be added to runtime imports.
 | `GENIE_ENABLE_RENDER` | Vercel + Trigger | server-side render kill switch; default `false` |
 | `GENIE_ENABLE_EXPORT` | Vercel server-only | export kill switch |
 | `GENIE_ENABLE_FINAL_APPROVAL` | Vercel server-only | disabled outside production-ready environments |
+| `GENIE_MVP_INLINE_PREFLIGHT` | Vercel server-only | developer-MVP Vercel cron dispatch when Trigger Cloud is not configured |
 | `GENIE_VAULT_SUPABASE_URL` | Separate Vault-writer deployment | separate Vault project URL |
 | `GENIE_VAULT_WRITER_DB_URL` | Separate Vault-writer deployment | custom insert-only database login; no update/delete/DDL |
 | `GENIE_VAULT_WRITER_SIGNING_PRIVATE_KEY` | Separate Vault-writer issuer only | mint short-lived `genie_vault_writer` Storage JWTs |
@@ -171,9 +174,9 @@ Genie therefore uses separate deployments and no provider secrets in Trigger:
 
 | Trigger project | Allowed secrets | Explicitly absent |
 |---|---|---|
-| `genie-control` | Trigger key, capability verify public key, unique broker client ID/signing key, broker audience | provider keys, Supabase service role, Vault credentials |
-| `genie-agent` | Trigger key, capability verify public key, unique broker client ID/signing key, broker audience | provider keys, renderer grants, Supabase service role |
-| `genie-media` | Trigger key, capability verify public key, unique broker client ID/signing key, broker audience, signed task grants | provider keys, model keys, Supabase service role |
+| `genie-control` | Trigger key, capability verify public key, unique broker client ID/key ID/signing key, broker audience | provider keys, Supabase service role, Vault credentials |
+| `genie-agent` | Trigger key, capability verify public key, unique broker client ID/key ID/signing key, broker audience | provider keys, renderer grants, Supabase service role |
+| `genie-media` | Trigger key, capability verify public key, unique broker client ID/key ID/signing key, broker audience, signed task grants | provider keys, model keys, Supabase service role |
 
 The Vercel provider broker validates the registered one-attempt grant, exact
 quote slot, capability, workspace/run/stage/fence, expiry, and broker client
@@ -182,7 +185,7 @@ every provider-key name from each Trigger project and must receive absence.
 
 Broker-client public keys are stored in a versioned server-authorized registry
 with `client_id`, Trigger project, environment, `kid`, validity window, and
-status. Rotation uses an explicit overlap window with two valid `kid` values;
+status. Rotation uses an explicit overlap window of at most 15 minutes with two valid `kid` values;
 revocation disables the compromised `kid` immediately and expires its
 outstanding assertion `jti` values. No Trigger project receives another
 project's private key, and no shared broker-client secret exists.

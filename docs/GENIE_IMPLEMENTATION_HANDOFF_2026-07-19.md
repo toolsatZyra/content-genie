@@ -1,0 +1,707 @@
+# Genie by Zyra — implementation continuation handoff
+
+**Snapshot date:** 2026-07-19
+**Workspace:** `C:\Work\Code\zyrastudio`
+**Git branch:** `main`
+**Current HEAD:** `d61bc1c5873e7030cfb84acdb601b598024ba390`
+**Goal status:** active — design, build, test, deploy, and calibrate Genie end to
+end
+**Current phase:** Phase 2, not yet closed
+**Status vocabulary:** work described below is either committed, implemented in
+the working tree, or externally verified. Those states are deliberately not
+treated as interchangeable.
+
+This file is the authoritative continuation snapshot for a fresh Codex
+conversation. The live worktree and external services remain the ultimate
+truth. Begin with the startup audit in section 13 before changing code.
+
+## 0. Developer-MVP scope change (2026-07-20)
+
+The owner explicitly prioritized a working application over the original
+launch-scale assurance program. `docs/MVP_DELIVERY_PROFILE_2026-07-20.md` is now
+the active release gate. Preserve the immutable-script, exact identity,
+cultural, provider-secret, media-ingest, USD 50, workspace-isolation, and final
+human-review invariants. Defer exhaustive concurrency, fault-injection,
+all-state/all-device matrices, per-phase independent reviews, and enterprise
+operations until owner testing or wider-team rollout. Deferred obligations are
+not verified and must remain labelled honestly.
+
+## 1. Mission and intended moat
+
+Genie by Zyra is an internal, multi-user AI production studio for cinematic
+Hindu devotional short-form films. It takes an exact user-provided Hindi script
+and, through Monica and a team of specialist agents, autonomously produces a
+cinematic, consistent, expressive 9:16 episode with voiceover, score, SFX,
+editing, QC, repair, and export.
+
+The owner also clarified the real-world visual and editing design. The durable
+decision is in
+`docs/MVP_REAL_WORLD_VISUAL_RESEARCH_AND_EDITING_2026-07-20.md`. Named-temple
+research already records and scans licensed Wikimedia references and now keeps
+up to four candidates. The generic named festival/ritual reference subject and
+shot-allocation extension is still an MVP completion item. The MVP renderer is
+FFmpeg in ephemeral Vercel Sandbox, not Remotion; the six/twelve-clip proofs
+have been replaced with `ceil(audio duration / 3 seconds)` word-bound visual
+slots (20-40 shots) and EDD-timed cuts. A Seedance multi-shot source clip may
+cover adjacent slots only when its internal changes map to the exact same word
+ranges. The revised Sandbox canary passed H.264, 1080x1920, yuv420p, exactly
+61.000 seconds.
+
+The moat is not generic script-to-video orchestration. It is the reliable,
+automatic combination of:
+
+- cinematic and engaging visual storytelling;
+- persistent character, costume, location, iconography, look, voice, score,
+  and sound identities;
+- expressive conversational Hindi narration with fluent Sanskrit
+  pronunciation;
+- culturally and theologically responsible devotional depiction;
+- provider-aware shot direction and reference continuity;
+- automatic detection and bounded repair of visual, audio, narrative,
+  continuity, cultural, and render defects;
+- final-video quality that a human viewer would describe as a good devotional
+  film, not merely a technically valid generation;
+- durable lineage, costs, decisions, retries, QC evidence, and human authority.
+
+InVideo Agent One is the broad script-to-video benchmark. Genie is narrower and
+deeper: devotional drama and mythology, series continuity, immutable scripts,
+cinematic vertical composition, Indian cultural rules, and automatic
+multi-agent quality control.
+
+## 2. Non-negotiable product contract
+
+### 2.1 Launch scope
+
+- Hindi, narration-only episodes.
+- Typical duration 60–120 seconds.
+- Vertical 9:16 output for Instagram Reels and YouTube Shorts.
+- No dialogue, lip-sync, or dialogue-character voice synthesis at launch.
+- Internal application. Multiple team members may work concurrently and may
+  start multiple Episodes while other Episodes generate or repair.
+- Initial expected production volume: approximately five Episodes per day.
+- Users may export completed videos directly.
+
+### 2.2 Immutable input and additive intelligence
+
+- The source script supplied by the user must never be rewritten, paraphrased,
+  shortened, reordered, or silently corrected.
+- Preserve exact input bytes/text and an exact processing coordinate map.
+- Script rubrics may advise or block eligibility, but may not mutate source
+  text.
+- Timing, beat decomposition, pronunciation, cultural notes, entity extraction,
+  narration markup, story design, shot plans, reference graphs, prompts, and QC
+  are sidecars bound to the exact source hash.
+
+### 2.3 Human intervention at launch
+
+The intended routine human flow is:
+
+1. Create/select Series and Episode; enter and lock the exact script.
+2. Choose narrator gender; male is default.
+3. Choose one of exactly 117 looks; Indian mythology
+   `glowing-divine-realism` is default. There is no Recommended section.
+4. Review generated character and location anchors. For each anchor the user
+   can accept, inspect/edit its prompt and regenerate, or upload a replacement.
+5. Genie generates character sheets and the complete world reference pack.
+6. A qualified source/cultural reviewer records a decision when required.
+7. The user confirms the exact production quote/ceiling and authorizes one
+   atomic World Lock.
+8. Monica and specialist agents operate autonomously through production and QC.
+9. The user reviews the final video and can submit any number of timecoded or
+   time-range repair rows in plain language through a curated Monica interface.
+
+The future clip-review/editor surface may expose individual clips and their
+prompts/references before the final edit, but it is not a launch prerequisite.
+
+### 2.4 Voices and creative defaults
+
+- Male ElevenLabs voice ID: `b0oby86k6n7Uh5LZcOBR`.
+- Female ElevenLabs voice ID: `GSdeLRB8detpjZjN63Wn`.
+- Male is the default narrator gender.
+- Narration target: expressive conversational Hindi, Delhi-identifiable accent,
+  fluent Sanskrit pronunciation.
+- Do not silently fall back to another voice. A withdrawn, missing, or
+  unverified identity fails closed.
+- Every recurring identity is versioned and inherited through a released
+  Series world.
+
+### 2.5 Provider routing and cost
+
+- Kling 2.5 on fal.ai: simple camera plus simple subject motion.
+- Kling 3.0 on fal.ai: camera-led motion.
+- Seedance: other/complex AI video shots.
+- Selected look is a separate prompt paragraph/tail derived from the exact
+  117-look registry; it does not replace the scene-composition paragraph.
+- Optimize for quality first, reliability second, cost third, speed fourth.
+- Target Episode cost below USD 40. Normal hard ceiling is USD 50 unless an
+  explicit top-up authority exists.
+- Reservations cap future authorized spend; they do not claim that provider
+  invoices cannot include failed/refused attempts.
+
+### 2.6 Cultural and content policy
+
+- Regional retellings are allowed when lineage/tradition is recorded.
+- Named temples require research against actual references and evidence-bound
+  depiction.
+- Violence and romance follow the treatment of Indian devotional cinema.
+- Era/caste depiction should be historically credible without dehumanizing or
+  promotional stereotyping.
+- No nudity or religious conflict content.
+- Monica may evaluate and block, but she is not the human cultural, legal, or
+  final release authority.
+- Human final release remains mandatory until the calibration/holdout contract
+  in `docs/qc-release-contract.md` is satisfied.
+
+## 3. Product organization and UX
+
+- Organization → Workspace → Series → Episode.
+- A Series is a versioned creative world/master folder.
+- Later Episodes inherit the released look, selected character/location
+  versions, narrator identity, pronunciation, score, and sound rules.
+- Episode changes may propose a later Series release; they must not silently
+  mutate the world used by existing Episodes.
+- Concurrent generation/repair is durable and backgrounded. Users can leave an
+  Episode, start another, return to progress, receive review-required
+  notifications, search older Series/Episodes, and download final exports.
+- The UI design language is Living Cinema: fluid, cinematic, playful, tactile,
+  and futuristic rather than a conventional enterprise dashboard.
+- Operational UI must never fabricate provider outputs, percentages, ETAs,
+  QC scores, or completion states.
+
+## 4. Authoritative design and assurance sources
+
+Read these in this order when a requirement is unclear:
+
+1. `docs/GENIE_IMPLEMENTATION_HANDOFF_2026-07-19.md` — current execution state.
+2. `docs/design.md` — authoritative end-to-end product/solution contract.
+3. `DESIGN.md` — Living Cinema UI contract.
+4. `docs/implementation-plan.md` — phases, work packages, gates, rollback, and
+   definition of done.
+5. `docs/qc-release-contract.md` — normative runtime QC/release requirements.
+6. `docs/state-and-data-contract.md` — state, transaction, concurrency, CAS,
+   fencing, and idempotency contract.
+7. `docs/provider-contract.md` and `docs/cost-envelope.md` — routing, freshness,
+   spend, provider evidence, and quote rules.
+8. `docs/series-and-cultural-policy.md` — source, cultural, continuity, and
+   release-authority rules.
+9. `docs/threat-model.md` — security boundaries.
+10. `docs/sdlc.md` — delivery loop and the revised phase-level adversarial
+    review cadence.
+11. `docs/verification-matrix.md` — explicit verification scenarios.
+12. `docs/traceability.md`, `docs/traceability-matrix.md`, and
+    `reference/acceptance/` — machine and human requirement/evidence routing.
+13. `docs/reference-porting-map.md` — verified AI Director look/character-sheet
+    porting map.
+14. `reference/rubric-config/` — research inputs. These do not override the
+    stage-specific runtime QC contract.
+
+`docs/project-state.md` contains valuable historical Phase 1 evidence but was
+outdated for the current Phase 2 working tree. It now points here for live
+status.
+
+## 5. Repository, Git, deployment, and secrets
+
+- GitHub: `https://github.com/toolsatZyra/content-genie.git`.
+- Branch: `main`.
+- Current HEAD: `d61bc1c5873e7030cfb84acdb601b598024ba390`
+  (`Build Phase 2 zero-spend creation checkpoint`).
+- The repository intentionally has no persistent `origin` because the owner
+  works across many repositories in parallel.
+- Push only with an explicit URL, for example:
+
+  ```powershell
+  git push https://github.com/toolsatZyra/content-genie.git main
+  ```
+
+- Git-linked Vercel production URL:
+  `https://content-genie-three.vercel.app/`.
+- Vercel project: `content-genie`, project ID
+  `prj_aSnq2s4OL3hw3e8NX29dLPXDFe3g`, team
+  `team_pwTpdWGJnbaaUJHUGUtCMxVG`.
+- Routine deployment is a verified `main` push; do not browse Vercel for normal
+  deployment.
+- Supabase production: `fnxztrqsqucojcvabjhk`.
+- Supabase Phase 2 preview: `iuzijmzcimtwyowhwinu`, branch
+  `genie-phase1-dev`.
+- Sentry is intentionally excluded. Application diagnostics, QC, costs, and
+  audit evidence live in Supabase.
+- `.env.local` contains private configuration and must never be committed or
+  copied into handoffs/logs.
+- Never stage or commit
+  `docs/Provider and Infrastructure Inventory.xlsx`.
+- Owner authorization covers in-scope GitHub, database, provider, and
+  deployment actions. Platform safety and permission boundaries still apply.
+
+## 6. External state verified for this handoff
+
+The following state was re-read from current services on 2026-07-19:
+
+### 6.1 Supabase
+
+- Preview is healthy and contains 102 migration records: 13 named Phase 1
+  migrations, the remote schema record, and 88 named Phase 2 migrations.
+- Preview latest migration name: `phase2_broker_key_overlap_security`.
+- Production is healthy and contains 14 records: 13 named Phase 1 migrations
+  plus the remote schema record.
+- Production contains zero Phase 2 migrations. This is intentional until the
+  Phase 2 gate and independent review pass.
+- The Supabase migration service assigns its own applied version timestamps;
+  compare migration names and SQL content rather than assuming its applied
+  version equals the local filename timestamp.
+
+### 6.2 Trigger.dev
+
+- `TRIGGER_SECRET_KEY` exists locally but is a development secret.
+- `TRIGGER_PROJECT_REF` is missing.
+- `trigger.config.ts` therefore uses the fail-closed placeholder
+  `proj_genie_control_unconfigured`.
+- The Trigger CLI is not authenticated with a deployment PAT. A project secret
+  is not a CLI PAT.
+- The development secret has been validated read-only against the Trigger API:
+  listing runs succeeds and identifies the `dev` environment owned by
+  `toolsatZyra`; the latest known run is
+  `genie-preflight-discovery-probe-v0`. No secret value is recorded here.
+- The development secret cannot call PAT-only `/api/v2/whoami` or
+  `/api/v1/projects`, and neither the repository nor the provider inventory
+  contains a real `proj_...` reference. The currently installed Trigger CLI is
+  not logged in and there is no local `TRIGGER_ACCESS_TOKEN`.
+- This is not the immediate code blocker, but Phase 2 cannot close until the
+  required Trigger project/identity/queues are deployed and authenticated.
+  Exhaust all local, preview-database, provider-broker, and browser work before
+  escalating this dependency.
+
+### 6.3 Authenticated provider evidence
+
+Current evidence artifacts include:
+
+- `docs/evidence/provider-snapshots/elevenlabs-2026-07-19.json`;
+- `docs/evidence/provider-snapshots/elevenlabs-with-timestamps-2026-07-19.json`;
+- `docs/evidence/provider-snapshots/fal-nano-banana-edit-canary-2026-07-19.json`;
+- `docs/evidence/provider-snapshots/fal-video-production-canaries-2026-07-19.json`;
+- `docs/evidence/provider-snapshots/openai-narration-audio-qc-2026-07-19.json`.
+
+These prove bounded authenticated canary observations. They are not a full
+production Episode or product-calibration proof.
+
+## 7. Phase status
+
+### Phase 0 — complete and committed
+
+Repository/toolchain, CI, security baseline, exact evidence machinery, and
+adversarial foundation were completed and pushed.
+
+### Phase 1 — complete and committed
+
+Identity, workspaces, Series/Episodes, roles, durable commands/events,
+notifications, audit/diagnostics, RLS/storage, and the initial Studio were
+closed through the required Phase 1 gate and review.
+
+### Phase 2 — implemented substantially in the working tree; not complete
+
+The committed Phase 2 zero-spend checkpoint ends at current HEAD. The live
+working tree adds the remainder of the provider/preflight/world/quote/World
+Lock slice. It has not passed the complete Phase 2 gate or the single required
+end-of-phase independent adversarial review. Do not promote it to production or
+call it complete.
+
+The current dirty tree contains 188 modified/untracked paths, including
+88 Phase 2 migrations, three Phase 2 pgTAP suites, ten API route groups,
+about 45 server modules, six Trigger files, UI chambers, policies, tests, and
+authenticated provider evidence. The large dirty state is intentional
+in-progress Phase 2 work, not disposable noise.
+
+### Phases 3 and 4 — not started as implementation phases
+
+Their design and plan exist, but production media orchestration, Monica’s full
+QC/repair loop, rendering, Premiere, repair chat, exports, search,
+notifications, and launch/calibration remain future implementation.
+
+## 8. Phase 2 implementation now present
+
+The following capabilities are present in the current worktree and/or preview
+schema. Each still requires the complete Phase 2 exit gate.
+
+### 8.1 Exact script, voice, and look foundation (`P2-01`–`P2-03`)
+
+- Exact script/raw-processing coordinate contracts and hardened map v2.
+- Uploaded UTF-8/UTF-16 text preserves original bytes, checksum, encoding
+  evidence, and decoded text through the same immutable atomic script-lock
+  boundary.
+- The pinned script rubric now validates exact source/config hashes,
+  deterministic applicability and rational math, independent evaluator
+  identity/evidence, and advisory-only gates. Its immutable service-authored run
+  is required and pinned before a new plan-evaluation preflight can start.
+- Pinned male/female identities and fail-closed voice verification.
+- Deterministic 117-look pack, manifest/provenance hashes, and default look.
+- Script/voice/look Living Cinema flow and exact Series creative inheritance.
+
+### 8.2 Durable preflight and restricted agents (`P2-04`, `P2-05`)
+
+- Preflight runs, stages, attempts, leases/fences, durable outcomes, failure
+  retry classification, and Trigger control dispatch contracts.
+- Restricted typed OpenAI agent/evaluator boundary.
+- All restricted model calls are ledgered with exact input/output hashes,
+  rejection/replay evidence, and no arbitrary side-effect authority.
+- World Extraction and Pronunciation Director use the ledgered structured-agent
+  path.
+- Executable-plan evaluation uses two fresh blind evaluators and bounded
+  automatic repair: initial plan plus no more than two materially changed
+  successors. Exact locked inputs are preserved.
+- Terminal plan-quality or quote-ceiling failures are sealed product outcomes,
+  not indefinite transport retries. They create a durable work item and a safe
+  creation-readiness projection.
+
+### 8.3 Provider authority and secure ingest (`P2-06`, `P2-07`)
+
+- Micro-spend versus production-spend separation.
+- Capability grants, bounded provider slots, provider profiles, authenticated
+  request/retry/alternate lanes, deterministic idempotency, and cost ledgers.
+- Provider keys stay behind the Vercel broker; Trigger receives bounded
+  assertions/grants rather than provider secrets.
+- fal signed-webhook inbox, late/lost/replay correction, output-target binding,
+  media-kind/dimension/duration binding, retry pools, and reconciliation.
+- Secure remote fetch defenses and quarantine-first image/audio ingest.
+- MIME, size, redirect/private-network, exact still-image container/CRC,
+  scan, re-encode, metadata, provenance, and promotion constraints.
+- Appended-payload polyglots are rejected before parser creation. A real
+  ephemeral Vercel Sandbox corpus proves a metadata-bearing PNG is scanned and
+  re-encoded after network denial with no GPS, comment, XMP, or private
+  attachment chunks/payload in the derivative. Malformed, oversized, and
+  wrong-MIME provider outputs never become authoritative.
+
+### 8.4 World Studio and cultural readiness (`P2-08`, `P2-09`)
+
+- World extraction, character/location entities, generated candidate versions,
+  prompt revision/regeneration, secure upload replacement, acceptance, version
+  history, character sheets, and verified world reference packs.
+- Named-temple research/evidence binding and null-safety corrections.
+- Qualified cultural source packets, competencies, appointments, recusal,
+  approve/block decisions, non-overridable policy, and source/world version
+  pins.
+- World anchor generation/edit dispatch and atomic promotion/retry behavior.
+
+### 8.5 Audio identity, planning, quote, and World Lock (`P2-10`–`P2-13`)
+
+- Pronunciation, score identity, sound rules, narrator identity, and pre-lock
+  narration dispatch/reconciliation.
+- Narration exact-text and master-clock binding, scan/replay evidence, and
+  independent audio QC.
+- Story/beat/shot/EDD/reference graph plan, provider-slot plan, feasibility and
+  evaluator consensus.
+- Exact quote compiler with provider lines plus seven mandatory allowance
+  classes and exact low/expected/high totals.
+- Quote confirmation binds the exact quote hash and ceiling. It cannot authorize
+  more than USD 50 without a separate top-up contract.
+- Atomic World Lock is designed to publish the Series release, production run,
+  high reservation, and production authority together or not at all.
+
+### 8.6 Living Cinema creation flow (`P2-14`)
+
+- Real World Studio, Preflight Studio, and Creation Launchpad replace the former
+  placeholder chambers.
+- World build, accept, regenerate, upload, cultural appointment/decision,
+  quote-confirm, and World Lock route integrations use retained idempotency.
+- Soft polling refreshes visible World/Preflight/Create chambers while durable
+  asynchronous work is pending; online/visibility events reconcile state.
+- Terminal plan/quote failure renders explicit safe feedback, disables quote
+  and lock actions, and states that no production spend was authorized.
+- Browser fixture/test coverage includes a blocked Phase 2 preflight state.
+
+## 9. Last verified tests and what remains unproven
+
+### 9.1 Recent passing evidence
+
+- The handoff QA reran the focused quote confirmation, World Lock route,
+  preflight failure classification, bounded plan repair, exact quote, and
+  creation-readiness contracts: 23 tests across six files passed.
+- The uploaded-source and script-rubric batch passes 43/43 focused unit/API
+  tests. The UTF-16 browser upload regression also passes in Chromium.
+- The secure-image negative corpus passes 13 focused tests across container,
+  scanner, and provider-ingest boundaries. Its credential-gated live case then
+  passed separately through the real ephemeral Vercel Sandbox in 65.36 seconds
+  (63.42 seconds in the scanner): the derivative retained its exact dimensions
+  and valid PNG/hash envelope while GPS, comments, XMP, and attachment
+  chunks/payload were absent. The ignored temporary OIDC file was deleted.
+- `pnpm typecheck` passed against the current TypeScript/UI/API worktree after
+  the latest browser-fixture and terminal-feedback edits.
+- All four current Phase 2 preview pgTAP suites pass: zero-spend/script/upload/
+  rubric 178 planned assertions, provider/secure ingest 85/85, world/cultural/
+  transactional World Lock 57/57, and executable plan/quote/terminal feedback
+  45/45 — 365 planned assertions in total.
+- The 57-assertion world suite now reruns AAL2 owner offboarding after the
+  bounded World Lock envelope exists: Series/Episode authority transfers, the
+  removed owner loses membership/session/work/lease authority, and the exact
+  autonomous run, reservation, and historical signer evidence remain unchanged.
+- The preview run exposed and the forward-only migration
+  `20260719080400_phase2_terminal_feedback_summary_disambiguation.sql` fixes a
+  genuine PL/pgSQL variable/column ambiguity that had prevented terminal
+  preflight failure from sealing its durable safe work item.
+- The complete-worktree formatting and lint passes are green after correcting
+  four small TypeScript hygiene findings and formatting the accumulated Phase 2
+  batch.
+- The integration suite is green at 5/5. Type checking, the 117-look generated
+  asset/pixel-decode gate, production-environment fail-closed test, secretless
+  boot test, secret/inventory/security scan, and browser-bundle policy gate are
+  green.
+- The production dependency licence gate is green for 182 package records. The
+  dependency audit is below its high-severity threshold after workspace-level
+  `tar` and `ws` overrides; three accepted lower-severity advisories remain (one
+  low and two moderate).
+- The concise full-unit run is conclusive: 77 test files and 449 tests passed
+  with exit code 0.
+- The full coverage run is conclusive against the same 77 files and 449 tests:
+  96.87% statements (651/672), 94.05% branches (506/538), 100% functions
+  (113/113), and 98.03% lines (600/612), with exit code 0.
+- The provider-broker identity boundary now enforces an explicit key-overlap
+  maximum of 15 minutes. Preview pgTAP proves both `kid` values during overlap,
+  immediate key revocation and client disable, unexpired-JTI invalidation,
+  stale-writer rejection, private-table denial, and append-only lifecycle plus
+  rejection security evidence. The TypeScript corpus independently covers exact
+  issuer/audience/project/environment/task/run/stage/subject/time/capability
+  bindings. True two-session revoke/disable-versus-consume races remain in the
+  concurrency audit before `V-P2-034` can close.
+- The frozen trusted-harness manifest now includes the exact 88 Phase 2
+  migration versions and all five required pgTAP suites. Its hostile controls,
+  sandbox policy, and isolated-runner policy pass. The complete `pnpm test:rls`
+  composite passes with exit code 0. Its final local live-database skip is
+  intentional because the isolated Supabase harness is not active; the managed
+  preview pgTAP checkpoint provides the live schema proof.
+- The complete 55-test creation browser suite initially exposed four stale
+  accessible-name locators and one real toast/sticky-tray overlap. The locators
+  now target `Build world + preflight`, and the toast clearance was raised from
+  126px to 146px. All five earlier focused regressions and the uploaded-source
+  regression pass. A final complete 55-test browser run remains required after
+  the Phase 2 candidate is frozen.
+- `pnpm build:canary` passes on Next.js 16.2.10. The acceptance-structure gate
+  passes, including traceability and checkpoint hostile controls. SBOM
+  generation passes with 828 components at `.tmp/artifacts/sbom.cdx.json`.
+
+These are targeted build-loop checks, not the Phase 2 gate.
+
+### 9.2 Resolved database stopping point
+
+File: `supabase/tests/phase2_world_cultural.test.sql`
+
+- The plan was expanded from 37 to 57 assertions.
+- A transaction-level fixture now creates one complete executable plan and
+  exact USD 7.95 quote, confirms the quote as an authenticated AAL2 user,
+  prepares World Lock, forces a unique-conflict at the final work-item write,
+  asserts that release/run/authority all roll back, performs a successful World
+  Lock, and verifies idempotent replay.
+- `.tmp/run-pgtap-preview.mjs` now captures only the pgTAP result functions used
+  by the three suites. Data-producing continuation lines shaped as:
+
+  ```sql
+  insert into ...
+  select ...
+  ```
+
+- remain untouched. The expanded suite then exposed a missing exact source/
+  world binding in the integration fixture; the fixture now constructs the
+  valid script/extraction/world/policy binding before World Lock.
+- The suite proves a forced unique conflict at the final work-item write rolls
+  back the release, run, and budget authority; the subsequent valid seal creates
+  exactly one USD 7.95 reservation/run/release and identical replay creates no
+  duplicate.
+
+### 9.3 Exact current stopping point
+
+The transactional database checkpoint and the first deterministic gate batch
+are closed. Unit, coverage, RLS/policy, focused browser repairs, canary build,
+acceptance structure, and SBOM are conclusive. The live requirement audit is in
+`docs/evidence/phase2/requirement-evidence-audit-2026-07-19.md`; `P2-01`,
+`P2-07`, `V-P2-003`, `V-P2-004`, `V-P2-008`, `V-P2-011`, `V-P2-012`, `V-P2-029`, `V-P2-030`, and `V-P2-031` are
+covered pending the frozen gate. The media proof is in
+`docs/evidence/phase2/media-scanner-corpus-2026-07-19.md`. Continue the remaining
+`P2-01`-`P2-14` and `V-P2-001`-`V-P2-034` gaps, then run the final complete
+browser and local/security/build regression batch.
+Trigger deployment qualification and the frozen remote-live evidence remain
+unresolved external phase-exit dependencies. Do not start the independent
+adversarial review until the deterministic phase-ready gate passes.
+
+## 10. Immediate continuation sequence
+
+Execute this order in the fresh conversation:
+
+1. Read this handoff, the root `AGENTS.md`, Phase 2 of
+   `docs/implementation-plan.md`, Phase 2 of `docs/verification-matrix.md`, and
+   the current `git status`/diff.
+2. Confirm HEAD, branch, no `origin`, preview/production project IDs, and that
+   the owner workbook and `.env.local` remain unstaged.
+3. Confirm the current Phase 2 preview pgTAP checkpoint remains 178 planned,
+   85/85, 57/57, and 45/45 if any schema or SQL-test change occurs:
+
+   ```powershell
+   node --env-file=.env.local .tmp/run-pgtap-preview.mjs iuzijmzcimtwyowhwinu supabase/tests/phase2_zero_spend_foundation.test.sql
+   node --env-file=.env.local .tmp/run-pgtap-preview.mjs iuzijmzcimtwyowhwinu supabase/tests/phase2_preflight_provider_ingest.test.sql
+   node --env-file=.env.local .tmp/run-pgtap-preview.mjs iuzijmzcimtwyowhwinu supabase/tests/phase2_world_cultural.test.sql
+   node --env-file=.env.local .tmp/run-pgtap-preview.mjs iuzijmzcimtwyowhwinu supabase/tests/phase2_executable_plan.test.sql
+   ```
+
+4. Preserve the conclusive unit, coverage, RLS/policy, focused-browser,
+   canary-build, acceptance-structure, and SBOM results above; rerun only the
+   affected focused layer while closing requirement gaps.
+5. Complete the `P2-01`-`P2-14` and `V-P2-001`-`V-P2-034` evidence audit. Then
+   run the full 55-test creation browser suite plus security, bundle, evidence,
+   preview-parity, formatting, lint, type, unit, coverage, RLS, and build gates
+   as one frozen-candidate regression batch.
+6. Re-run the four preview pgTAP suites only if schema or SQL-test inputs change;
+   their current checkpoint is 178 planned plus 85/85, 57/57, and 45/45.
+7. Audit every `P2-01`–`P2-14` item and `V-P2-001`–`V-P2-034` scenario against
+   actual code/evidence. Close implementation or test gaps before the phase
+   gate.
+8. Resolve/deploy the Trigger project identity/queues when it becomes the
+   critical-path blocker. Do not substitute the development secret for a CLI
+   PAT or invent a project reference.
+9. Freeze the Phase 2 candidate and run the complete local, database, browser,
+   security, media, build, preview, and authorized live-canary gate.
+10. Only after deterministic gates pass, run one independent context-minimized
+    end-of-Phase-2 adversarial review covering code, schema, authorization,
+    tests, media, UX/visuals, deployment, and objective traceability.
+11. Fix all P0/P1 findings and any correctness-relevant lower-priority
+    findings, then rerun the complete affected gate.
+12. Commit and push Phase 2 to explicit GitHub `main`; verify the automatic
+    Vercel deployment at the canonical URL. Do not navigate Vercel merely to
+    initiate deployment.
+13. Update this handoff and continue Phase 3.
+
+## 11. Phase 2 exit gate
+
+Do not call Phase 2 complete until evidence proves all of the following:
+
+- `P2-01` through `P2-14` satisfy the implementation-plan contracts.
+- Exact script bytes/text cannot be mutated through UI, RPC, model, or provider
+  paths.
+- Voice IDs and all 117 looks are exact, deterministic, and fail closed.
+- Restricted agents cannot obtain arbitrary network/database/provider
+  authority; every model invocation is ledgered.
+- Micro and production spend/slots cannot cross-authorize.
+- Provider requests, callbacks, retries, lost responses, quarantine, scan, and
+  promotion are durable and effectively-once.
+- Named-temple, source, cultural, pronunciation, score, sound, narration,
+  master-clock, plan, reference, QC, quote, and world versions are exact and
+  current.
+- Quote confirmation and World Lock require the intended AAL2 authority and
+  reject stale versions/hashes.
+- Fault injection proves World Lock is all-or-nothing at every meaningful write
+  boundary; concurrency and replay do not mint duplicate authority/spend.
+- Creation UX passes desktop/tablet/mobile, keyboard, zoom, reduced-motion,
+  accessibility, visual, loading, retry, terminal-failure, and leave/return
+  journeys without fabricated state.
+- Trigger project and queues are authenticated and cannot read provider keys.
+- All preview migrations match the frozen source candidate; production remains
+  unchanged until promotion is explicitly justified by the phase gate.
+- Formatting, lint, types, unit, coverage, integration, RLS/policy, pgTAP,
+  browser, build, bundle, security, dependency/license, secretless, provider
+  contract, and exact evidence checks pass.
+- One independent end-of-phase adversarial review reports no unresolved P0/P1.
+
+The repository scripts provide most deterministic layers. Inspect `package.json`
+before choosing the final command set; do not assume a narrow script proves the
+whole phase.
+
+## 12. Remaining roadmap after Phase 2
+
+### Phase 3 — autonomous production and Monica QC
+
+Implement the durable Trigger control/agent/media runtime, provider adapters,
+shot generation, quarantined ingest, exact-reference graph execution,
+narration/score/SFX production, edit timeline, renderer, quality specialists,
+Monica consensus, bounded automatic repair, cost/reliability control, and
+failure recovery. Validate cinematic consistency and glitches at the media
+artifact level, not only through metadata.
+
+Provider keys remain at the broker. Trigger projects receive separate identities
+and bounded grants. Production dispatch must inherit the exact World Lock
+manifest/quote and cannot improvise new source text or world identities.
+
+At the end of Phase 3: batch deterministic tests, full phase gate, one
+independent adversarial review, fixes, re-gate, commit/push, deployment smoke.
+
+### Phase 4 — Premiere, repair, collaboration, export
+
+Implement final-video review, timecoded/time-range repair rows, Monica’s curated
+conversation, repair proposals and CAS promotion, qualified cultural and final
+creative approvals, immutable export, download, searchable library, Series and
+Episode organization, concurrent status, notifications, revocation, and audit.
+
+At the end of Phase 4: full phase gate, one independent adversarial review,
+fixes, re-gate, commit/push, deployed end-to-end software proof.
+
+### Launch and calibration
+
+- Software-complete and product-calibrated are separate states.
+- The owner will supply the first 10–20 scripts/Episodes for pilot and tuning
+  after the software build. Those samples do not prove general detector or
+  cinematic quality.
+- Follow the calibration and untouched holdout requirements in
+  `docs/qc-release-contract.md` before reducing human release authority.
+- Final proof must cover a real deployed Episode from exact script through
+  World Lock, providers, Monica, qualified review, final approval, export,
+  lineage, cost, recovery, and downloadable video.
+
+## 13. Fresh-conversation startup audit
+
+The new conversation should use the same local Genie project and checkout, not
+a forked chat or clean worktree. The old conversation should stop editing once
+the new one starts.
+
+Run these read-only checks first:
+
+```powershell
+git branch --show-current
+git rev-parse HEAD
+git status --short
+git remote -v
+git diff --stat
+```
+
+Then verify:
+
+- branch is `main`;
+- HEAD is `d61bc1c5873e7030cfb84acdb601b598024ba390` unless the owner/current
+  worktree proves a newer intentional checkpoint;
+- no persistent `origin` has been added;
+- the large Phase 2 dirty tree is still present;
+- `.env.local` and `docs/Provider and Infrastructure Inventory.xlsx` are not
+  staged;
+- Supabase preview latest migration is `phase2_broker_key_overlap_security` (88
+  Phase 2 migrations) and production has no Phase 2 migration;
+- no persistent development server is running;
+- `.tmp/run-pgtap-preview.mjs` retains the narrow pgTAP-only instrumentation and
+  the four Phase 2 suites remain at 178 planned, 85/85, 57/57, and 45/45 after
+  schema/test changes.
+
+If any item differs, treat the live state as authoritative, determine whether
+another actor intentionally advanced the project, and update this handoff
+before proceeding.
+
+## 14. Known risks and prohibited shortcuts
+
+- Do not commit the current tree merely to make it easier to hand off; `main`
+  triggers deployment and Phase 2 is not gated.
+- Do not promote Phase 2 preview migrations to production early.
+- Do not use passing structural tests as proof of transaction/runtime behavior.
+- Do not relax quote, World Lock, RLS, cultural, secure-ingest, or exact-script
+  constraints to make tests pass.
+- Do not create fabricated progress, ETA, QC, or provider output in the UI.
+- Do not allow model-generated text to become source-script truth.
+- Do not expose provider keys to browser or Trigger runtimes.
+- Do not treat generated temple imagery as factual without evidence-bound
+  references.
+- Do not run a new adversarial reviewer after every fix/batch. Review once at
+  the end of the phase, fix findings, and re-gate.
+- Do not run unrelated write-heavy agents concurrently in the shared checkout.
+- Do not browse Vercel for routine deployment.
+- Do not leave test servers running after browser work.
+
+## 15. Definition of project completion
+
+The active goal is not complete when Phase 2 passes. It is complete only when
+the end-to-end design and implementation plan are realized through Phases 0–4,
+required independent phase reviews and fixes pass, production infrastructure is
+configured, the GitHub/Vercel/Supabase/Trigger/provider path is deployed and
+verified, a real Episode works end to end with complete lineage, and the
+remaining owner-supplied pilot/calibration work is clearly separated and ready.
+
+Until that evidence exists, keep the goal active and continue autonomously.

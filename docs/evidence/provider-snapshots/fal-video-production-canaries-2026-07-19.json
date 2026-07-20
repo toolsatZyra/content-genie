@@ -1,0 +1,105 @@
+{
+  "schemaVersion": "genie.fal-video-production-canaries.v1",
+  "provider": "fal.ai",
+  "retrievedAt": "2026-07-19T13:06:06.255Z",
+  "expiresAt": "2026-10-17T13:06:06.255Z",
+  "purpose": "Authenticated account and vertical MP4 capability evidence for production video routing. Request identities are retained only as SHA-256 digests.",
+  "pricingEvidence": {
+    "artifact": "fal-2026-07-17.json",
+    "rawSha256": "0bbe010c183d0d1b3eb38a4dbd62a71f7fd71a648234011cb1e349462c7df084",
+    "canonicalHash": "20c63f9d979b379afb093e2f09b40fba4d17c2e6347b4c2f320d3bacd74ce50d"
+  },
+  "profiles": [
+    {
+      "profileKey": "kling-2.5-simple-camera-subject",
+      "providerFamily": "fal",
+      "modelKey": "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
+      "modelVersion": "2026-07-19-authenticated-vertical-canary",
+      "endpointKey": "kling-video-v2.5-turbo-pro-image-to-video",
+      "motionClass": "simple_camera_subject",
+      "officialSchema": {
+        "sourceUrl": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai%2Fkling-video%2Fv2.5-turbo%2Fpro%2Fimage-to-video",
+        "rawSha256": "89719e9bbf2864ef733e61182f87c3884ad4fcce269cd3fb304aa37ea9207ae2",
+        "canonicalHash": "979783417dfb1e319ffbf84bdafb878ec32f305aa70b7d926fcb728d0dd00f52",
+        "durationSeconds": [5, 10],
+        "directImageReferences": 1
+      },
+      "canary": {
+        "submittedAt": "2026-07-19T13:00:59.236Z",
+        "completedAt": "2026-07-19T13:06:06.255Z",
+        "requestIdSha256": "e22030b549428abc18efde172fd6cf2373422c4b14e931c397628735954f1809",
+        "inputManifestSha256": "7b0f2cee2d9bfb8758e520d1a69d98100a2e3bb7973f96adf5086652bc85737c",
+        "contentSha256": "be7e3f719f151c3c57073ec6e8fa69d688211660569c546257824820a20de0d0",
+        "contentType": "video/mp4",
+        "byteLength": 3198075,
+        "width": 1080,
+        "height": 1920,
+        "durationMs": 5042,
+        "mp4FtypPass": true,
+        "inferenceTimeSeconds": 297.103679895401,
+        "mediaHost": "v3b.fal.media"
+      }
+    },
+    {
+      "profileKey": "kling-3-camera-led",
+      "providerFamily": "fal",
+      "modelKey": "fal-ai/kling-video/v3/pro/image-to-video",
+      "modelVersion": "2026-07-19-authenticated-vertical-canary",
+      "endpointKey": "kling-video-v3-pro-image-to-video",
+      "motionClass": "camera_led",
+      "officialSchema": {
+        "sourceUrl": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai%2Fkling-video%2Fv3%2Fpro%2Fimage-to-video",
+        "rawSha256": "e48bb88661f8eebe3d40904f4be71659e823006fcbf9a0789a8cd9d39a9de7e8",
+        "canonicalHash": "19bada0f4b6bed681b54f490d73cc69618e646ee1c6a96ca95d2a0b26a59489a",
+        "durationSeconds": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+        "directStartImageReferences": 1
+      },
+      "canary": {
+        "submittedAt": "2026-07-19T13:00:59.279Z",
+        "completedAt": "2026-07-19T13:02:36.613Z",
+        "requestIdSha256": "9d8c1e09c0febcefb455e0b2add2a0f1570712aca59af56ca66e9fa2db8fdb2d",
+        "inputManifestSha256": "c1782faac1128c1232f57bc0b96d139488d6e291d8a1ed1d896f01935939af98",
+        "contentSha256": "0b220b885b062039e08d1908d54537e3ab7c3266a818ce9a1de81d2b91b2aca3",
+        "contentType": "video/mp4",
+        "byteLength": 2038429,
+        "width": 1080,
+        "height": 1920,
+        "durationMs": 3042,
+        "mp4FtypPass": true,
+        "inferenceTimeSeconds": 88.00770783424377,
+        "mediaHost": "v3b.fal.media"
+      }
+    },
+    {
+      "profileKey": "seedance-2-complex-general",
+      "providerFamily": "seedance",
+      "modelKey": "bytedance/seedance-2.0/reference-to-video",
+      "modelVersion": "2026-07-19-authenticated-vertical-canary",
+      "endpointKey": "seedance-2.0-reference-to-video",
+      "motionClass": "complex_general",
+      "officialSchema": {
+        "sourceUrl": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance%2Fseedance-2.0%2Freference-to-video",
+        "rawSha256": "3700d3b348f00102d600d252d3980cdb835a2e8b39a0240976e4e841246fcac1",
+        "canonicalHash": "f49614fd15f016e958008ef2b6878f56295366983d1362b3747ce379d1abaabb",
+        "durationSeconds": [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+        "maximumImageReferences": 9,
+        "maximumTotalReferences": 12
+      },
+      "canary": {
+        "submittedAt": "2026-07-19T12:54:31.349Z",
+        "completedAt": "2026-07-19T12:59:15.136Z",
+        "requestIdSha256": "2f6f40ba412569441a7fe3e055dd2fc8bb26e3cc3918ab35515d4a02c7cccca5",
+        "inputManifestSha256": "5ad717e7db7933ae6a628d2c902406f4c39277bcb725f0281e37eb00639d83e5",
+        "contentSha256": "e1553da27aac3ddc7a4358268f9a71c9b0509af8fea3e94fd4ed4242fd16b0ad",
+        "contentType": "video/mp4",
+        "byteLength": 1898343,
+        "width": 720,
+        "height": 1280,
+        "durationMs": 4042,
+        "mp4FtypPass": true,
+        "inferenceTimeSeconds": 277.77874398231506,
+        "mediaHost": "v3b.fal.media"
+      }
+    }
+  ]
+}

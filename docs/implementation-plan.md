@@ -8,6 +8,13 @@ its source contracts
 **Target:** Software-complete launch system, deployed canary, and owner-ready
 human pilot
 
+> **Developer-MVP override (2026-07-20):** Owner direction now prioritizes the
+> shortest credible owner-operated end-to-end application over the original
+> launch-hardening program. `docs/MVP_DELIVERY_PROFILE_2026-07-20.md` is the
+> active release gate for the first deployment. Requirements deferred by that
+> profile remain visible and must not be represented as verified, but they do
+> not block the developer MVP.
+
 ## 1. Outcome and delivery rule
 
 This plan builds Genie as an internal, multi-user AI film studio that turns an
@@ -28,9 +35,10 @@ devotional episode. The launch system must:
 - fail closed on integrity, authority, cultural, quality, budget, provider, or
   evidence uncertainty.
 
-No phase is complete merely because its happy-path UI works. A phase exits only
-when its requirements, regression suite, adversarial tests, security delta,
-visual QA, evidence, documentation, commit, and push are complete.
+Under the developer-MVP profile, a coherent phase slice exits when its
+owner-visible happy path, essential invariants, focused regression, build, and
+deployment evidence pass. The broader launch gates below remain the roadmap
+for wider-team or production-readiness promotion.
 
 ## 2. Delivery topology
 

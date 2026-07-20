@@ -17,10 +17,16 @@ assert.ok(manifest.entries.some(({ role }) => role === "trusted-branch-controlle
 assert.ok(manifest.entries.some(({ role }) => role === "durable-branch-reaper"));
 assert.ok(manifest.entries.some(({ role }) => role === "scheduled-reaper-entrypoint"));
 assert.ok(manifest.entries.some(({ role }) => role === "scheduled-reaper-workflow"));
-assert.equal(manifest.phase2Migrations.length, 15);
+assert.equal(manifest.phase2Migrations.length, 88);
 assert.deepEqual(
   manifest.pgTapSuites.map(({ testFile }) => testFile),
-  ["phase1_foundation.test.sql", "phase2_zero_spend_foundation.test.sql"],
+  [
+    "phase1_foundation.test.sql",
+    "phase2_executable_plan.test.sql",
+    "phase2_preflight_provider_ingest.test.sql",
+    "phase2_world_cultural.test.sql",
+    "phase2_zero_spend_foundation.test.sql",
+  ],
 );
 assert.deepEqual(manifest.packageManager, {
   declaration: "pnpm@11.9.0",

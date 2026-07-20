@@ -4,12 +4,13 @@ import { join } from "node:path";
 import {
   analyzePhase2Migrations,
   analyzePhase2PgTapSource,
+  expectedMigrationSuffixes,
 } from "./phase2-database-policy.mjs";
 
 const root = process.cwd();
 const directory = join(root, "supabase", "migrations");
 const files = readdirSync(directory)
-  .filter((file) => file.endsWith(".sql") && file.includes("_phase2_"))
+  .filter((file) => expectedMigrationSuffixes.some((suffix) => file.endsWith(suffix)))
   .sort();
 const sources = files.map((file) => ({
   file,

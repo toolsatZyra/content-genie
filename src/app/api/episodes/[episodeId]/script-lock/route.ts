@@ -15,6 +15,7 @@ import {
 } from "@/server/bounded-request-body";
 import {
   ScriptIntegrityError,
+  UploadedScriptError,
   mutationRpcFailureStatus,
   parseScriptLockRequest,
   prepareScriptLockCommand,
@@ -114,7 +115,7 @@ export async function POST(
       }
       if (!attestationUnavailable) {
         try {
-          commandResult = await client.rpc("command_lock_episode_script", {
+          commandResult = await client.rpc("command_lock_episode_script_v2", {
             ...prepared.parameters,
             p_coordinate_attestation_id: attestationId,
           });
@@ -189,12 +190,16 @@ export async function POST(
       error instanceof SyntaxError ||
       error instanceof CommandValidationError ||
       error instanceof ScriptIntegrityError ||
+      error instanceof UploadedScriptError ||
       error instanceof BoundedRequestBodyError
     ) {
       return response(
         {
           code:
-            error instanceof ScriptIntegrityError ? error.code : "INVALID_SCRIPT_LOCK",
+            error instanceof ScriptIntegrityError ||
+            error instanceof UploadedScriptError
+              ? error.code
+              : "INVALID_SCRIPT_LOCK",
           message: error.message,
           ok: false,
         },

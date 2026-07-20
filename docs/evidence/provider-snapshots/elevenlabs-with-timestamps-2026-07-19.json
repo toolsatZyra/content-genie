@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "genie.elevenlabs-with-timestamps-evidence.v1",
+  "checkedAtDate": "2026-07-19",
+  "provider": "elevenlabs",
+  "endpointTemplate": "https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/with-timestamps?output_format=mp3_44100_128",
+  "request": {
+    "required": ["text", "model_id", "voice_settings"],
+    "modelId": "eleven_multilingual_v2",
+    "outputFormat": "mp3_44100_128",
+    "voiceSettings": [
+      "stability",
+      "similarity_boost",
+      "style",
+      "use_speaker_boost"
+    ]
+  },
+  "authenticatedResponse": {
+    "status": 200,
+    "contentType": "application/json",
+    "exactTopLevelKeys": [
+      "alignment",
+      "audio_base64",
+      "normalized_alignment"
+    ],
+    "exactAlignmentKeys": [
+      "characters",
+      "character_start_times_seconds",
+      "character_end_times_seconds"
+    ],
+    "alignmentCharacterCount": 14,
+    "audioByteLength": 20942,
+    "audioSha256": "bc49df63a98cbb828911147f8d6b0766a77c6fee5c8269928fd0e2627917d238",
+    "requestIdSha256": "58aed92efac0ef5f2183fa9f633442031e4c989cf6b46dfeeaaf3cffdc2e419c"
+  },
+  "policy": {
+    "exactInputTextRequired": true,
+    "maximumInputScalars": 20000,
+    "maximumDecodedAudioBytes": 26214400,
+    "maximumResponseBytes": 37748736,
+    "providerOutputAlwaysQuarantined": true
+  }
+}

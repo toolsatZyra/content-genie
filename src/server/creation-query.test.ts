@@ -103,6 +103,25 @@ function successfulResults(
       data: allLookAvailability,
       error: null,
     },
+    creation_readiness_projections: {
+      data: {
+        preflight: {
+          audioIdentity: null,
+          failure: null,
+          masterClock: null,
+          plan: null,
+          productionRun: null,
+          qc: null,
+          quote: null,
+        },
+        world: { characters: [], locations: [], referencePack: null },
+      },
+      error: null,
+    },
+    source_review_readiness_projections: {
+      data: null,
+      error: null,
+    },
   };
 }
 
@@ -152,6 +171,17 @@ describe("the creation projection query", () => {
         rawUtf8Sha256: "a".repeat(64),
         revisionNumber: 2,
       },
+      preflight: {
+        audioIdentity: null,
+        failure: null,
+        masterClock: null,
+        plan: null,
+        productionRun: null,
+        qc: null,
+        quote: null,
+        sourceReview: null,
+      },
+      world: { characters: [], locations: [], referencePack: null },
     });
   });
 
@@ -264,6 +294,7 @@ describe("the creation projection query", () => {
     "episode_configuration_candidates",
     "voice_version_availability",
     "look_version_availability",
+    "creation_readiness_projections",
   ])("propagates a %s query failure", async (table) => {
     const expected = new Error(`${table} unavailable`);
     const results = successfulResults();

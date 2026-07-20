@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "genie.elevenlabs-authenticated-canary-evidence.v1",
+  "checkedAtDate": "2026-07-19",
+  "provider": "elevenlabs",
+  "modelId": "eleven_multilingual_v2",
+  "outputFormat": "mp3_44100_128",
+  "phraseSha256": "ce12849bca3abd726284049ffe32330bea15806e035ecfd786e679f9639284e4",
+  "voices": [
+    {
+      "gender": "male",
+      "voiceVersionId": "ec4e61a6-dc45-53d9-ba4b-fd5c7f267b2f",
+      "externalVoiceId": "b0oby86k6n7Uh5LZcOBR",
+      "providerNameSha256": "9e764cb20aeab74524813f238e33a7ed773fc08e3329e1506e4bed255b61b76c",
+      "audioByteLength": 14254,
+      "audioSha256": "a4b85830f3b63bef7fcf26c186a496e11388ad54ceb7fbd7fccb34552709cfd6",
+      "requestIdSha256": "4b4bbdedbcce606d58db1d7ec496965d8f38ada00ef3b6c8f10a02b32dd5a2af"
+    },
+    {
+      "gender": "female",
+      "voiceVersionId": "bb2db360-9e44-5e17-95d3-a1e38ef21fa7",
+      "externalVoiceId": "GSdeLRB8detpjZjN63Wn",
+      "providerNameSha256": "cf6435a04bb74778271002df7b231d00ba5cb45b3740f2c06de8b253b81bd501",
+      "audioByteLength": 21777,
+      "audioSha256": "61937f54f58a82a6c216166f3582328e39d7201d4db9357f5966949e1654b6bf",
+      "requestIdSha256": "973ebc3466746fdf1ac03c0809b62fb76564fbb45cc6dddbcbb4bb2433c61c59"
+    }
+  ]
+}

@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, auth, storage, private, audit, pg_catalog;
 
-select plan(158);
+select plan(178);
 
 select is(
   private.estimate_hindi_narration_duration_v1(
@@ -145,6 +145,15 @@ values
     'Duration Guard',
     '92000000-0000-4000-8000-000000000001',
     '92000000-0000-4000-8000-000000000001'
+  ),
+  (
+    '94000000-0000-4000-8000-000000000004',
+    '91100000-0000-4000-8000-000000000001',
+    '93000000-0000-4000-8000-000000000001',
+    3,
+    'Uploaded Script',
+    '92000000-0000-4000-8000-000000000001',
+    '92000000-0000-4000-8000-000000000001'
   );
 
 insert into private.aggregate_versions (
@@ -167,6 +176,12 @@ values
     '91100000-0000-4000-8000-000000000001',
     'episode',
     '94000000-0000-4000-8000-000000000003',
+    1
+  ),
+  (
+    '91100000-0000-4000-8000-000000000001',
+    'episode',
+    '94000000-0000-4000-8000-000000000004',
     1
   );
 
@@ -334,6 +349,14 @@ select is(
   'GSdeLRB8detpjZjN63Wn',
   'female identity is exact'
 );
+set local session_replication_role = replica;
+update public.voice_version_availability
+set status = 'pending_authenticated_canary',
+    aggregate_version = 1,
+    verified_at = null,
+    withdrawn_at = null,
+    verification_expires_at = null;
+set local session_replication_role = origin;
 select is(
   (
     select count(*)
@@ -612,17 +635,32 @@ select is(
   array[
     'authorize_storage_sign',
     'command_accept_invitation',
+    'command_activate_broker_client_key',
+    'command_add_broker_client_key',
+    'command_appoint_cultural_reviewer',
     'command_archive_series',
+    'command_authorize_micro_quote',
+    'command_authorize_world_build_intent',
     'command_claim_work_item',
+    'command_confirm_production_quote',
     'command_create_episode',
     'command_create_invitation',
     'command_create_series',
+    'command_decide_world_candidate',
+    'command_disable_broker_client',
     'command_lock_episode_script',
+    'command_lock_episode_script_v2',
+    'command_lock_first_episode_world',
     'command_offboard_member',
+    'command_prepare_world_upload',
+    'command_register_broker_client',
+    'command_revoke_broker_client_key',
     'command_select_episode_look',
-    'command_select_episode_voice'
+    'command_select_episode_voice',
+    'command_submit_source_review',
+    'prepare_first_episode_world_lock'
   ]::text[],
-  'authenticated can execute only the eleven reviewed Phase 1 plus slice commands'
+  'authenticated can execute only the reviewed Phase 1 and Phase 2 commands'
 );
 
 select set_config(
@@ -1635,7 +1673,9 @@ reset role;
 set local session_replication_role = replica;
 update public.voice_version_availability
 set status = 'pending_authenticated_canary',
-    withdrawn_at = null
+    verified_at = null,
+    withdrawn_at = null,
+    verification_expires_at = null
 where voice_version_id = 'bb2db360-9e44-5e17-95d3-a1e38ef21fa7';
 set local session_replication_role = origin;
 set local role authenticated;
@@ -2647,7 +2687,8 @@ reset role;
 update public.voice_version_availability
 set status = 'verified',
     verified_at = statement_timestamp(),
-    withdrawn_at = null
+    withdrawn_at = null,
+    verification_expires_at = statement_timestamp() + interval '1 day'
 where voice_version_id = (
   select id from public.voice_versions where gender = 'male'
 );
@@ -3204,5 +3245,414 @@ select is(
   'a later trusted reaper can claim a safely released orphan lease'
 );
 
+select has_column(
+  'public',
+  'script_revisions',
+  'original_source_bytes',
+  'uploaded scripts preserve their exact original source bytes'
+);
+select has_column(
+  'public',
+  'script_revisions',
+  'original_source_sha256',
+  'uploaded scripts bind the original bytes to an immutable digest'
+);
+select has_trigger(
+  'public',
+  'script_revisions',
+  'script_revisions_uploaded_source',
+  'uploaded source binding occurs inside the script-lock transaction'
+);
+select is(
+  private.decode_uploaded_script_source_v1(
+    decode('efbbbf616263', 'hex'),
+    jsonb_build_object(
+      'bom', 'utf-8',
+      'byteLength', 6,
+      'decoderProfile', 'genie-uploaded-script-decoder.v1',
+      'encoding', 'utf-8',
+      'originalSha256',
+      encode(extensions.digest(decode('efbbbf616263', 'hex'), 'sha256'), 'hex')
+    )
+  ),
+  'abc',
+  'UTF-8 upload decoding removes only the source BOM'
+);
+select is(
+  private.decode_uploaded_script_source_v1(
+    decode('fffe610062006300', 'hex'),
+    jsonb_build_object(
+      'bom', 'utf-16le',
+      'byteLength', 8,
+      'decoderProfile', 'genie-uploaded-script-decoder.v1',
+      'encoding', 'utf-16le',
+      'originalSha256',
+      encode(
+        extensions.digest(decode('fffe610062006300', 'hex'), 'sha256'),
+        'hex'
+      )
+    )
+  ),
+  'abc',
+  'UTF-16 upload decoding is deterministic and byte preserving'
+);
+select throws_ok(
+  $command$
+    select private.decode_uploaded_script_source_v1(
+      decode('fffe61', 'hex'),
+      jsonb_build_object(
+        'bom', 'utf-16le',
+        'byteLength', 3,
+        'decoderProfile', 'genie-uploaded-script-decoder.v1',
+        'encoding', 'utf-16le',
+        'originalSha256',
+        encode(extensions.digest(decode('fffe61', 'hex'), 'sha256'), 'hex')
+      )
+    )
+  $command$,
+  '22023',
+  'uploaded script source bytes rejected',
+  'malformed UTF-16 source bytes fail closed'
+);
+select ok(
+  not has_function_privilege(
+    'anon',
+    'public.command_lock_episode_script_v2(uuid,uuid,bigint,text,bytea,text,text,text,text,jsonb,jsonb,integer,integer,integer,integer,integer,integer,boolean,uuid,uuid,text,text,uuid,public.script_source_kind,bytea,text,jsonb)',
+    'execute'
+  ),
+  'anonymous callers cannot lock uploaded scripts'
+);
+
+set local session_replication_role = replica;
+update public.voice_version_availability
+set status = 'pending_authenticated_canary',
+    verified_at = null,
+    withdrawn_at = null,
+    verification_expires_at = null
+where voice_version_id = (select id from public.voice_versions where gender = 'male');
+set local session_replication_role = origin;
+
+select set_config(
+  'request.jwt.claims',
+  '{"role":"service_role"}',
+  true
+);
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000000', true);
+select set_config('request.jwt.claim.role', 'service_role', true);
+set local role service_role;
+select public.attest_script_coordinate_map(
+  '9a000000-0000-4000-8000-000000000010',
+  '91100000-0000-4000-8000-000000000001',
+  '94000000-0000-4000-8000-000000000004',
+  '92000000-0000-4000-8000-000000000001',
+  repeat('b', 64),
+  encode(extensions.digest(convert_to('abc', 'UTF8'), 'sha256'), 'hex'),
+  encode(extensions.digest(convert_to('abc', 'UTF8'), 'sha256'), 'hex'),
+  '{"v":2,"c":"zero-based-half-open","r":[[0,1,2,3],[0,1,2,3],[1,2,3]],"p":[[0,1,2,3],[0,1,2,3],[1,2,3]],"s":[[0,0,3,0,3]]}',
+  '{"nodeVersion":"22.14.0","icuVersion":"76.1","unicodeVersion":"17.0.0","graphemeSegmenterProfile":"unicode-segmenter@0.17.0:Unicode-17.0.0:UAX29-revision-47","graphemeProbeSha256":"472911620e8d642248b9e0204b31b347ef80653af0eb128d6a76cb217b5e5096"}'
+);
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"92000000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1","session_id":"96000000-0000-4000-8000-000000000004","email":"phase2.one@zyra.test"}',
+  true
+);
+select set_config(
+  'request.jwt.claim.sub',
+  '92000000-0000-4000-8000-000000000001',
+  true
+);
+select set_config('request.jwt.claim.role', 'authenticated', true);
+set local role authenticated;
+select lives_ok(
+  $command$
+    select public.command_lock_episode_script_v2(
+      '91100000-0000-4000-8000-000000000001',
+      '94000000-0000-4000-8000-000000000004',
+      1,
+      'abc',
+      convert_to('abc', 'UTF8'),
+      encode(extensions.digest(convert_to('abc', 'UTF8'), 'sha256'), 'hex'),
+      'abc',
+      encode(extensions.digest(convert_to('abc', 'UTF8'), 'sha256'), 'hex'),
+      'genie-script-processing.v1',
+      '{"v":2,"c":"zero-based-half-open","r":[[0,1,2,3],[0,1,2,3],[1,2,3]],"p":[[0,1,2,3],[0,1,2,3],[1,2,3]],"s":[[0,0,3,0,3]]}',
+      '{"nodeVersion":"22.14.0","icuVersion":"76.1","unicodeVersion":"17.0.0","graphemeSegmenterProfile":"unicode-segmenter@0.17.0:Unicode-17.0.0:UAX29-revision-47","graphemeProbeSha256":"472911620e8d642248b9e0204b31b347ef80653af0eb128d6a76cb217b5e5096"}',
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      true,
+      '9a000000-0000-4000-8000-000000000010',
+      '97000000-0000-4000-8000-000000000010',
+      'phase2-uploaded-script-lock-0001',
+      repeat('b', 64),
+      '98000000-0000-4000-8000-000000000010',
+      'uploaded_text',
+      decode('fffe610062006300', 'hex'),
+      encode(
+        extensions.digest(decode('fffe610062006300', 'hex'), 'sha256'),
+        'hex'
+      ),
+      jsonb_build_object(
+        'bom', 'utf-16le',
+        'byteLength', 8,
+        'decoderProfile', 'genie-uploaded-script-decoder.v1',
+        'encoding', 'utf-16le',
+        'originalSha256',
+        encode(
+          extensions.digest(decode('fffe610062006300', 'hex'), 'sha256'),
+          'hex'
+        )
+      )
+    )
+  $command$,
+  'uploaded script source bytes seal through the atomic script command'
+);
+select ok(
+  (
+    select source_kind = 'uploaded_text'
+      and raw_text = 'abc'
+      and original_source_bytes = decode('fffe610062006300', 'hex')
+      and original_source_sha256 =
+        encode(
+          extensions.digest(decode('fffe610062006300', 'hex'), 'sha256'),
+          'hex'
+        )
+      and source_encoding_evidence ->> 'encoding' = 'utf-16le'
+    from public.script_revisions
+    where episode_id = '94000000-0000-4000-8000-000000000004'
+  ),
+  'the sealed uploaded revision retains exact bytes, digest, decoding evidence, and text'
+);
+reset role;
+
+-- Script-rubric suggestions are durable advice, never source authority.
+create temporary table script_rubric_fixture on commit drop as
+select
+  jsonb_build_object(
+    'continuationExpected',true,'episodePosition','first',
+    'hasRevealOrDecisiveTurn',true,'market','hi-IN','mode','script_only',
+    'platformModel','other','priorEpisodesAvailable',true,
+    'seriesContext','pinned'
+  ) as context_json,
+  jsonb_build_array(
+    jsonb_build_object(
+      'evaluatorConfigurationId','script-rubric-config-1',
+      'evaluatorRunId','9d000000-0000-4000-8000-000000000001',
+      'modelFamily','independent-family-1','promptSha256',repeat('1',64),
+      'promptVersion','script-rubric-prompt-v1'
+    ),
+    jsonb_build_object(
+      'evaluatorConfigurationId','script-rubric-config-2',
+      'evaluatorRunId','9d000000-0000-4000-8000-000000000002',
+      'modelFamily','independent-family-2','promptSha256',repeat('2',64),
+      'promptVersion','script-rubric-prompt-v2'
+    )
+  ) as evaluator_runs,
+  (
+    select jsonb_agg(
+      jsonb_build_object(
+        'applicability','applicable',
+        'consensusScore',case when parameter_id='opening_hook' then 3 else 8 end,
+        'evidence',case when parameter_id='opening_hook' then
+          jsonb_build_array(
+            jsonb_build_object(
+              'rationale','The opening image is not yet explicit.',
+              'scriptEndUtf16',1,'scriptStartUtf16',0
+            ),
+            jsonb_build_object(
+              'rationale','The opening beat lacks a status change.',
+              'scriptEndUtf16',2,'scriptStartUtf16',1
+            )
+          )
+        else jsonb_build_array(
+          jsonb_build_object(
+            'rationale','Observable evidence is present in the locked text.',
+            'scriptEndUtf16',1,'scriptStartUtf16',0
+          )
+        ) end,
+        'notApplicableReason',null,'parameterId',parameter_id,'spread',0
+      ) order by ordinal
+    )
+    from unnest(array[
+      'opening_hook','protagonist_clarity','conflict_stakes','structure_pacing',
+      'twist_reveal','cliffhanger_pull','dialogue_economy',
+      'relationship_legibility','series_continuity','genre_freshness',
+      'localization_fit','monetization_compliance'
+    ]) with ordinality as parameter(parameter_id,ordinal)
+  ) as parameter_results,
+  jsonb_build_object(
+    'commercialPull','76.875','commercialPullDisplay','76.9',
+    'commercialPullProjectedDenominator','1','craftQuality','74.5',
+    'craftQualityDisplay','74.5','craftQualityProjectedDenominator','100',
+    'overall','65.8625','overallDisplay','65.9','risk','20',
+    'riskDisplay','20.0'
+  ) as composites,
+  jsonb_build_array(jsonb_build_object(
+    'effect','advisory','gateId','first_episode_hook',
+    'sourceEffect','cap-verdict'
+  )) as gates,
+  '[]'::jsonb as priority_items,
+  jsonb_build_object(
+    'displayLabel','Rework','internalLabel','rewrite_heavily'
+  ) as verdict;
+grant select on script_rubric_fixture to service_role;
+
+select has_table(
+  'public','script_rubric_runs',
+  'completed script-rubric advice has a durable public projection'
+);
+select has_column(
+  'public','preflight_runs','script_rubric_run_id',
+  'plan evaluation can pin the exact completed script-rubric run'
+);
+select ok(
+  not has_function_privilege(
+    'authenticated',
+    'public.command_record_script_rubric_run(uuid,uuid,uuid,uuid,text,jsonb,jsonb,jsonb,jsonb,integer,jsonb,jsonb,jsonb,boolean)',
+    'execute'
+  ) and has_function_privilege(
+    'service_role',
+    'public.command_record_script_rubric_run(uuid,uuid,uuid,uuid,text,jsonb,jsonb,jsonb,jsonb,integer,jsonb,jsonb,jsonb,boolean)',
+    'execute'
+  ),
+  'only service authority can persist deterministic script-rubric advice'
+);
+select throws_ok(
+  $command$
+    select private.validate_script_rubric_payload_v1(
+      (select evaluator_runs from script_rubric_fixture),
+      (select parameter_results from script_rubric_fixture),
+      (select composites from script_rubric_fixture),
+      '[{"effect":"hard_block_stage"}]'::jsonb,
+      '[]'::jsonb,
+      (select verdict from script_rubric_fixture)
+    )
+  $command$,
+  '22023','script rubric deterministic result is invalid',
+  'a script-rubric gate cannot be promoted into production authority'
+);
+
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
+select set_config('request.jwt.claim.role','service_role',true);
+set local role service_role;
+select throws_ok(
+  $command$
+    select public.command_create_preflight_run(
+      '91100000-0000-4000-8000-000000000001',
+      '94000000-0000-4000-8000-000000000004',
+      (select id from public.episode_configuration_candidates
+       where episode_id='94000000-0000-4000-8000-000000000004'
+       order by created_at desc limit 1),
+      (select id from public.script_revisions
+       where episode_id='94000000-0000-4000-8000-000000000004'),
+      'plan_evaluation',false,null,null,null,
+      '9e000000-0000-4000-8000-000000000001',
+      'rubric-plan-missing-0001',repeat('c',64)
+    )
+  $command$,
+  '55000','completed advisory script rubric is required before planning',
+  'planning fails closed when the required advisory diagnostic is missing'
+);
+select lives_ok(
+  $command$
+    select public.command_record_script_rubric_run(
+      '91100000-0000-4000-8000-000000000001',
+      '94000000-0000-4000-8000-000000000004',
+      (select id from public.script_revisions
+       where episode_id='94000000-0000-4000-8000-000000000004'),
+      '9e000000-0000-4000-8000-000000000002',
+      (select raw_utf8_sha256 from public.script_revisions
+       where episode_id='94000000-0000-4000-8000-000000000004'),
+      (select context_json from script_rubric_fixture),
+      (select evaluator_runs from script_rubric_fixture),
+      (select parameter_results from script_rubric_fixture),
+      (select composites from script_rubric_fixture),100,
+      (select gates from script_rubric_fixture),
+      (select priority_items from script_rubric_fixture),
+      (select verdict from script_rubric_fixture),true
+    )
+  $command$,
+  'a weak script-rubric result persists as deterministic advisory evidence'
+);
+select ok(
+  (
+    select advisory_only and script_sha256_before=script_sha256_after
+      and source_rubric_sha256=
+        '714fef20f2151ee63bce3307267f531485f3f3c29215bb8a5fa552ee9dd165b4'
+      and gates @> '[{"effect":"advisory","gateId":"first_episode_hook"}]'::jsonb
+      and verdict ->> 'internalLabel'='rewrite_heavily'
+      and result_hash ~ '^[a-f0-9]{64}$'
+    from public.script_rubric_runs
+    where script_revision_id=(
+      select id from public.script_revisions
+      where episode_id='94000000-0000-4000-8000-000000000004'
+    )
+  ),
+  'rewrite advice retains exact config, source, gate, verdict, and result bindings'
+);
+select ok(
+  (
+    select raw_text='abc' and raw_utf8_sha256=encode(
+      extensions.digest(convert_to('abc','UTF8'),'sha256'),'hex'
+    )
+    from public.script_revisions
+    where episode_id='94000000-0000-4000-8000-000000000004'
+  ),
+  'script-rubric rewrite advice leaves the immutable user source unchanged'
+);
+reset role;
+update public.episode_configuration_candidates
+set voice_confirmed_by='92000000-0000-4000-8000-000000000001',
+    voice_confirmed_at=statement_timestamp(),
+    look_confirmed_by='92000000-0000-4000-8000-000000000001',
+    look_confirmed_at=statement_timestamp()
+where episode_id='94000000-0000-4000-8000-000000000004';
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
+select set_config('request.jwt.claim.role','service_role',true);
+set local role service_role;
+select lives_ok(
+  $command$
+    select public.command_create_preflight_run(
+      '91100000-0000-4000-8000-000000000001',
+      '94000000-0000-4000-8000-000000000004',
+      (select id from public.episode_configuration_candidates
+       where episode_id='94000000-0000-4000-8000-000000000004'
+       order by created_at desc limit 1),
+      (select id from public.script_revisions
+       where episode_id='94000000-0000-4000-8000-000000000004'),
+      'plan_evaluation',false,null,null,null,
+      '9e000000-0000-4000-8000-000000000003',
+      'rubric-plan-ready-0001',repeat('d',64)
+    )
+  $command$,
+  'planning can begin after the advisory diagnostic is complete'
+);
+select ok(
+  (
+    select p.script_rubric_run_id=r.id
+    from public.preflight_runs p
+    join public.script_rubric_runs r
+      on r.script_revision_id=p.script_revision_id
+    where p.episode_id='94000000-0000-4000-8000-000000000004'
+      and p.kind='plan_evaluation'
+  ),
+  'the plan run pins the exact script-rubric evidence it consumed'
+);
+reset role;
+select throws_ok(
+  $command$
+    update public.script_rubric_runs set advisory_only=false
+    where script_revision_id=(
+      select id from public.script_revisions
+      where episode_id='94000000-0000-4000-8000-000000000004'
+    )
+  $command$,
+  '55000','immutable record cannot be updated or deleted',
+  'even the table owner cannot turn advisory script evidence into a blocker'
+);
 select * from finish();
 rollback;

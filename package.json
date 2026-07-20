@@ -44,7 +44,7 @@
     "test:visual": "playwright test --project=chromium --grep @visual",
     "test:security": "node scripts/security-check.mjs && node scripts/test-secret-patterns.mjs && node scripts/test-server-secret-inventory.mjs && node scripts/test-precheckpoint-gate-policy.mjs && node scripts/check-gitleaks-ignore.mjs",
     "test:bundle": "node scripts/test-browser-bundle-scanner.mjs",
-    "test:rls": "node scripts/check-rls-baseline.mjs && node scripts/test-rls-policy.mjs && node scripts/check-phase2-database-policy.mjs && node scripts/test-phase2-database-policy.mjs && node scripts/test-database-harness-policy.mjs && node scripts/test-pgtap-harness-policy.mjs && node scripts/test-direct-database-result.mjs && node scripts/test-live-candidate-evidence.mjs && node scripts/test-phase1-forward-rollback-policy.mjs && node scripts/test-private-runtime-path.mjs && node scripts/test-trusted-live-branch-control.mjs && node scripts/test-live-branch-reaper.mjs && node scripts/test-live-broker-signing.mjs && node scripts/test-remote-live-broker.mjs && pnpm test:live-trusted-harness && node scripts/test-live-sandbox-policy.mjs && node scripts/test-isolated-next-runner-policy.mjs && node scripts/run-live-database-tests.mjs",
+    "test:rls": "node scripts/check-rls-baseline.mjs && node scripts/test-rls-policy.mjs && node scripts/check-phase2-database-policy.mjs && node scripts/test-phase2-database-policy.mjs && node scripts/check-phase2-preflight-provider-policy.mjs && node scripts/test-phase2-preflight-provider-policy.mjs && node scripts/test-database-harness-policy.mjs && node scripts/test-pgtap-harness-policy.mjs && node scripts/test-direct-database-result.mjs && node scripts/test-live-candidate-evidence.mjs && node scripts/test-phase1-forward-rollback-policy.mjs && node scripts/test-private-runtime-path.mjs && node scripts/test-trusted-live-branch-control.mjs && node scripts/test-live-branch-reaper.mjs && node scripts/test-live-broker-signing.mjs && node scripts/test-remote-live-broker.mjs && pnpm test:live-trusted-harness && node scripts/test-live-sandbox-policy.mjs && node scripts/test-isolated-next-runner-policy.mjs && node scripts/run-live-database-tests.mjs",
     "test:secretless": "node scripts/check-secretless-environment.mjs",
     "test:secretless:assert": "node scripts/check-secretless-environment.mjs --assert-current",
     "test:acceptance:structure": "node scripts/generate-traceability-plan.mjs && node scripts/test-traceability-generator.mjs && node scripts/test-traceability-checkpoint.mjs && pnpm test:phase2:evidence-policy && git diff --exit-code -- reference/acceptance/traceability-plan.v1.json",
@@ -61,6 +61,7 @@
   "dependencies": {
     "@supabase/ssr": "0.12.3",
     "@supabase/supabase-js": "2.110.7",
+    "@trigger.dev/sdk": "4.5.4",
     "@vercel/sandbox": "2.7.0",
     "next": "16.2.10",
     "postgres": "3.4.9",
@@ -73,6 +74,7 @@
     "@axe-core/playwright": "4.12.1",
     "@playwright/test": "1.61.1",
     "@tailwindcss/postcss": "4.3.3",
+    "@trigger.dev/build": "4.5.4",
     "@types/node": "22.20.1",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
@@ -83,6 +85,7 @@
     "prettier": "3.9.5",
     "supabase": "2.109.1",
     "tailwindcss": "4.3.3",
+    "trigger.dev": "4.5.4",
     "typescript": "5.9.3",
     "vitest": "4.1.10"
   }

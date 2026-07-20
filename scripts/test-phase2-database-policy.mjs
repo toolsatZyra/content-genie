@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   analyzePhase2Migrations,
   analyzePhase2PgTapSource,
+  expectedMigrationSuffixes,
 } from "./phase2-database-policy.mjs";
 import {
   assertPhase2CoordinatePredecessorReconstruction,
@@ -17,7 +18,7 @@ import {
 
 const directory = join(process.cwd(), "supabase", "migrations");
 const sources = readdirSync(directory)
-  .filter((file) => file.endsWith(".sql") && file.includes("_phase2_"))
+  .filter((file) => expectedMigrationSuffixes.some((suffix) => file.endsWith(suffix)))
   .sort()
   .map((file) => ({ file, sql: readFileSync(join(directory, file), "utf8") }));
 
@@ -187,6 +188,19 @@ for (const [mutationIndex, mutation] of [
     "and availability.status = 'withdrawn'\n  where release.id = new.pinned_series_release_id",
   ),
   mutate("episode_state <> 'world_setup'", "episode_state = 'world_setup'"),
+  mutate(
+    "advisory_only boolean not null default true check (advisory_only)",
+    "advisory_only boolean not null default false check (not advisory_only)",
+  ),
+  mutate("gate ->> 'effect' <> 'advisory'", "gate ->> 'effect' <> 'hard_block_stage'"),
+  mutate(
+    "completed advisory script rubric is required before planning",
+    "script rubric is optional before planning",
+  ),
+  mutate(
+    "create index preflight_runs_script_rubric_run_fk_idx",
+    "create index removed_preflight_runs_script_rubric_run_fk_idx",
+  ),
 ].entries()) {
   assert.ok(
     analyzePhase2Migrations(mutation).errors.length > 0,

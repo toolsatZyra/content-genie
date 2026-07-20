@@ -2,7 +2,7 @@
 
 **Status:** authoritative design companion  
 **Official documentation observed:** 2026-07-17  
-**Authenticated account canaries:** not yet verified  
+**Authenticated account canaries:** Nano Banana 2 generation profile verified 2026-07-19; other capabilities pending
 **Owner:** provider adapters and capability registry
 
 This document converts provider research and the local infrastructure workbook
@@ -58,13 +58,39 @@ evidence, and tested concurrency. The design-time evidence payload is
 
 ### 3.1 Nano Banana 2
 
-- fal endpoint: `fal-ai/nano-banana-2/edit`
-- use: reference-conditioned image editing and generation
+- fal generation endpoint: `fal-ai/nano-banana-2`
+- fal reference-edit endpoint: `fal-ai/nano-banana-2/edit`
+- use: unreferenced anchors through the generation endpoint; recasts, character
+  sheets, and evidence-bound temple/location work through the edit endpoint
 - production constraints: taken only from the persisted authenticated schema
   snapshot; the product must not advertise an input-reference count or
   resolution until that snapshot and a canary prove it
-- official reference:
+- official references:
+  <https://fal.ai/models/fal-ai/nano-banana-2> and
   <https://fal.ai/models/fal-ai/nano-banana-2/edit>
+
+An authenticated 1K/minimal-thinking generation canary on 2026-07-19 returned
+one valid 9:16 PNG (`1,290,146` bytes; SHA-256
+`519c01288e2e7c31ecf58eced99f3c22e5ee0c6a2ceb0998e7774677922bc44b`)
+from `v3b.fal.media`. The provider image record contained `width` and `height`
+fields with null values. Genie therefore treats provider dimensions as optional
+untrusted hints and establishes authoritative dimensions only through its own
+sandbox probe. The hashed provider request identity was
+`cec52efc4569172a5cbf5836d1324ee1b6a7aa6b855cc3ec08ca96c883b2e10a`.
+This canary proves account reachability and the 1K request/queue/result shape.
+
+The exact pinned production request profile was then exercised in a second
+authenticated canary: 9:16, 2K, high thinking, PNG, one image, web search off,
+and safety tolerance 2. It returned one valid `1536x2752` PNG (`5,542,144`
+bytes; SHA-256
+`89e686f077af9967ace0a6403a12aaf33429292f4a4df74a95a06ddb7ad963a5`)
+from `v3b.fal.media`. Its hashed provider request identity was
+`4b8b2c4cb0d8d8de1a44526d744b2b439301e8adb3fa3e2324d248bf6aa252df`.
+The provider again returned null dimension hints; Genie's isolated PNG probe
+established the authoritative dimensions. This verifies the request and output
+shape for Nano Banana 2 generation. It does not verify reference editing,
+settled billing, retention, concurrency, or any other provider capability, so
+those gates remain fail closed.
 
 Genie separates a clean identity portrait from the multi-view character sheet.
 The portrait is the primary likeness anchor; a collage sheet is an approval and
@@ -250,7 +276,7 @@ projects hold only their own broker-client private signing key and never a
 provider key. Postgres stores public verification keys and hashed assertion
 JTIs, never broker-client private keys.
 
-Key rotation permits a bounded documented overlap of public-key versions.
+Key rotation permits a documented overlap of public-key versions for at most 15 minutes.
 Unknown, expired, not-yet-valid, disabled, wrong-environment, or revoked keys
 fail closed. Revocation or client disable invalidates unexpired assertion JTIs
 and wins any race before provider dispatch. Replay, wrong-project use, and

@@ -2,8 +2,8 @@ import { notFound, redirect } from "next/navigation";
 
 import { CreationStudio } from "@/components/creation/creation-studio";
 import { getServerEnvironment } from "@/config/server-env";
-import type { CreationProjection } from "@/domain/creation";
-import { findLook } from "@/domain/look/look-registry";
+import type { CreationChamber, CreationProjection } from "@/domain/creation";
+import { findLook, findLookByVersionId } from "@/domain/look/look-registry";
 import { findVoiceByVersionId } from "@/domain/voice/voice-registry";
 import {
   createServerSupabaseClient,
@@ -12,6 +12,7 @@ import {
 import { loadCreationProjection } from "@/server/creation-query";
 import {
   deterministicCreationProjection,
+  deterministicReadyCreationProjection,
   deterministicReadOnlyNoScriptCreationProjection,
 } from "@/test/fakes/creation";
 
@@ -64,6 +65,65 @@ function canResumeCreationInLook(projection: CreationProjection): boolean {
   );
 }
 
+const creationChambers = [
+  "script",
+  "voice",
+  "look",
+  "world",
+  "preflight",
+  "create",
+] as const satisfies readonly CreationChamber[];
+
+function preferredInitialChamber(
+  projection: CreationProjection,
+  requested: string | undefined,
+): CreationChamber | undefined {
+  if (!requested || !creationChambers.includes(requested as CreationChamber)) {
+    return undefined;
+  }
+  const configuration = projection.configuration;
+  const look = configuration
+    ? findLookByVersionId(configuration.lookVersionId)
+    : undefined;
+  const lookReady = Boolean(
+    canResumeCreationInLook(projection) &&
+    configuration &&
+    look &&
+    configuration.lookAvailabilityByVersionId[look.versionId] === "active" &&
+    configuration.lookConfirmation.origin === "human_confirmed" &&
+    configuration.voiceConfirmation.origin === "human_confirmed",
+  );
+  const worldReady =
+    projection.world.characters.length + projection.world.locations.length > 0 &&
+    [...projection.world.characters, ...projection.world.locations].every(
+      ({ state }) => state === "accepted",
+    ) &&
+    projection.world.referencePack?.state === "verified";
+  const preflightReady =
+    projection.preflight.failure === null &&
+    projection.preflight.sourceReview?.status === "approved" &&
+    projection.preflight.audioIdentity?.state === "verified" &&
+    projection.preflight.masterClock?.state === "verified" &&
+    projection.preflight.plan?.state === "qc_passed" &&
+    projection.preflight.qc?.verdict === "pass" &&
+    projection.preflight.quote?.confirmed === true &&
+    projection.preflight.quote.expired === false;
+  const allowed: Readonly<Record<CreationChamber, boolean>> = {
+    create: Boolean(projection.preflight.productionRun) || preflightReady,
+    look: canResumeCreationInLook(projection),
+    preflight: worldReady,
+    script: true,
+    voice: Boolean(projection.script),
+    world: lookReady,
+  };
+  const requestedIndex = creationChambers.indexOf(requested as CreationChamber);
+  for (let index = requestedIndex; index >= 0; index -= 1) {
+    const chamber = creationChambers[index];
+    if (chamber && allowed[chamber]) return chamber;
+  }
+  return undefined;
+}
+
 export default async function CreationPage({
   params,
   searchParams,
@@ -89,6 +149,12 @@ export default async function CreationPage({
       "phase2-canceled",
       "phase2-delivered",
       "phase2-read-only-no-script",
+      "phase2-world",
+      "phase2-world-ready",
+      "phase2-preflight",
+      "phase2-preflight-blocked",
+      "phase2-world-lock",
+      "phase2-running",
     ].includes(query.fixture ?? "")
   ) {
     const scriptAppearsAfterReconciliation =
@@ -107,7 +173,19 @@ export default async function CreationPage({
       query.fixture === "phase2-read-only-no-script"
         ? deterministicReadOnlyNoScriptCreationProjection()
         : projection;
-    if (query.fixture === "phase2-canceled") {
+    if (query.fixture === "phase2-world") {
+      fixtureProjection = deterministicReadyCreationProjection("review");
+    } else if (query.fixture === "phase2-world-ready") {
+      fixtureProjection = deterministicReadyCreationProjection("ready");
+    } else if (query.fixture === "phase2-preflight") {
+      fixtureProjection = deterministicReadyCreationProjection("preflight");
+    } else if (query.fixture === "phase2-preflight-blocked") {
+      fixtureProjection = deterministicReadyCreationProjection("blocked");
+    } else if (query.fixture === "phase2-world-lock") {
+      fixtureProjection = deterministicReadyCreationProjection("confirmed");
+    } else if (query.fixture === "phase2-running") {
+      fixtureProjection = deterministicReadyCreationProjection("running");
+    } else if (query.fixture === "phase2-canceled") {
       fixtureProjection = {
         ...fixtureProjection,
         episode: { ...fixtureProjection.episode, workflowState: "canceled" },
@@ -234,14 +312,26 @@ export default async function CreationPage({
         };
       }
     }
-    const resumeLook =
-      query.resumeCreation === "look" && canResumeCreationInLook(fixtureProjection);
+    const fixtureDefaultChamber: CreationChamber | undefined =
+      query.fixture === "phase2-world"
+        ? "world"
+        : query.fixture === "phase2-world-ready" ||
+            query.fixture === "phase2-preflight" ||
+            query.fixture === "phase2-preflight-blocked"
+          ? "preflight"
+          : query.fixture === "phase2-world-lock" || query.fixture === "phase2-running"
+            ? "create"
+            : undefined;
+    const initialChamber = preferredInitialChamber(
+      fixtureProjection,
+      query.resumeCreation ?? fixtureDefaultChamber,
+    );
     return (
       <CreationStudio
-        initialChamber={resumeLook ? "look" : undefined}
+        initialChamber={initialChamber}
         key={creationProjectionKey(fixtureProjection)}
         projection={fixtureProjection}
-        restoreAuthoritativeLook={resumeLook}
+        restoreAuthoritativeLook={initialChamber === "look"}
       />
     );
   }
@@ -253,14 +343,13 @@ export default async function CreationPage({
   if (!user) redirect("/");
   const projection = await loadCreationProjection(client, user, episodeId);
   if (!projection) notFound();
-  const resumeLook =
-    query.resumeCreation === "look" && canResumeCreationInLook(projection);
+  const initialChamber = preferredInitialChamber(projection, query.resumeCreation);
   return (
     <CreationStudio
-      initialChamber={resumeLook ? "look" : undefined}
+      initialChamber={initialChamber}
       key={creationProjectionKey(projection)}
       projection={projection}
-      restoreAuthoritativeLook={resumeLook}
+      restoreAuthoritativeLook={initialChamber === "look"}
     />
   );
 }

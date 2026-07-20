@@ -11,6 +11,7 @@ export interface ServerEnvironment {
   readonly environment: GenieEnvironment;
   readonly enableExport: boolean;
   readonly enableFinalApproval: boolean;
+  readonly enableMvpInlinePreflight: boolean;
   readonly enableProviderSpend: boolean;
   readonly enableRender: boolean;
   readonly public: PublicEnvironment;
@@ -144,6 +145,11 @@ export function parseServerEnvironment(source: EnvironmentSource): ServerEnviron
     issues,
   );
   const enableRender = parseBoolean(source, "GENIE_ENABLE_RENDER", issues);
+  const enableMvpInlinePreflight = parseBoolean(
+    source,
+    "GENIE_MVP_INLINE_PREFLIGHT",
+    issues,
+  );
   const commandHmacSecret = optional(source, "GENIE_COMMAND_HMAC_SECRET");
   const supabaseProjectRef = optional(source, "SUPABASE_PROJECT_REF");
   const supabaseTestProjectRef = optional(source, "SUPABASE_TEST_PROJECT_REF");
@@ -192,8 +198,14 @@ export function parseServerEnvironment(source: EnvironmentSource): ServerEnviron
     );
   }
 
-  if ((enableProviderSpend || enableRender) && !triggerSecretKey) {
-    issues.push("provider spend/render requires TRIGGER_SECRET_KEY");
+  if (
+    (enableProviderSpend || enableRender) &&
+    !triggerSecretKey &&
+    !enableMvpInlinePreflight
+  ) {
+    issues.push(
+      "provider spend/render requires TRIGGER_SECRET_KEY or GENIE_MVP_INLINE_PREFLIGHT",
+    );
   }
 
   if (issues.length > 0) throw new EnvironmentContractError(issues);
@@ -203,6 +215,7 @@ export function parseServerEnvironment(source: EnvironmentSource): ServerEnviron
     environment,
     enableExport,
     enableFinalApproval,
+    enableMvpInlinePreflight,
     enableProviderSpend,
     enableRender,
     public: publicEnvironment,

@@ -352,8 +352,7 @@ budget, storage, command, approval, or export authority.
 | `broker_assertion.consume` | Broker has already verified EdDSA signature; exact allowlisted client/project/environment/`kid`; `iss`, `aud`, task/run/stage subject, `iat`, `nbf`, and ≤60-second `exp` match the registered attempt and capability grant; `jti` unseen | Insert hashed `jti` with unique constraint and expiry, then revalidate capability grant, quote slot, authority epoch and fence in the same transaction; replay or mismatch has no provider side effect |
 
 `broker_clients`, key versions, and consumed assertion JTIs are server-only.
-Private signing keys never enter Postgres. Rotation permits only a documented
-short overlap window. Revocation and replay rejection are immutable audit and
+Private signing keys never enter Postgres. Rotation permits only a documented overlap window of at most 15 minutes. Revocation and replay rejection are immutable audit and
 mandatory security-alert events.
 
 ### 4.4 Production run

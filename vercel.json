@@ -1,0 +1,21 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/cron/provider-output-ingest",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/world-reference-finalize",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/mvp-production",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/mvp-preflight",
+      "schedule": "* * * * *"
+    }
+  ]
+}
