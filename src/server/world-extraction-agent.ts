@@ -265,8 +265,10 @@ export async function extractWorldFromLockedScript(
     {
       input: `LOCKED_SCRIPT_SHA256=${inputHash}\nSCRIPT_DATA_JSON=${JSON.stringify({ script: input.script })}`,
       instructions,
+      maximumDurationMs: 240_000,
       maxOutputTokens: 12_000,
       model: "gpt-5.6-sol",
+      reasoningEffort: "medium",
       schema: WORLD_EXTRACTION_JSON_SCHEMA,
       schemaName: "genie_world_extraction",
     },

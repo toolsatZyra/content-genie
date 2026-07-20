@@ -798,3 +798,45 @@ At the time this section was written, production migration, explicit GitHub
 push, automatic Vercel deployment, and post-deploy live Episode proof remained
 the immediate release steps. The larger Phase 3 and Phase 4 roadmap is still
 active and must not be called complete from this MVP slice.
+
+## 17. 2026-07-20 live Ep 1 recovery and retry hardening
+
+The section 16 release candidate was committed as `d16a9bb` and pushed to
+explicit GitHub `main`. Vercel deployment `dpl_4ZuuwvjFabQjDNXYMAn2jyJBeT1T`
+became READY for that exact commit, owned the canonical production alias, and
+served the new agentic-crew and studio hierarchy UI. Production now has both
+World progress/prop migrations from section 16 with the same RLS, Realtime,
+and exact-intent verification as preview.
+
+The owner's existing Episode `6f6bdc23-8e54-4f41-b693-3f2e0a0d6852` (Ep 1)
+was opened through the deployed UI. Its World action returned 202 and created
+durable preflight run `4ab7961d-dabb-47d8-9a49-5d857219cc1d`, proving that the
+former AAL1 authorization dead end is closed. The live worker then exposed two
+separate retry defects that narrow local mocks had not exercised:
+
+- OpenAI strict structured output rejects the unsupported JSON Schema keyword
+  `uniqueItems`. It was removed only from the provider schema; the local parser
+  still enforces unique IDs and reference lists. Commit `ae76e22` is deployed
+  READY as Vercel deployment `dpl_9rzoF6ZFwVmA5JPZB6yL4Xy7PcuC`, and a bounded
+  live probe returned OpenAI 200 with the repaired strict schema.
+- A preflight retry attempted to insert the same immutable input manifest a
+  second time and collided with its unique run/hash constraint. Migrations
+  `phase3_preflight_retry_manifest_reuse` and
+  `phase3_preflight_retry_manifest_reuse_disambiguation` now reuse only the
+  exact recomputed manifest hash. Both preview and production have the two
+  migrations. A rollback-only production dispatch diagnostic succeeded and
+  the next worker received a higher fencing token with the same input
+  manifest, proving retry authority is durable without minting a second input.
+
+The second live attempt reached OpenAI but exceeded the old 180-second request
+window. The recovery candidate keeps the same model, strict schema, immutable
+script binding, cultural fields, output cap, ledger, and parser, while using
+medium reasoning and a World-only 240-second request window within the
+five-minute cron boundary. A successful retry also resets the system progress
+row to `extracting`, so the UI no longer remains falsely failed while a fresh
+worker is active. Type checking, lint, four focused unit files / 12 tests,
+static preflight/provider policy, and the canary production build pass. The
+exact stage is held in its reversible `created` retry state until this recovery
+candidate is deployed; it has one remaining attempt. Resume only that run and
+stage after the exact deployment is READY, then preserve the resulting live
+entity/provider evidence here.

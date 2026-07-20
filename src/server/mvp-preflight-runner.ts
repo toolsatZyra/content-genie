@@ -24,7 +24,10 @@ import {
   quarantineImmediateProviderBytes,
   transitionProviderRequest,
 } from "@/server/provider-broker-ledger";
-import { failWorldBuildProgress } from "@/server/world-build-progress";
+import {
+  failWorldBuildProgress,
+  resumeWorldBuildProgress,
+} from "@/server/world-build-progress";
 
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -151,6 +154,7 @@ export async function advanceNextMvpPreflight(): Promise<
     triggerRunId,
   });
   try {
+    await resumeWorldBuildProgress({ preflightRunId: run.id });
     const executed = await executePreflightControl({
       envelope: dispatched.envelope,
       taskId,

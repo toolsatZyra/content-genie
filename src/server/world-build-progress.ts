@@ -150,3 +150,18 @@ export async function failWorldBuildProgress(
     .neq("state", "review_ready");
   if (error) throw new Error("World progress failure could not be projected.");
 }
+
+export async function resumeWorldBuildProgress(
+  input: Readonly<{ preflightRunId: string }>,
+): Promise<void> {
+  const { error } = await createAdminSupabaseClient()
+    .from("world_build_progress_items")
+    .update({
+      safe_detail: "Retrying locked-script extraction with fresh worker authority",
+      state: "extracting",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("preflight_run_id", input.preflightRunId)
+    .eq("item_kind", "system");
+  if (error) throw new Error("World retry progress could not be projected.");
+}
