@@ -1518,7 +1518,7 @@ textarea:focus-visible {
   background: rgba(9, 7, 16, 0.84);
   border-bottom: 1px solid var(--line);
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto 1fr;
   min-height: 76px;
   padding: 12px 30px;
   position: sticky;
@@ -1526,10 +1526,11 @@ textarea:focus-visible {
   z-index: 40;
 }
 
-.creation-header > div {
+.creation-title-context {
   align-items: center;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  gap: 5px;
   line-height: 1.25;
 }
 
@@ -3018,7 +3019,7 @@ textarea:focus-visible {
   border-bottom: 1px solid var(--line);
   display: grid;
   gap: 20px;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 1fr auto;
   min-height: 76px;
   padding: 0 28px;
   position: sticky;
@@ -3224,7 +3225,7 @@ textarea:focus-visible {
 }
 
 .atrium-series {
-  margin: 32px 0 36px;
+  margin: 26px 0 30px;
 }
 
 .atrium-series .section-heading h2 {
@@ -3234,7 +3235,7 @@ textarea:focus-visible {
 .atrium-series-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
 }
 
 .atrium-series-grid > button {
@@ -3244,10 +3245,10 @@ textarea:focus-visible {
   border: 1px solid var(--line);
   border-radius: 4px 20px 4px 20px;
   display: grid;
-  gap: 13px;
-  grid-template-columns: 42px minmax(0, 1fr) auto;
-  min-height: 92px;
-  padding: 15px;
+  gap: 10px;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  min-height: 72px;
+  padding: 10px;
   text-align: left;
 }
 
@@ -3265,10 +3266,10 @@ textarea:focus-visible {
   color: var(--gold-soft);
   display: flex;
   font-family: var(--font-display);
-  font-size: 20px;
-  height: 42px;
+  font-size: 16px;
+  height: 34px;
   justify-content: center;
-  width: 42px;
+  width: 34px;
 }
 
 .atrium-series-grid > button > span:nth-child(2) {
@@ -3336,7 +3337,7 @@ textarea:focus-visible {
 .live-episode-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
 }
 
 .live-episode-card {
@@ -3344,8 +3345,8 @@ textarea:focus-visible {
   border: 1px solid var(--line);
   border-radius: 5px 25px 5px 25px;
   display: grid;
-  grid-template-columns: 104px minmax(0, 1fr);
-  min-height: 142px;
+  grid-template-columns: 72px minmax(0, 1fr);
+  min-height: 96px;
   overflow: hidden;
   padding: 0;
   text-align: left;
@@ -3386,11 +3387,11 @@ textarea:focus-visible {
 .live-poster > span {
   border: 1px solid rgba(255, 224, 160, 0.35);
   border-radius: 50%;
-  height: 72px;
-  left: calc(50% - 36px);
+  height: 46px;
+  left: calc(50% - 23px);
   position: absolute;
   top: 15%;
-  width: 72px;
+  width: 46px;
 }
 
 .live-poster > i {
@@ -3398,9 +3399,9 @@ textarea:focus-visible {
   border-radius: 50% 50% 10% 10%;
   bottom: -5%;
   height: 54%;
-  left: calc(50% - 23px);
+  left: calc(50% - 16px);
   position: absolute;
-  width: 46px;
+  width: 32px;
 }
 
 .live-card-copy {
@@ -3408,7 +3409,7 @@ textarea:focus-visible {
   flex-direction: column;
   justify-content: center;
   min-width: 0;
-  padding: 16px;
+  padding: 10px 12px;
 }
 
 .live-card-copy > small {
@@ -3423,10 +3424,10 @@ textarea:focus-visible {
 .live-card-copy > strong {
   display: -webkit-box;
   font-family: var(--font-display);
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 400;
   letter-spacing: -0.025em;
-  margin: 6px 0 9px;
+  margin: 3px 0 5px;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -3687,14 +3688,14 @@ em.state-chip {
 .series-catalog {
   display: grid;
   gap: 18px;
-  grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr);
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
   margin-top: 28px;
 }
 
 .series-worlds {
   display: grid;
   gap: 12px;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
 }
 
 .series-world {
@@ -3712,8 +3713,8 @@ em.state-chip {
   background: transparent;
   border: 0;
   display: grid;
-  grid-template-columns: 112px minmax(0, 1fr);
-  min-height: 142px;
+  grid-template-columns: 72px minmax(0, 1fr);
+  min-height: 92px;
   padding: 0;
   text-align: left;
   width: 100%;
@@ -3729,11 +3730,11 @@ em.state-chip {
 .series-world-art i {
   border: 1px solid rgba(255, 224, 160, 0.32);
   border-radius: 50%;
-  height: 76px;
-  left: calc(50% - 38px);
+  height: 46px;
+  left: calc(50% - 23px);
   position: absolute;
-  top: 20px;
-  width: 76px;
+  top: 14px;
+  width: 46px;
 }
 
 .series-world-art b {
@@ -3761,26 +3762,29 @@ em.state-chip {
   flex-direction: column;
   justify-content: center;
   min-width: 0;
-  padding: 18px;
+  padding: 10px 12px;
 }
 
 .series-world-main small {
   color: var(--gold);
-  font-size: 12px;
+  font-size: 10px;
   text-transform: uppercase;
 }
 
 .series-world-main strong {
   font-family: var(--font-display);
-  font-size: 23px;
+  font-size: 18px;
   font-weight: 400;
-  margin: 5px 0;
+  margin: 3px 0;
 }
 
 .series-world-main p {
   color: var(--muted);
   line-height: 1.5;
   margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .series-world > footer {
@@ -4561,8 +4565,8 @@ em.state-chip {
   .live-episode-card:first-child,
   .live-episode-card:nth-child(4n) {
     grid-column: 1;
-    grid-template-columns: 112px minmax(0, 1fr);
-    min-height: 142px;
+    grid-template-columns: 72px minmax(0, 1fr);
+    min-height: 96px;
   }
 
   .live-focus {
@@ -4571,8 +4575,8 @@ em.state-chip {
   }
 
   .series-world-main {
-    grid-template-columns: 96px minmax(0, 1fr);
-    min-height: 132px;
+    grid-template-columns: 72px minmax(0, 1fr);
+    min-height: 92px;
   }
 
   .invite-form > div {
@@ -5340,6 +5344,7 @@ em.state-chip {
   display: grid;
   gap: 26px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
 }
 
 .world-card {
@@ -5355,10 +5360,7 @@ em.state-chip {
   transition:
     border-color 180ms ease,
     transform 180ms ease;
-}
-
-.world-card.is-offset {
-  transform: translateY(42px);
+  height: 100%;
 }
 
 .world-card.is-accepted {
@@ -6479,10 +6481,6 @@ em.state-chip {
 
   .source-review-evidence {
     grid-template-columns: 1fr;
-  }
-
-  .world-card.is-offset {
-    transform: none;
   }
 
   .monica-core {

@@ -120,7 +120,7 @@ async function seriesIdForRun(preflightRunId: string): Promise<string> {
   return (row as { series_id: string }).series_id;
 }
 
-async function ensureFalCapability(workspaceId: string): Promise<string> {
+export async function ensureFalCapability(workspaceId: string): Promise<string> {
   const environment = getServerEnvironment();
   const schemaSummary = {
     endpoint: "fal-ai/nano-banana-2",
@@ -160,6 +160,79 @@ async function ensureFalCapability(workspaceId: string): Promise<string> {
     throw new WorldAnchorProviderError("World image capability is malformed.");
   }
   return (value as { capabilityId: string }).capabilityId;
+}
+
+type WorldRegenerationContext = Readonly<{
+  characterFormId: string | null;
+  characterId: string | null;
+  characterKey: string | null;
+  characterName: string | null;
+  entityKind: "character" | "location";
+  extractionResultId: string;
+  formKey: string | null;
+  formName: string | null;
+  locationId: string | null;
+  locationKey: string | null;
+  locationName: string | null;
+  namedTemple: boolean;
+  negativePromptText: string;
+  operation: "edit_image" | "gen_image";
+  promptText: string;
+  providerCapabilityId: string | null;
+  providerPayload: Record<string, unknown> | null;
+  realPlaceName: string | null;
+  regenerationRequestId: string;
+  templeEvidenceSetHash: string | null;
+  worldManifest: Record<string, unknown>;
+  worldManifestHash: string;
+}>;
+
+function parseWorldRegenerationContext(value: unknown): WorldRegenerationContext {
+  const keys = [
+    "characterFormId",
+    "characterId",
+    "characterKey",
+    "characterName",
+    "entityKind",
+    "extractionResultId",
+    "formKey",
+    "formName",
+    "locationId",
+    "locationKey",
+    "locationName",
+    "namedTemple",
+    "negativePromptText",
+    "operation",
+    "promptText",
+    "providerCapabilityId",
+    "providerPayload",
+    "realPlaceName",
+    "regenerationRequestId",
+    "templeEvidenceSetHash",
+    "worldManifest",
+    "worldManifestHash",
+  ] as const;
+  if (!exactObject(value, keys)) {
+    throw new WorldAnchorProviderError("World regeneration context is malformed.");
+  }
+  const row = value as Record<string, unknown>;
+  if (
+    !["character", "location"].includes(String(row.entityKind)) ||
+    !["edit_image", "gen_image"].includes(String(row.operation)) ||
+    typeof row.extractionResultId !== "string" ||
+    typeof row.regenerationRequestId !== "string" ||
+    typeof row.promptText !== "string" ||
+    typeof row.negativePromptText !== "string" ||
+    typeof row.namedTemple !== "boolean" ||
+    !row.worldManifest ||
+    typeof row.worldManifest !== "object" ||
+    Array.isArray(row.worldManifest) ||
+    typeof row.worldManifestHash !== "string" ||
+    !/^[a-f0-9]{64}$/u.test(row.worldManifestHash)
+  ) {
+    throw new WorldAnchorProviderError("World regeneration context is malformed.");
+  }
+  return value as WorldRegenerationContext;
 }
 
 async function ensureFalEditCapability(workspaceId: string): Promise<string> {
@@ -560,4 +633,151 @@ export async function prepareWorldAnchorProviderDispatches(
     );
   }
   return Object.freeze(dispatches);
+}
+
+export async function prepareWorldRegenerationProviderDispatch(
+  input: Readonly<{
+    envelope: PreflightTaskEnvelope;
+    regenerationRequestId: string;
+  }>,
+): Promise<WorldAnchorProviderDispatch | null> {
+  const context = parseWorldRegenerationContext(
+    await rpc("command_prepare_world_regeneration_context", {
+      p_preflight_run_id: input.envelope.preflightRunId,
+      p_regeneration_request_id: input.regenerationRequestId,
+      p_stage_attempt_id: input.envelope.stageAttemptId,
+    }),
+  );
+  if (context.regenerationRequestId !== input.regenerationRequestId) {
+    throw new WorldAnchorProviderError("World regeneration scope is stale.");
+  }
+  if (context.namedTemple) {
+    throw new WorldAnchorProviderError(
+      "A real-world recast needs refreshed verified reference evidence.",
+    );
+  }
+
+  const capabilityId = await ensureFalCapability(input.envelope.workspaceId);
+  const jobId = deterministicUuid(`regeneration:${input.regenerationRequestId}:job`);
+  const targetAssetId = deterministicUuid(
+    `regeneration:${input.regenerationRequestId}:asset`,
+  );
+  const providerInput = {
+    ...(context.providerPayload ?? {}),
+    ...providerPayload(context.promptText, targetAssetId),
+  };
+  delete (providerInput as Record<string, unknown>).imageUrls;
+  const job = {
+    capabilityJti: deterministicUuid(`job:${jobId}:capability-jti`),
+    characterFormId: context.characterFormId,
+    characterId: context.characterId,
+    characterKey: context.characterKey,
+    characterName: context.characterName,
+    entityKind: context.entityKind,
+    formKey: context.formKey,
+    formName: context.formName,
+    jobId,
+    locationId: context.locationId,
+    locationKey: context.locationKey,
+    locationName: context.locationName,
+    namedTemple: false,
+    negativePromptText: context.negativePromptText,
+    operation: "gen_image",
+    promptText: context.promptText,
+    providerCapabilityId: capabilityId,
+    providerPayload: providerInput,
+    realPlaceName: context.realPlaceName,
+    slotKey: `regeneration.${input.regenerationRequestId}`,
+    targetAssetId,
+    templeEvidenceSetHash: null,
+    worldManifest: context.worldManifest,
+    worldManifestHash: context.worldManifestHash,
+  };
+  await rpc("command_prepare_world_anchor_jobs", {
+    p_jobs: [job],
+    p_preflight_run_id: input.envelope.preflightRunId,
+    p_provider_capability_id: capabilityId,
+    p_stage_attempt_id: input.envelope.stageAttemptId,
+    p_world_extraction_result_id: context.extractionResultId,
+  });
+  const retryPool = await rpc("command_ensure_world_anchor_retry_pool", {
+    p_preflight_run_id: input.envelope.preflightRunId,
+    p_stage_attempt_id: input.envelope.stageAttemptId,
+  });
+  if (
+    !exactObject(retryPool, [
+      "hardCeilingMinor",
+      "ok",
+      "pooledQuoteHash",
+      "preparationId",
+      "primarySlotCount",
+      "replayed",
+      "retrySlotCount",
+    ]) ||
+    (retryPool as Record<string, unknown>).ok !== true ||
+    (retryPool as Record<string, unknown>).primarySlotCount !== 1 ||
+    (retryPool as Record<string, unknown>).retrySlotCount !== 31
+  ) {
+    throw new WorldAnchorProviderError("World regeneration retry pool is malformed.");
+  }
+  await rpc("command_bind_world_regeneration_job", {
+    p_regeneration_request_id: input.regenerationRequestId,
+    p_world_anchor_job_id: jobId,
+  });
+  const claim = await rpc("command_claim_world_anchor_provider_job", {
+    p_correlation_id: deterministicUuid(`job:${jobId}:correlation`),
+    p_idempotency_key: `world-job:${jobId}`,
+    p_job_id: jobId,
+  });
+  if (!exactObject(claim, claimKeys)) {
+    throw new WorldAnchorProviderError(
+      "World regeneration provider claim is malformed.",
+    );
+  }
+  const record = claim as Record<string, unknown>;
+  if (record.ok !== true || typeof record.providerRequestState !== "string") {
+    throw new WorldAnchorProviderError(
+      "World regeneration provider claim was rejected.",
+    );
+  }
+  if (
+    ["submitted", "accepted", "polling", "succeeded"].includes(
+      record.providerRequestState,
+    )
+  ) {
+    return null;
+  }
+  if (record.providerRequestState !== "reserved" || record.operation !== "gen_image") {
+    throw new WorldAnchorProviderError(
+      "World regeneration provider request is not dispatchable.",
+    );
+  }
+  const request: ProviderBrokerRequest = Object.freeze({
+    authorityEpoch: record.authorityEpoch as number,
+    capabilityGrantId: record.capabilityGrantId as string,
+    fencingToken: record.fencingToken as number,
+    inputManifestId: record.inputManifestId as string,
+    inputManifestSha256: record.inputManifestHash as string,
+    operation: "gen_image",
+    preflightRunId: record.preflightRunId as string,
+    providerRequestId: record.providerRequestId as string,
+    quoteLineId: record.quoteLineId as string,
+    schemaVersion: PROVIDER_BROKER_SCHEMA_VERSION,
+    stageAttemptId: record.stageAttemptId as string,
+    stageRunId: record.stageRunId as string,
+    workspaceId: record.workspaceId as string,
+  });
+  const signing = getProviderCapabilitySigningEnvironment();
+  return Object.freeze({
+    capabilityToken: issueProviderCapabilityToken({
+      audience: signing.audience,
+      capabilityJti: record.capabilityJti as string,
+      issuer: signing.issuer,
+      kid: signing.kid,
+      privateKeyPkcs8Base64: signing.privateKeyPkcs8Base64,
+      request,
+      ttlSeconds: 300,
+    }),
+    request,
+  });
 }

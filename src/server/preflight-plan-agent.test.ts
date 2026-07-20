@@ -469,6 +469,13 @@ describe("executable cinematic plan agent", () => {
     expect(plan.shots[0].startMs).toBe(0);
     expect(plan.shots.at(-1).endMs).toBe(60_000);
     expect(
+      plan.edd.shots.every(({ promptBlueprint }: { promptBlueprint: string }) =>
+        promptBlueprint.includes(
+          "do not assume or mention any prior or following image",
+        ),
+      ),
+    ).toBe(true);
+    expect(
       plan.edd.shots
         .slice(0, 4)
         .map(

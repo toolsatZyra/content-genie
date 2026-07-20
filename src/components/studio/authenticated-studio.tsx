@@ -602,7 +602,6 @@ export function AuthenticatedStudio({
             </section>
             <SeriesShelf
               episodes={allEpisodes}
-              onCreate={() => openComposer("series")}
               onOpen={(seriesId) => {
                 setSelectedSeriesId(seriesId);
                 setView("series");
@@ -836,25 +835,17 @@ export function AuthenticatedStudio({
 
 function SeriesShelf({
   episodes,
-  onCreate,
   onOpen,
   series,
 }: Readonly<{
   episodes: readonly EpisodeSummary[];
-  onCreate: () => void;
   onOpen: (seriesId: string) => void;
   series: readonly SeriesSummary[];
 }>) {
   return (
     <section className="atrium-series" aria-labelledby="atrium-series-heading">
       <div className="section-heading">
-        <div>
-          <span className="eyebrow">Your studio hierarchy</span>
-          <h2 id="atrium-series-heading">Series</h2>
-        </div>
-        <button className="quiet-button" onClick={onCreate} type="button">
-          Create Series
-        </button>
+        <h2 id="atrium-series-heading">Series</h2>
       </div>
       {series.length > 0 ? (
         <div className="atrium-series-grid">
@@ -1156,7 +1147,7 @@ function SeriesWorlds({
                   <b />
                 </span>
                 <span>
-                  <small>Series · {item.state}</small>
+                  <small>Series</small>
                   <strong>{item.title}</strong>
                   <p>
                     {item.description ||
@@ -1181,13 +1172,9 @@ function SeriesWorlds({
             <span className="eyebrow">Selected Series</span>
             <h2 id="selected-series-heading">{selectedSeries.title}</h2>
           </div>
-          <span
-            className={`state-chip ${
-              selectedSeries.state === "unavailable" ? "attention" : "draft"
-            }`}
-          >
-            {humanize(selectedSeries.state)}
-          </span>
+          {selectedSeries.state === "unavailable" ? (
+            <span className="state-chip attention">Unavailable</span>
+          ) : null}
         </header>
         <p>
           {selectedSeries.description ||

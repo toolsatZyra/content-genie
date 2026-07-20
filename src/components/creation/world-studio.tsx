@@ -29,9 +29,17 @@ interface WorldStudioProps {
   readonly onStart: () => void;
   readonly onRegenerate: (entity: WorldEntity, revisedPromptText: string) => void;
   readonly onUpload: (entity: WorldEntity, file: File) => void;
+  readonly optimisticAcceptedKeys: ReadonlySet<string>;
+  readonly pendingOperations: Readonly<
+    Record<string, "accept" | "regenerate" | "upload">
+  >;
   readonly projection: CreationWorldProjection;
   readonly stageHeadingRef: RefObject<HTMLHeadingElement | null>;
   readonly working: boolean;
+}
+
+export function worldEntityKey(entity: WorldEntity): string {
+  return `${entity.entityKind}:${entity.entityKind === "character" ? entity.item.formId : entity.item.entityId}`;
 }
 
 const ACTIVE_PROGRESS_STATES = new Set([
@@ -105,6 +113,8 @@ export function WorldStudio({
   onStart,
   onRegenerate,
   onUpload,
+  optimisticAcceptedKeys,
+  pendingOperations,
   projection,
   stageHeadingRef,
   working,
@@ -129,7 +139,9 @@ export function WorldStudio({
     [projection.characters, projection.locations],
   );
   const acceptedCount = allEntities.filter(
-    ({ item }) => item.state === "accepted",
+    (entity) =>
+      entity.item.state === "accepted" ||
+      optimisticAcceptedKeys.has(worldEntityKey(entity)),
   ).length;
   const completedWorldEntityIds = useMemo(
     () =>
@@ -364,6 +376,11 @@ export function WorldStudio({
         <div className="world-constellation">
           {allEntities.map((entity, index) => {
             const item = entity.item;
+            const entityKey = worldEntityKey(entity);
+            const pendingOperation = pendingOperations[entityKey];
+            const displayedState = optimisticAcceptedKeys.has(entityKey)
+              ? "accepted"
+              : item.state;
             const { composition: promptComposition, lookTail } = promptParts(
               item.promptText,
             );
@@ -373,7 +390,8 @@ export function WorldStudio({
               entity.item.worldObjectKind === "prop";
             return (
               <article
-                className={`world-card is-${item.state}${index % 3 === 1 ? " is-offset" : ""}`}
+                aria-busy={pendingOperation !== undefined}
+                className={`world-card is-${displayedState}`}
                 key={`${entity.entityKind}:${item.entityId}`}
               >
                 <div className="world-card-image">
@@ -382,8 +400,14 @@ export function WorldStudio({
                     assetVersionId={item.assetVersionId}
                     key={item.assetVersionId}
                   />
-                  <span className={`world-state is-${item.state}`}>
-                    {stateLabel(item.state)}
+                  <span className={`world-state is-${displayedState}`}>
+                    {pendingOperation === "accept"
+                      ? "Accepting anchor"
+                      : pendingOperation === "regenerate"
+                        ? "Sending recast"
+                        : pendingOperation === "upload"
+                          ? "Securing upload"
+                          : stateLabel(displayedState)}
                   </span>
                   <small>
                     {entity.entityKind === "character"
@@ -412,7 +436,7 @@ export function WorldStudio({
                         : "Look tail evidence missing"}
                     </small>
                   </div>
-                  {isCharacter && item.state === "accepted" ? (
+                  {isCharacter && displayedState === "accepted" ? (
                     <p
                       className={`world-evidence is-${entity.item.sheetState ?? "pending"}`}
                     >
@@ -431,17 +455,25 @@ export function WorldStudio({
                   <footer>
                     <button
                       className="world-accept"
-                      disabled={!canEdit || working || item.state !== "review_required"}
+                      disabled={
+                        !canEdit ||
+                        pendingOperation !== undefined ||
+                        displayedState !== "review_required"
+                      }
                       onClick={() => onAccept(entity)}
                       type="button"
                     >
-                      {item.state === "accepted" ? "Accepted" : "Accept anchor"}
+                      {displayedState === "accepted"
+                        ? "Accepted"
+                        : pendingOperation === "accept"
+                          ? "Acceptingâ€¦"
+                          : "Accept anchor"}
                     </button>
                     <button
                       disabled={
                         !canEdit ||
-                        working ||
-                        !["accepted", "review_required"].includes(item.state)
+                        pendingOperation !== undefined ||
+                        !["accepted", "review_required"].includes(displayedState)
                       }
                       onClick={() => openEditor(entity)}
                       type="button"
@@ -449,7 +481,11 @@ export function WorldStudio({
                       Edit prompt · recast
                     </button>
                     <button
-                      disabled={!canEdit || working || item.state === "generating"}
+                      disabled={
+                        !canEdit ||
+                        pendingOperation !== undefined ||
+                        displayedState === "generating"
+                      }
                       onClick={() => requestUpload(entity)}
                       type="button"
                     >
@@ -544,7 +580,7 @@ export function WorldStudio({
               <button
                 className="creation-primary"
                 disabled={
-                  working ||
+                  pendingOperations[worldEntityKey(editing)] !== undefined ||
                   composition.trim().length === 0 ||
                   promptParts(editing.item.promptText).lookTail.length === 0
                 }

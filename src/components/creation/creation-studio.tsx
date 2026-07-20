@@ -70,7 +70,11 @@ import {
 } from "@/lib/commands/client";
 import { CreationLaunchpad } from "@/components/creation/creation-launchpad";
 import { PreflightStudio } from "@/components/creation/preflight-studio";
-import { WorldStudio, type WorldEntity } from "@/components/creation/world-studio";
+import {
+  WorldStudio,
+  worldEntityKey,
+  type WorldEntity,
+} from "@/components/creation/world-studio";
 import { shouldReconcileRealtimeStatus } from "@/lib/realtime/reconciliation";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
 
@@ -409,6 +413,12 @@ export function CreationStudio({
   const [hydrated, setHydrated] = useState(false);
   const [notice, setNotice] = useState("");
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [worldOperations, setWorldOperations] = useState<
+    Readonly<Record<string, "accept" | "regenerate" | "upload">>
+  >({});
+  const [optimisticAcceptedWorldKeys, setOptimisticAcceptedWorldKeys] = useState<
+    ReadonlySet<string>
+  >(new Set());
   const [draftRestored, setDraftRestored] = useState(false);
   const [draftStorageState, setDraftStorageState] =
     useState<DraftStorageState>("checking");
@@ -1354,7 +1364,13 @@ export function CreationStudio({
     decision: "accept" | "regenerate",
     revisedPromptText: string | null,
   ): Promise<void> {
-    if (!canEditCreation || !projection.configuration || working) return;
+    const operationKey = worldEntityKey(entity);
+    if (
+      !canEditCreation ||
+      !projection.configuration ||
+      worldOperations[operationKey] !== undefined
+    )
+      return;
     const decisionEntityId =
       entity.entityKind === "character" ? entity.item.formId : entity.item.entityId;
     const payload = {
@@ -1375,7 +1391,14 @@ export function CreationStudio({
       fingerprint,
     );
     worldIdempotencyKeys.current.set(attemptKey, attempt);
-    setWorking(true);
+    if (decision === "regenerate") {
+      setOptimisticAcceptedWorldKeys((current) => {
+        const next = new Set(current);
+        next.delete(operationKey);
+        return next;
+      });
+    }
+    setWorldOperations((current) => ({ ...current, [operationKey]: decision }));
     setSaveState("saving");
     setNotice("");
     try {
@@ -1404,7 +1427,10 @@ export function CreationStudio({
           ? `${entity.item.name} is now a versioned world anchor.`
           : `Monica is recasting ${entity.item.name} from your revised composition.`,
       );
-      refreshIntoChamber("world");
+      if (decision === "accept") {
+        setOptimisticAcceptedWorldKeys((current) => new Set(current).add(operationKey));
+      }
+      router.refresh();
     } catch (error) {
       if (error instanceof CommandMutationError && error.definitive) {
         worldIdempotencyKeys.current.delete(attemptKey);
@@ -1416,9 +1442,13 @@ export function CreationStudio({
           "The world-decision outcome is unconfirmed. Monica is reconciling the authoritative version; retrying the unchanged decision is safe.",
         );
       }
-      refreshIntoChamber("world");
+      router.refresh();
     } finally {
-      setWorking(false);
+      setWorldOperations((current) => {
+        const next = { ...current };
+        delete next[operationKey];
+        return next;
+      });
     }
   }
 
@@ -1431,7 +1461,13 @@ export function CreationStudio({
       );
       return;
     }
-    if (!canEditCreation || !projection.configuration || working) return;
+    const operationKey = worldEntityKey(entity);
+    if (
+      !canEditCreation ||
+      !projection.configuration ||
+      worldOperations[operationKey] !== undefined
+    )
+      return;
     const entityId =
       entity.entityKind === "character" ? entity.item.formId : entity.item.entityId;
     const attemptKey = `${entity.entityKind}:${entityId}`;
@@ -1449,6 +1485,11 @@ export function CreationStudio({
       fingerprint,
     );
     worldUploadIdempotencyKeys.current.set(attemptKey, attempt);
+    setOptimisticAcceptedWorldKeys((current) => {
+      const next = new Set(current);
+      next.delete(operationKey);
+      return next;
+    });
     let encodedFilename: string;
     try {
       encodedFilename = encodeURIComponent(file.name);
@@ -1458,7 +1499,7 @@ export function CreationStudio({
       setNotice("That filename cannot be represented safely. Rename it and try again.");
       return;
     }
-    setWorking(true);
+    setWorldOperations((current) => ({ ...current, [operationKey]: "upload" }));
     setSaveState("saving");
     setNotice(`Monica is inspecting ${file.name} in an isolated media chamber.`);
     try {
@@ -1504,7 +1545,11 @@ export function CreationStudio({
       }
       refreshIntoChamber("world");
     } finally {
-      setWorking(false);
+      setWorldOperations((current) => {
+        const next = { ...current };
+        delete next[operationKey];
+        return next;
+      });
     }
   }
 
@@ -1809,15 +1854,20 @@ export function CreationStudio({
         >
           <span aria-hidden="true">←</span> Atrium
         </Link>
-        <div>
-          <small>{projection.episode.seriesTitle}</small>
+        <div className="creation-title-context">
           <strong>{projection.episode.title}</strong>
+          <span aria-hidden="true">,</span>
+          <small>{projection.episode.seriesTitle}</small>
         </div>
-        <span aria-hidden="true" className={`creation-save-state is-${saveState}`}>
-          <i aria-hidden="true" />
-          <span className="save-state-long">{saveStateLong}</span>
-          <span className="save-state-short">{saveStateShort}</span>
-        </span>
+        {saveState !== "idle" ? (
+          <span aria-hidden="true" className={`creation-save-state is-${saveState}`}>
+            <i aria-hidden="true" />
+            <span className="save-state-long">{saveStateLong}</span>
+            <span className="save-state-short">{saveStateShort}</span>
+          </span>
+        ) : (
+          <span aria-hidden="true" />
+        )}
       </header>
 
       {creationAccess !== "editable" ? (
@@ -2401,6 +2451,8 @@ export function CreationStudio({
               void decideWorldCandidate(entity, "regenerate", revisedPromptText)
             }
             onUpload={(entity, file) => void uploadWorldCandidate(entity, file)}
+            optimisticAcceptedKeys={optimisticAcceptedWorldKeys}
+            pendingOperations={worldOperations}
             projection={projection.world}
             stageHeadingRef={stageHeadingRef}
             working={working}

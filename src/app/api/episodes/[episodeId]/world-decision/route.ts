@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 
 import { getServerEnvironment } from "@/config/server-env";
 import {
@@ -19,6 +19,8 @@ import {
 } from "@/server/bounded-request-body";
 import { ensureSourceCulturalPacket } from "@/server/source-cultural-preflight";
 import { ensureWorldReferencePack } from "@/server/world-reference-pack";
+import { advanceNextMvpPreflight } from "@/server/mvp-preflight-runner";
+import { ensureWorldRegenerationRun } from "@/server/world-regeneration";
 
 const MAX_WORLD_DECISION_BYTES = 24_000;
 
@@ -113,6 +115,35 @@ export async function POST(
         status,
         requestId,
       );
+    }
+    const regenerationRequestId =
+      input.decision === "regenerate" &&
+      data &&
+      typeof data === "object" &&
+      typeof (data as Record<string, unknown>).regenerationRequestId === "string"
+        ? ((data as Record<string, unknown>).regenerationRequestId as string)
+        : null;
+    if (regenerationRequestId) {
+      try {
+        const regeneration = await ensureWorldRegenerationRun(regenerationRequestId);
+        if (regeneration.shouldTrigger) {
+          after(async () => {
+            await advanceNextMvpPreflight().catch((caught) => {
+              console.error(
+                "The immediate World recast worker did not finish; the durable cron will reconcile it.",
+                caught,
+              );
+            });
+          });
+        }
+      } catch (caught) {
+        // The decision row remains durable. The minute worker claims every queued
+        // regeneration, including requests created before this consumer existed.
+        console.error(
+          "World recast dispatch will be reconciled by the durable worker.",
+          caught,
+        );
+      }
     }
     const referencePack =
       input.decision === "accept"

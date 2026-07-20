@@ -497,6 +497,9 @@ function promptText(value: string): string {
   return value.replace(/\s+/gu, " ").trim();
 }
 
+const STANDALONE_IMAGE_CONTRACT =
+  "Single self-contained still image only. Render only this visible composition; no sequence, montage, split frame, before-and-after, prior image, next image, or off-frame event. ";
+
 export function compileCharacterAnchorPrompt(
   character: ExtractedCharacter,
   form: ExtractedCharacterForm,
@@ -510,6 +513,7 @@ export function compileCharacterAnchorPrompt(
       `${form.hairAndHeadwear}; ${form.clothingAndJewellery}. Sacred attributes: ` +
       `${form.sacredAttributes.join("; ") || "none specified"}. Emotional baseline: ${form.emotionalBaseline}. ` +
       `Continuity locks: ${form.continuityDirectives.join("; ") || "preserve every stated identity feature"}. ` +
+      STANDALONE_IMAGE_CONTRACT +
       `Respectful Hindu devotional-film depiction, anatomically coherent, no typography, no watermark.`,
   );
   return Object.freeze({
@@ -541,6 +545,7 @@ export function compileLocationAnchorPrompt(
       (populatedRealWorldSubject
         ? `Use the supplied public photographs as factual visual evidence for the documented ${location.realWorldSubjectKind}; preserve authentic setting, actions, dress, objects, and spatial relationships while avoiding identifiable-face invention. `
         : "No people. ") +
+      STANDALONE_IMAGE_CONTRACT +
       `Respectful Hindu devotional-film depiction, historically coherent, no typography, no watermark.`,
   );
   return Object.freeze({
@@ -560,7 +565,9 @@ export function compilePropAnchorPrompt(
       `Environment: ${prop.environment}. Framing: ${prop.framing}. Camera: ${prop.cameraAngle}. ` +
       `Lighting: ${prop.lightingMode}. Continuity locks: ` +
       `${prop.continuityDirectives.join("; ") || "preserve silhouette, scale, material and ornament exactly"}. ` +
-      `Show the object clearly without a person holding it. Respectful Hindu devotional-film depiction, ` +
+      `Show the object clearly without a person holding it. ` +
+      STANDALONE_IMAGE_CONTRACT +
+      `Respectful Hindu devotional-film depiction, ` +
       `historically coherent, anatomically irrelevant, no typography, no watermark.`,
   );
   return Object.freeze({

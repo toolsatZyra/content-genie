@@ -28,6 +28,12 @@ import {
   failWorldBuildProgress,
   resumeWorldBuildProgress,
 } from "@/server/world-build-progress";
+import { prepareWorldRegenerationProviderDispatch } from "@/server/world-anchor-provider";
+import {
+  ensureNextWorldRegenerationRun,
+  failWorldRegeneration,
+  worldRegenerationRequestForRun,
+} from "@/server/world-regeneration";
 
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -136,6 +142,7 @@ export async function advanceNextMvpPreflight(): Promise<
   if (!environment.enableProviderSpend || !environment.enableMvpInlinePreflight) {
     throw new MvpPreflightError("Provider generation is disabled.");
   }
+  await ensureNextWorldRegenerationRun();
   const client = createAdminSupabaseClient();
   const { data: run, error } = await client
     .from("preflight_runs")
@@ -153,13 +160,26 @@ export async function advanceNextMvpPreflight(): Promise<
     preflightRunId: run.id,
     triggerRunId,
   });
+  const regenerationRequestId = await worldRegenerationRequestForRun(run.id);
   try {
-    await resumeWorldBuildProgress({ preflightRunId: run.id });
-    const executed = await executePreflightControl({
-      envelope: dispatched.envelope,
-      taskId,
-      triggerRunId,
-    });
+    if (!regenerationRequestId) {
+      await resumeWorldBuildProgress({ preflightRunId: run.id });
+    }
+    const executed = regenerationRequestId
+      ? {
+          pendingExternal: true,
+          providerDispatches: [
+            await prepareWorldRegenerationProviderDispatch({
+              envelope: dispatched.envelope,
+              regenerationRequestId,
+            }),
+          ].filter((value) => value !== null),
+        }
+      : await executePreflightControl({
+          envelope: dispatched.envelope,
+          taskId,
+          triggerRunId,
+        });
     if (executed.pendingExternal) {
       for (const provider of executed.providerDispatches) {
         await submitProviderDirectly(provider);
@@ -179,6 +199,12 @@ export async function advanceNextMvpPreflight(): Promise<
     });
   } catch (caught) {
     const classified = classifyPreflightControlFailure(caught);
+    if (regenerationRequestId) {
+      await failWorldRegeneration(
+        regenerationRequestId,
+        classified?.safeErrorClass ?? "world-regeneration-failed",
+      ).catch(() => undefined);
+    }
     await failPreflightControl({
       envelope: dispatched.envelope,
       retryable: classified?.retryable ?? true,
@@ -186,12 +212,14 @@ export async function advanceNextMvpPreflight(): Promise<
       taskId,
       triggerRunId,
     }).catch(() => undefined);
-    await failWorldBuildProgress({
-      detail: classified?.retryable
-        ? "The worker paused safely and will retry"
-        : "World generation stopped safely and needs attention",
-      preflightRunId: run.id,
-    }).catch(() => undefined);
+    if (!regenerationRequestId) {
+      await failWorldBuildProgress({
+        detail: classified?.retryable
+          ? "The worker paused safely and will retry"
+          : "World generation stopped safely and needs attention",
+        preflightRunId: run.id,
+      }).catch(() => undefined);
+    }
     throw caught;
   }
 }

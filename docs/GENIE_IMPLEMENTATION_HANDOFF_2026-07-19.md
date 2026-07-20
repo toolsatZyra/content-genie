@@ -1043,3 +1043,48 @@ No persistent test server remains. The owner workbook is still untracked and
 was not staged. Ep 1 is unblocked for human anchor review; the broader Phase 2,
 Phase 3, and Phase 4 gates remain active and must not be inferred complete from
 this recovery.
+
+## 21. 2026-07-21 owner-feedback World recast and studio-density batch
+
+The owner-feedback review in `C:\Users\shiba\Downloads\Genie Feedback.docx`
+identified one backend defect and a coherent UI/prompting batch. The stalled
+Ep 1 `Mithila ki Rajsabha` recast was not a slow FAL request: regeneration
+request `4edbd5d4-be6c-4a71-b923-bc428153cf44` was durably `queued`, but no
+provider request or worker consumer had ever been created for that event.
+
+Migration `world_regeneration_dispatch_recovery` closes that gap. It binds an
+exact user-authorized regeneration request to a fresh fenced `world_anchor`
+preflight run, one bounded Nano Banana job, normal provider capability and
+quote authority, secure ingest, and the existing atomic candidate-promotion
+path. The minute MVP worker also claims legacy queued requests, so the live Ep
+1 request does not require another user click. All new RPCs are executable by
+`service_role` only; preview and production both have the migration, with the
+live request still queued until the matching application worker deploys.
+
+The same batch implements the requested interaction and visual corrections:
+
+- World cards are aligned in consistent rows; the deliberate vertical stagger
+  is removed.
+- accept, recast, and upload use per-card pending state, so independent anchors
+  remain actionable in parallel; short-lived signed previews are cached across
+  reconciliation refreshes.
+- every World anchor prompt and every Director shot blueprint explicitly
+  describes one self-contained image/shot and forbids prior/next-image
+  assumptions; researched real-world references and locked World identities
+  remain separate generation inputs.
+- the creation header now reads Episode then Series and has no idle `Ready`
+  label; the main studio profile/actions are right-aligned.
+- Atrium has one matched Create Series/Create Episode action pair, no duplicate
+  row-level Create Series action or hierarchy label, and compact rectangular
+  Series/Episode cards. The Series catalogue no longer prints `Series · active`
+  and uses a denser multi-column layout.
+
+Proportionate pre-deploy evidence is green: formatting, lint, type checking,
+84 unit files / 502 tests, integration 5/5 with one intentional live-scanner
+skip, the two focused Atrium/Series and World accept/recast browser journeys,
+and the secret-canary production build. Supabase preview confirms all new
+functions and run-binding columns, and preview/production privilege probes
+confirm no `anon` or `authenticated` execution. Explicit GitHub push,
+automatic Vercel verification, and completed Ep 1 replacement-candidate proof
+remain the final steps for this batch. This does not complete the broader
+phase gates.

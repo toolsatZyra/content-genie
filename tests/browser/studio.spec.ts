@@ -370,9 +370,7 @@ test("Phase 1 fixture organizes concurrent Episodes, Series and review work", as
   await expect(
     page.getByRole("heading", { level: 1, name: "Every story has a world." }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: /Series · active Shiva: The/ }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /Series Shiva: The/ })).toBeVisible();
 
   await expect(page.getByRole("button", { name: "Monica" })).toHaveCount(0);
   await page.getByRole("button", { name: "Open activity and notifications" }).click();

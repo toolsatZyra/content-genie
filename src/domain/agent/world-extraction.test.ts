@@ -99,6 +99,8 @@ describe("world extraction contract", () => {
     const blocks = prompt.prompt.split("\n\n");
     expect(blocks).toHaveLength(2);
     expect(blocks[0]).toContain("Bhagwan Shiva");
+    expect(blocks[0]).toContain("Single self-contained still image only");
+    expect(blocks[0]).toContain("no sequence, montage, split frame");
     expect(blocks[1]).toBe(look.lockedLookBlock);
     expect(prompt.negativePrompt).toBe(look.negativePolicy.promptTail);
   });
@@ -132,6 +134,7 @@ describe("world extraction contract", () => {
     const prompt = compilePropAnchorPrompt(parsed.props[0]!, look);
     expect(prompt.prompt).toContain("Shiva's Pinaka bow");
     expect(prompt.prompt).toContain("without a person holding it");
+    expect(prompt.prompt).toContain("no sequence, montage, split frame");
     expect(prompt.prompt.split("\n\n")[1]).toBe(look.lockedLookBlock);
   });
 
@@ -155,6 +158,7 @@ describe("world extraction contract", () => {
     const prompt = compileLocationAnchorPrompt(parsed.locations[0]!, look, true).prompt;
     expect(prompt).toContain("documentary reference plate");
     expect(prompt).toContain("authentic setting, actions, dress, objects");
+    expect(prompt).toContain("Single self-contained still image only");
     expect(prompt).not.toContain("No people");
   });
 

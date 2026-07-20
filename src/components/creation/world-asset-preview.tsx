@@ -8,14 +8,29 @@ interface SignedAssetResponse {
   readonly signedUrl?: string;
 }
 
+const signedPreviewCache = new Map<
+  string,
+  Readonly<{ cachedAt: number; signedUrl: string }>
+>();
+const SIGNED_PREVIEW_CACHE_MS = 10 * 60 * 1_000;
+
 export function WorldAssetPreview({
   alt,
   assetVersionId,
 }: Readonly<{ alt: string; assetVersionId: string }>) {
-  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [signedUrl, setSignedUrl] = useState<string | null>(() => {
+    const cached = signedPreviewCache.get(assetVersionId);
+    return cached && Date.now() - cached.cachedAt < SIGNED_PREVIEW_CACHE_MS
+      ? cached.signedUrl
+      : null;
+  });
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    const cached = signedPreviewCache.get(assetVersionId);
+    if (cached && Date.now() - cached.cachedAt < SIGNED_PREVIEW_CACHE_MS) {
+      return;
+    }
     const abortController = new AbortController();
     void fetch(`/api/assets/${encodeURIComponent(assetVersionId)}/sign`, {
       cache: "no-store",
@@ -27,6 +42,10 @@ export function WorldAssetPreview({
         if (!response.ok || body.ok !== true || typeof body.signedUrl !== "string") {
           throw new Error("Preview unavailable");
         }
+        signedPreviewCache.set(assetVersionId, {
+          cachedAt: Date.now(),
+          signedUrl: body.signedUrl,
+        });
         setSignedUrl(body.signedUrl);
       })
       .catch((error: unknown) => {
