@@ -3,13 +3,17 @@ import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 
 import { getServerEnvironment } from "@/config/server-env";
-import type { ExtractedLocation } from "@/domain/agent/world-extraction";
+import type {
+  ExtractedLocation,
+  RealWorldSubjectKind,
+} from "@/domain/agent/world-extraction";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import {
   fetchRemoteToQuarantineBuffer,
   type RemoteFetchResult,
 } from "@/security/remote-fetch";
 import { getActiveRemoteFetchPolicy } from "@/server/provider-broker-ledger";
+import { retainDistinctResearchReference } from "@/server/research-reference-selection";
 import { scanAndReencodeWorldImage } from "@/server/sandbox-media-scanner";
 import type { PreflightTaskEnvelope } from "../../trigger/preflight-contract";
 
@@ -120,7 +124,16 @@ function searchable(value: string): string {
 }
 
 function distinctiveTokens(placeName: string): readonly string[] {
-  const ignored = new Set(["temple", "mandir", "shrine", "the", "of", "india"]);
+  const ignored = new Set([
+    "festival",
+    "india",
+    "mandir",
+    "ritual",
+    "shrine",
+    "temple",
+    "the",
+    "of",
+  ]);
   return Object.freeze(
     searchable(placeName)
       .split(" ")
@@ -163,6 +176,7 @@ function normalizedLicenseUrl(value: string | null, sourcePageUrl: string): stri
 function parseReferencePage(
   value: unknown,
   placeName: string,
+  subjectKind: RealWorldSubjectKind,
 ): ReferenceMetadata | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const page = value as Record<string, unknown>;
@@ -220,6 +234,13 @@ function parseReferencePage(
   if (tokens.length < 1 || !tokens.some((token) => evidenceText.includes(token))) {
     return null;
   }
+  const kindEvidence = {
+    festival: /festival|puja|celebration|procession|utsav/u,
+    none: /$a/u,
+    ritual: /ritual|worship|prayer|ceremony|aarti|arti|puja|abhishek/u,
+    temple: /temple|mandir|shrine|devasthan/u,
+  }[subjectKind];
+  if (!kindEvidence.test(evidenceText)) return null;
   const authorCredit =
     decodeHtml(extValue(metadata, "Artist", 4_000) ?? "") ||
     "Wikimedia Commons contributor";
@@ -245,7 +266,10 @@ function parseReferencePage(
   });
 }
 
-async function fetchReferenceMetadata(placeName: string): Promise<
+async function fetchReferenceMetadata(
+  placeName: string,
+  subjectKind: RealWorldSubjectKind,
+): Promise<
   Readonly<{
     apiResponseSha256: string;
     querySha256: string;
@@ -257,12 +281,13 @@ async function fetchReferenceMetadata(placeName: string): Promise<
     action: "query",
     format: "json",
     formatversion: "2",
-    generator: "images",
-    gimlimit: "50",
+    generator: "search",
+    gsrlimit: "50",
+    gsrnamespace: "6",
+    gsrsearch: placeName,
     iiprop: "url|mime|size|sha1|extmetadata",
     iiurlwidth: "1600",
     prop: "imageinfo",
-    titles: placeName,
   }).toString();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30_000);
@@ -273,7 +298,7 @@ async function fetchReferenceMetadata(placeName: string): Promise<
       credentials: "omit",
       headers: {
         Accept: "application/json",
-        "User-Agent": "Zyra-Genie-Temple-Research/1.0",
+        "User-Agent": "Zyra-Genie-Real-World-Research/1.0",
       },
       redirect: "error",
       signal: controller.signal,
@@ -323,25 +348,41 @@ async function fetchReferenceMetadata(placeName: string): Promise<
       "No verifiable temple-reference candidates were found.",
     );
   }
-  const unique = new Map<string, ReferenceMetadata>();
+  const unique = new Map<
+    string,
+    Readonly<{ rank: number; reference: ReferenceMetadata }>
+  >();
   for (const page of pageList) {
-    const reference = parseReferencePage(page, placeName);
-    if (reference) unique.set(reference.sourcePageUrl, reference);
+    const reference = parseReferencePage(page, placeName, subjectKind);
+    const rank =
+      page &&
+      typeof page === "object" &&
+      !Array.isArray(page) &&
+      Number.isSafeInteger((page as Record<string, unknown>).index)
+        ? Number((page as Record<string, unknown>).index)
+        : Number.MAX_SAFE_INTEGER;
+    if (reference) unique.set(reference.sourcePageUrl, { rank, reference });
   }
   const references = [...unique.values()]
     .sort((left, right) => {
       const place = searchable(placeName);
-      const leftScore = searchable(left.canonicalTitle).includes(place) ? 1 : 0;
-      const rightScore = searchable(right.canonicalTitle).includes(place) ? 1 : 0;
+      const leftScore = searchable(left.reference.canonicalTitle).includes(place)
+        ? 1
+        : 0;
+      const rightScore = searchable(right.reference.canonicalTitle).includes(place)
+        ? 1
+        : 0;
       return (
         rightScore - leftScore ||
-        left.canonicalTitle.localeCompare(right.canonicalTitle)
+        left.rank - right.rank ||
+        left.reference.canonicalTitle.localeCompare(right.reference.canonicalTitle)
       );
     })
-    .slice(0, 4);
+    .map(({ reference }) => reference)
+    .slice(0, 12);
   if (references.length < 2) {
     throw new TempleResearchError(
-      "Two independently licensed photographs of the named temple were not found.",
+      "Two independently licensed photographs of the real-world subject were not found.",
     );
   }
   return Object.freeze({
@@ -409,10 +450,14 @@ async function uploadOrVerify(input: {
 async function findPromotedResearchAsset(
   workspaceId: string,
   contentSha256: string,
-): Promise<Readonly<{ assetVersionId: string; objectName: string }> | null> {
+): Promise<Readonly<{
+  assetVersionId: string;
+  contentSha256: string;
+  objectName: string;
+}> | null> {
   const { data, error } = await createAdminSupabaseClient()
     .from("asset_versions")
-    .select("id,object_name,asset:assets!inner(asset_kind)")
+    .select("id,object_name,content_sha256,asset:assets!inner(asset_kind)")
     .eq("workspace_id", workspaceId)
     .eq("content_sha256", contentSha256)
     .eq("asset.asset_kind", "research_reference")
@@ -422,7 +467,11 @@ async function findPromotedResearchAsset(
   if (error)
     throw new TempleResearchError("Research-asset replay lookup failed.", true);
   return data
-    ? Object.freeze({ assetVersionId: data.id, objectName: data.object_name })
+    ? Object.freeze({
+        assetVersionId: data.id,
+        contentSha256: data.content_sha256,
+        objectName: data.object_name,
+      })
     : null;
 }
 
@@ -431,12 +480,9 @@ async function promoteReference(input: {
   fetchResult: RemoteFetchResult;
   metadata: ReferenceMetadata;
   policy: Awaited<ReturnType<typeof getActiveRemoteFetchPolicy>>;
-}): Promise<Readonly<{ assetVersionId: string; objectName: string }>> {
-  const existing = await findPromotedResearchAsset(
-    input.envelope.workspaceId,
-    input.fetchResult.sha256,
-  );
-  if (existing) return existing;
+}): Promise<
+  Readonly<{ assetVersionId: string; contentSha256: string; objectName: string }>
+> {
   const remoteFetchRequestId = await recordRemoteFetch({
     envelope: input.envelope,
     policy: input.policy,
@@ -518,6 +564,11 @@ async function promoteReference(input: {
   if (typeof attestationId !== "string") {
     throw new TempleResearchError("Temple media attestation was malformed.");
   }
+  const existing = await findPromotedResearchAsset(
+    input.envelope.workspaceId,
+    scanned.outputSha256,
+  );
+  if (existing) return existing;
   const assetVersionId = randomUUID();
   const objectName = `${input.envelope.workspaceId}/research_reference/${stableAssetId}/${assetVersionId}/source`;
   const storageVersion = await uploadOrVerify({
@@ -542,7 +593,11 @@ async function promoteReference(input: {
   ) {
     throw new TempleResearchError("Temple research promotion was malformed.");
   }
-  return Object.freeze({ assetVersionId, objectName });
+  return Object.freeze({
+    assetVersionId,
+    contentSha256: scanned.outputSha256,
+    objectName,
+  });
 }
 
 async function signedImageUrls(
@@ -605,18 +660,18 @@ async function replayEvidence(
   });
 }
 
-export async function researchNamedTemple(input: {
+export async function researchRealWorldSubject(input: {
   envelope: PreflightTaskEnvelope;
   extractionResultId: string;
   location: ExtractedLocation;
 }): Promise<TempleResearchEvidence> {
   if (
-    !input.location.namedTemple ||
     !input.location.researchRequired ||
+    input.location.realWorldSubjectKind === "none" ||
     !input.location.realPlaceName
   ) {
     throw new TempleResearchError(
-      "Temple research was requested for a non-temple location.",
+      "Real-world research was requested for a non-public subject.",
     );
   }
   const replay = await replayEvidence(
@@ -629,12 +684,17 @@ export async function researchNamedTemple(input: {
     environment,
     fetchClass: "research_reference",
   });
-  const metadata = await fetchReferenceMetadata(input.location.realPlaceName);
+  const metadata = await fetchReferenceMetadata(
+    input.location.realPlaceName,
+    input.location.realWorldSubjectKind,
+  );
   const promoted: {
     assetVersionId: string;
+    contentSha256: string;
     metadata: ReferenceMetadata;
     objectName: string;
   }[] = [];
+  const fetchedContentHashes = new Set<string>();
   for (const reference of metadata.references) {
     const fetched = await fetchRemoteToQuarantineBuffer(reference.sourceFileUrl, {
       allowedContentTypes: eligibleMimeTypes,
@@ -644,13 +704,23 @@ export async function researchNamedTemple(input: {
       maximumRedirects: 2,
       timeoutMs: 60_000,
     });
+    if (fetchedContentHashes.has(fetched.sha256)) continue;
+    fetchedContentHashes.add(fetched.sha256);
     const asset = await promoteReference({
       envelope: input.envelope,
       fetchResult: fetched,
       metadata: reference,
       policy,
     });
-    promoted.push({ ...asset, metadata: reference });
+    if (!retainDistinctResearchReference(promoted, { ...asset, metadata: reference })) {
+      continue;
+    }
+    if (promoted.length === 4) break;
+  }
+  if (promoted.length < 2) {
+    throw new TempleResearchError(
+      "Two content-distinct licensed photographs of the real-world subject were not found.",
+    );
   }
   const referenceManifest = promoted.map(({ assetVersionId, metadata: reference }) => ({
     assetVersionId,
@@ -705,3 +775,7 @@ export async function researchNamedTemple(input: {
     packetId,
   });
 }
+
+// Compatibility alias for callers and evidence whose durable table names predate
+// festival and ritual research support.
+export const researchNamedTemple = researchRealWorldSubject;

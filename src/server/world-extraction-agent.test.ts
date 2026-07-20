@@ -63,6 +63,7 @@ const extraction = {
       lightingMode: "predawn blue with first warm rays",
       namedTemple: false,
       realPlaceName: null,
+      realWorldSubjectKind: "none",
       researchRequired: false,
       sacredDetails: ["small undisturbed meditation platform"],
       timeAndAtmosphere: "still predawn air with subtle drifting mist",

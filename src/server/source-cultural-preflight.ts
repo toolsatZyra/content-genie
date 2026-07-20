@@ -466,14 +466,14 @@ function scriptSource(input: SourceCulturalInput): CatalogSource {
   });
 }
 
-function templeSource(
+function realWorldPhotoSource(
   reference: TempleReference,
   location: LocationInput,
 ): CatalogSource {
   return Object.freeze({
     editionCitation: `${reference.authorCredit}; ${reference.licenseShortName}; ${reference.licenseUrl}`,
-    key: `temple-photo.${reference.sourceMetadataHash.slice(0, 20)}`,
-    proposition: `Rights-cleared photographic reference for the visible architecture and geometry of ${location.realPlaceName ?? location.displayName}; not a narrative or ritual authority.`,
+    key: `real-world-photo.${reference.sourceMetadataHash.slice(0, 20)}`,
+    proposition: `Rights-cleared factual photographic reference for the visible setting, participants, objects, architecture, and documented actions of ${location.realPlaceName ?? location.displayName}; not a narrative, theological, or ritual-practice authority.`,
     rightsBasis: `${reference.licenseShortName}; ${reference.licenseUrl}; attribution ${reference.authorCredit}.`,
     rightsStatus: "licensed",
     sourceClass: "rights_cleared_photography",
@@ -615,26 +615,30 @@ export async function ensureSourceCulturalPacket(input: {
   }
 
   for (const location of preparation.locations.filter(
-    ({ namedTemple }) => namedTemple,
+    ({ templeReferences }) => templeReferences.length > 0,
   )) {
     if (location.templeReferences.length < 2) {
       throw new SourceCulturalPreflightError(
-        "A named temple does not have two verified photographic references.",
+        "A real-world subject does not have two verified photographic references.",
       );
     }
     for (const [index, reference] of location.templeReferences.entries()) {
       const recorded = await recordSource({
         seriesId: preparation.seriesId,
-        source: templeSource(reference, location),
+        source: realWorldPhotoSource(reference, location),
         stableKey: sourceStableKey(
-          `temple.${location.canonicalKey}.${index + 1}`,
+          `real-world.${location.canonicalKey}.${index + 1}`,
           reference.sourceMetadataHash,
         ),
         workspaceId: input.workspaceId,
       });
       links.push({
-        claimClass: "temple",
-        evidenceRole: index === 0 ? "geometry" : "architecture",
+        claimClass: location.namedTemple ? "temple" : "rights",
+        evidenceRole: location.namedTemple
+          ? index === 0
+            ? "geometry"
+            : "architecture"
+          : "rights",
         sourceRecordVersionId: recorded.sourceVersionId,
         subjectId: location.locationVersionId,
         subjectKind: "location_version",

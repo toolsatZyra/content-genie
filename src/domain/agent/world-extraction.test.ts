@@ -51,6 +51,7 @@ const extraction = {
       lightingMode: "predawn blue with first warm rays",
       namedTemple: false,
       realPlaceName: null,
+      realWorldSubjectKind: "none",
       researchRequired: false,
       sacredDetails: ["small undisturbed meditation platform"],
       timeAndAtmosphere: "still predawn air with subtle drifting mist",
@@ -94,6 +95,7 @@ describe("world extraction contract", () => {
           displayName: "Kashi Vishwanath Temple",
           namedTemple: true,
           realPlaceName: "Shri Kashi Vishwanath Temple, Varanasi",
+          realWorldSubjectKind: "temple",
           researchRequired: true,
         },
       ],
@@ -105,6 +107,29 @@ describe("world extraction contract", () => {
     expect(
       compileLocationAnchorPrompt(parsed.locations[0]!, look, true).prompt,
     ).toContain(look.lockedLookBlock);
+  });
+
+  it("requires public photographic evidence for named festivals and preserves people", () => {
+    const parsed = parseWorldExtraction({
+      ...extraction,
+      locations: [
+        {
+          ...extraction.locations[0],
+          displayName: "Durga Puja",
+          realPlaceName: "Durga Puja",
+          realWorldSubjectKind: "festival",
+          researchRequired: true,
+        },
+      ],
+    });
+    const look = findLook(DEFAULT_LOOK_ID)!;
+    expect(() => compileLocationAnchorPrompt(parsed.locations[0]!, look)).toThrow(
+      "verified photographic references",
+    );
+    const prompt = compileLocationAnchorPrompt(parsed.locations[0]!, look, true).prompt;
+    expect(prompt).toContain("documentary reference plate");
+    expect(prompt).toContain("authentic setting, actions, dress, objects");
+    expect(prompt).not.toContain("No people");
   });
 
   it("rejects duplicate world keys, unbound ambiguity keys, and guessed temple metadata", () => {

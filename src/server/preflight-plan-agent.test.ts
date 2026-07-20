@@ -193,7 +193,27 @@ function fixture() {
           locationManifest: { canonicalName: "पर्वत" },
           locationManifestHash: hash("2"),
           locationVersionId: id("23"),
-          templeEvidenceSetHash: null,
+          researchReferences: [
+            {
+              assetVersionId: id("31"),
+              authorCredit: "Photographer One",
+              canonicalTitle: "Festival reference one",
+              contentHash: hash("4"),
+              licenseShortName: "CC BY-SA 4.0",
+              sourcePageUrl:
+                "https://commons.wikimedia.org/wiki/File:Festival_reference_one.jpg",
+            },
+            {
+              assetVersionId: id("32"),
+              authorCredit: "Photographer Two",
+              canonicalTitle: "Festival reference two",
+              contentHash: hash("5"),
+              licenseShortName: "CC BY 4.0",
+              sourcePageUrl:
+                "https://commons.wikimedia.org/wiki/File:Festival_reference_two.jpg",
+            },
+          ],
+          templeEvidenceSetHash: hash("f"),
         },
       ],
       manifest: { schemaVersion: "world" },
@@ -221,6 +241,7 @@ function fixture() {
         shotNumber % 3
       ],
       narrativeFunction: "Advance cause, reaction, and consequence.",
+      realWorldReferenceAssetVersionId: shotNumber % 2 === 1 ? id("31") : id("32"),
       scoreCue: "A restrained motif gains one layer.",
       sfxCue: "Specific cloth, wind, and environment detail.",
       shotNumber,
@@ -448,6 +469,17 @@ describe("executable cinematic plan agent", () => {
     expect(plan.shots[0].startMs).toBe(0);
     expect(plan.shots.at(-1).endMs).toBe(60_000);
     expect(
+      plan.edd.shots
+        .slice(0, 4)
+        .map(
+          ({
+            realWorldReferenceAssetVersionId,
+          }: {
+            realWorldReferenceAssetVersionId: string;
+          }) => realWorldReferenceAssetVersionId,
+        ),
+    ).toEqual([id("31"), id("32"), id("31"), id("32")]);
+    expect(
       plan.requestSlots.every(
         (slot: { durationMs: number; retainedDurationMs: number }) =>
           slot.durationMs >= slot.retainedDurationMs,
@@ -471,6 +503,12 @@ describe("executable cinematic plan agent", () => {
           referenceKind === "continuity",
       ),
     ).toBe(true);
+    expect(
+      plan.references.filter(
+        ({ referenceKind }: { referenceKind: string }) =>
+          referenceKind === "real_world",
+      ),
+    ).toHaveLength(plan.shots.length);
     const challengeCall = mocks.rpc.mock.calls.find(
       ([name]) => name === "command_issue_plan_evaluator_challenges",
     );
@@ -482,6 +520,37 @@ describe("executable cinematic plan agent", () => {
       ).size,
     ).toBe(2);
     expect(mocks.agent).toHaveBeenCalledTimes(3);
+  });
+
+  it("rejects a researched photograph repeated before its alternatives", async () => {
+    const data = fixture();
+    mocks.agent.mockReset().mockResolvedValueOnce({
+      output: {
+        ...data.director,
+        shots: data.director.shots.map((shot) => ({
+          ...shot,
+          realWorldReferenceAssetVersionId: id("31"),
+        })),
+      },
+      requestHash: hash("5"),
+      responseId: "resp_director",
+      responseRequestId: "request_director",
+    });
+
+    await expect(
+      executePlanPreflight({
+        authorityEpoch: 1,
+        capabilityGrantId: null,
+        fencingToken: 1,
+        inputManifestId: id("90"),
+        inputManifestSha256: hash("a"),
+        preflightRunId: id("6"),
+        schemaVersion: "genie.preflight-task.v1",
+        stageAttemptId: id("9"),
+        stageRunId: id("91"),
+        workspaceId: id("1"),
+      }),
+    ).rejects.toThrow("repeated a real-world photograph");
   });
 
   it("repairs a blocked plan with exact feedback and fresh blind evaluation", async () => {

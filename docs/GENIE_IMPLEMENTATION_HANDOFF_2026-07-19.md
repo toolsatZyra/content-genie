@@ -3,10 +3,11 @@
 **Snapshot date:** 2026-07-19
 **Workspace:** `C:\Work\Code\zyrastudio`
 **Git branch:** `main`
-**Current HEAD:** `d61bc1c5873e7030cfb84acdb601b598024ba390`
-**Goal status:** active — design, build, test, deploy, and calibrate Genie end to
-end
-**Current phase:** Phase 2, not yet closed
+**Deployed implementation checkpoint:** `2164fc776ceb7cd87f7db5f4b485f942538c7e1c`
+**Goal status:** active — the generic festival/ritual implementation is in the
+working tree and both databases; deploy it, then obtain owner-observable real
+Episode proof
+**Current phase:** deployed developer-MVP completion
 **Status vocabulary:** work described below is either committed, implemented in
 the working tree, or externally verified. Those states are deliberately not
 treated as interchangeable.
@@ -26,6 +27,40 @@ all-state/all-device matrices, per-phase independent reviews, and enterprise
 operations until owner testing or wider-team rollout. Deferred obligations are
 not verified and must remain labelled honestly.
 
+### Live deployed checkpoint
+
+- GitHub `main` contains checkpoint
+  `2164fc776ceb7cd87f7db5f4b485f942538c7e1c`.
+- Git-connected Vercel deployment `dpl_DN5S8Bqtkz4mVoZVGK14ExrJUF86` reached
+  `READY` and aliased `https://content-genie-three.vercel.app/`.
+- The public runtime probe returned HTTP 200 with
+  `{"environment":"production","ok":true}`; the two MVP cron routes returned
+  HTTP 401 without their cron authorization.
+- Supabase preview `iuzijmzcimtwyowhwinu` and production
+  `fnxztrqsqucojcvabjhk` contain the Phase 2 foundation and compact Phase 3 MVP
+  production/review/export migrations. Both enforce 1-40 clip shot numbers and
+  a 0-40 production-job clip count.
+- Final focused candidate evidence: lint and types passed; 84 unit files / 497
+  tests passed; production build, secret scans, browser-bundle scan, and the
+  owner approval browser journey passed; the bounded browser server stopped.
+- The 20-input isolated renderer canary produced H.264, 1080x1920, yuv420p,
+  exactly 61.000 seconds.
+- Migrations `phase3_real_world_visual_research`,
+  `phase3_mvp_command_execute_grants`, and
+  `phase3_real_world_reference_graph` are applied to preview and production.
+  The working tree generalizes licensed photo research to named
+  temples, festivals, and rituals; exposes the references to the Director;
+  enforces use-before-repeat allocation; records the chosen asset in the EDD
+  and executable graph; and makes production use it for the exact narration
+  window only when both identities match. Focused lint, types, and 26 tests
+  pass. Anonymous execution is explicitly removed from the
+  three owner-facing MVP SECURITY DEFINER commands. The complete lean candidate
+  gate passes; commit/push and deployment verification remain.
+- The independent context-minimized review found three issues: incidental
+  explicit names could be skipped, duplicate image content could survive page
+  de-duplication, and the EDD photo was not in the executable graph. All three
+  are fixed; the reviewer rechecked each correction and reported them fixed.
+
 ## 1. Mission and intended moat
 
 Genie by Zyra is an internal, multi-user AI production studio for cinematic
@@ -36,10 +71,11 @@ editing, QC, repair, and export.
 
 The owner also clarified the real-world visual and editing design. The durable
 decision is in
-`docs/MVP_REAL_WORLD_VISUAL_RESEARCH_AND_EDITING_2026-07-20.md`. Named-temple
-research already records and scans licensed Wikimedia references and now keeps
-up to four candidates. The generic named festival/ritual reference subject and
-shot-allocation extension is still an MVP completion item. The MVP renderer is
+`docs/MVP_REAL_WORLD_VISUAL_RESEARCH_AND_EDITING_2026-07-20.md`. Real-world
+research records and scans licensed public file references for explicitly
+named temples, festivals, and rituals and keeps up to four candidates. The
+Director rotates those references across applicable exact-word shots before
+reuse, and production uses the chosen EDD reference as the motion source. The MVP renderer is
 FFmpeg in ephemeral Vercel Sandbox, not Remotion; the six/twelve-clip proofs
 have been replaced with `ceil(audio duration / 3 seconds)` word-bound visual
 slots (20-40 shots) and EDD-timed cuts. A Seedance multi-shot source clip may
@@ -203,8 +239,9 @@ status.
 
 - GitHub: `https://github.com/toolsatZyra/content-genie.git`.
 - Branch: `main`.
-- Current HEAD: `d61bc1c5873e7030cfb84acdb601b598024ba390`
-  (`Build Phase 2 zero-spend creation checkpoint`).
+- Deployed implementation checkpoint:
+  `2164fc776ceb7cd87f7db5f4b485f942538c7e1c`
+  (`feat: ship Genie developer MVP production flow`).
 - The repository intentionally has no persistent `origin` because the owner
   works across many repositories in parallel.
 - Push only with an explicit URL, for example:
@@ -659,14 +696,14 @@ git diff --stat
 Then verify:
 
 - branch is `main`;
-- HEAD is `d61bc1c5873e7030cfb84acdb601b598024ba390` unless the owner/current
-  worktree proves a newer intentional checkpoint;
+- HEAD is at or beyond deployed checkpoint
+  `2164fc776ceb7cd87f7db5f4b485f942538c7e1c`;
 - no persistent `origin` has been added;
-- the large Phase 2 dirty tree is still present;
 - `.env.local` and `docs/Provider and Infrastructure Inventory.xlsx` are not
   staged;
-- Supabase preview latest migration is `phase2_broker_key_overlap_security` (88
-  Phase 2 migrations) and production has no Phase 2 migration;
+- Supabase preview and production contain the Phase 2 foundation plus the
+  compact MVP production, inline-preflight, editorial-timeline, and
+  three-second-visual-coverage migrations;
 - no persistent development server is running;
 - `.tmp/run-pgtap-preview.mjs` retains the narrow pgTAP-only instrumentation and
   the four Phase 2 suites remain at 178 planned, 85/85, 57/57, and 45/45 after

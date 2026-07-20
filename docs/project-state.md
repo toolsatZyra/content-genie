@@ -1,8 +1,8 @@
 # Genie Project State and Continuation Handoff
 
-> **Live-status notice (2026-07-19):** This document preserves detailed Phase 1
-> and early Phase 2 history. For the current large Phase 2 working tree, external
-> state, exact stopping point, and fresh-conversation startup sequence, read
+> **Live-status notice (2026-07-20):** This document preserves detailed Phase 1
+> and early Phase 2 history. For the deployed developer-MVP state, remaining
+> visual-research gap, and fresh-conversation startup sequence, read
 > `docs/GENIE_IMPLEMENTATION_HANDOFF_2026-07-19.md` first. If the two documents
 > differ on current status, the newer handoff and verified live state control.
 

@@ -208,11 +208,12 @@ export function WorldStudio({
                       Character sheet: {entity.item.sheetState ?? "being assembled"}
                     </p>
                   ) : null}
-                  {entity.entityKind === "location" && entity.item.namedTemple ? (
+                  {entity.entityKind === "location" &&
+                  (entity.item.namedTemple || entity.item.templeEvidenceSetHash) ? (
                     <p
                       className={`world-evidence is-${entity.item.templeEvidenceSetHash ? "verified" : "pending"}`}
                     >
-                      Temple reference evidence:{" "}
+                      Real-world reference evidence:{" "}
                       {entity.item.templeEvidenceSetHash ? "bound" : "required"}
                     </p>
                   ) : null}

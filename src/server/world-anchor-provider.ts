@@ -17,7 +17,7 @@ import {
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { issueProviderCapabilityToken } from "@/server/provider-capability-issuer";
 import {
-  researchNamedTemple,
+  researchRealWorldSubject,
   type TempleResearchEvidence,
 } from "@/server/temple-research";
 import type { PreflightTaskEnvelope } from "../../trigger/preflight-contract";
@@ -304,9 +304,9 @@ function jobsForExtraction(input: {
     const jobId = deterministicUuid(`run:${input.envelope.preflightRunId}:job:${slot}`);
     const targetAssetId = deterministicUuid(`job:${jobId}:asset`);
     const templeEvidence = input.templeEvidenceByLocationKey.get(location.canonicalKey);
-    if (location.namedTemple && (!templeEvidence || !input.editCapabilityId)) {
+    if (location.researchRequired && (!templeEvidence || !input.editCapabilityId)) {
       throw new WorldAnchorProviderError(
-        "Named-temple generation is missing verified reference evidence.",
+        "Real-world generation is missing verified reference evidence.",
       );
     }
     const compiled = compileLocationAnchorPrompt(
@@ -390,22 +390,22 @@ export async function prepareWorldAnchorProviderDispatches(
       "World extraction exceeds the 32-anchor launch ceiling.",
     );
   }
-  const namedTemples = input.extraction.locations.filter(
-    (location) => location.namedTemple && location.researchRequired,
+  const researchedSubjects = input.extraction.locations.filter(
+    (location) => location.researchRequired,
   );
   const [seriesId, capabilityId, editCapabilityId] = await Promise.all([
     seriesIdForRun(input.envelope.preflightRunId),
     ensureFalCapability(input.envelope.workspaceId),
-    namedTemples.length > 0
+    researchedSubjects.length > 0
       ? ensureFalEditCapability(input.envelope.workspaceId)
       : Promise.resolve(null),
   ]);
   const templeEvidence = await Promise.all(
-    namedTemples.map(
+    researchedSubjects.map(
       async (location) =>
         [
           location.canonicalKey,
-          await researchNamedTemple({
+          await researchRealWorldSubject({
             envelope: input.envelope,
             extractionResultId: input.extractionResultId,
             location,

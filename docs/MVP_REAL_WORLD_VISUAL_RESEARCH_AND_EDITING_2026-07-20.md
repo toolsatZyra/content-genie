@@ -1,7 +1,7 @@
 # MVP real-world visual research and editing decision
 
-**Status:** accepted product design, with the named-temple slice implemented
-and the festival/ritual subject extension required before software-complete.
+**Status:** implemented developer-MVP contract. A full owner Episode remains
+the final product-behaviour proof.
 
 ## Real-world visual research
 
@@ -20,9 +20,9 @@ The visual research scout must:
    dimensions, retrieval evidence, and content hash;
 3. reject candidates without an adequate reusable licence, subject match, or
    minimum usable resolution;
-4. de-duplicate exact and near-duplicate images, cluster candidates by visible
-   moment/view, and select up to four factually relevant but visually distinct
-   references per subject;
+4. de-duplicate source pages and downloaded photo bytes, continue through later
+   candidates after a duplicate, preserve catalogue relevance order, and
+   select up to four factually relevant references per subject;
 5. quarantine, validate, and promote selected media through the existing
    research-reference ingest boundary;
 6. expose the selected contact sheet and provenance to the cultural/world
@@ -33,12 +33,17 @@ The visual research scout must:
 8. bind those IDs into the executable prompt/reference graph so the image and
    video providers receive the reference whenever that subject is visible.
 
-The current named-temple implementation already performs licence filtering,
-metadata capture, quarantine scanning, provenance recording, and reference-led
-location generation. It now retains up to four eligible photographs. Festival
-and ritual subjects need the same contract generalized beyond a location whose
-type is `namedTemple`; that extension is an MVP completion item, not a claim of
-current coverage.
+The implementation now applies this contract to explicitly named temples,
+festivals, and rituals. World Extraction records the subject class and
+canonical public name. The research scout searches public file records,
+requires subject-class evidence, filters reusable licences and resolution,
+quarantines and re-encodes the files, and retains two to four references. The
+Director must select one approved photo for every applicable three-second shot
+and cannot repeat it until the alternatives have been used. The selected asset
+ID is written into the immutable EDD and executable reference graph, where the
+database verifies that it belongs to the selected location's verified research
+packet. Production requires the EDD and graph IDs to match and uses that asset
+as the actual image-to-video source for the exact narration window.
 
 Random Google Images results, unverified social posts, and pages whose licence
 cannot be established are not production inputs. Google image usage-rights
@@ -87,9 +92,9 @@ FFmpeg already executes reliably.
 
 - A named-temple script produces two to four licensed, provenance-visible,
   non-identical references and binds them to the generated location identity.
-- The festival/ritual extension proves one representative named festival and
-  one representative named ritual with distinct references allocated to the
-  applicable storyboard shots.
+- Public-catalogue canaries return multiple file candidates for a representative
+  named festival, ritual, and temple; unit evidence proves distinct references
+  are allocated to applicable storyboard shots before reuse.
 - A 60-120 second render contains 20-40 word-bound visual slots; cut points
   follow the locked EDD timestamps and the final media probe reports H.264,
   1080x1920, `yuv420p`, and the locked narration duration.

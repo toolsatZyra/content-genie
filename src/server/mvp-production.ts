@@ -6,6 +6,7 @@ import { Sandbox } from "@vercel/sandbox";
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { launchMediaLimits, sniffMediaMagic } from "@/security/media-ingest";
+import { selectProductionReferences } from "@/server/production-reference-selection";
 
 const QUEUE_ORIGIN = "https://queue.fal.run";
 const MAXIMUM_CLIPS = 40;
@@ -49,6 +50,7 @@ type ShotRow = Readonly<{
 
 type EditorialShot = Readonly<{
   promptBlueprint: string;
+  realWorldReferenceAssetVersionId: string | null;
   shotNumber: number;
 }>;
 
@@ -274,8 +276,30 @@ function editorialShots(value: unknown): readonly EditorialShot[] {
           false,
         );
       }
+      const researchReference =
+        row.realWorldReferenceAssetVersionId === undefined ||
+        row.realWorldReferenceAssetVersionId === null
+          ? null
+          : safeText(
+              row.realWorldReferenceAssetVersionId,
+              "The researched visual reference",
+              36,
+            );
+      if (
+        researchReference !== null &&
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+          researchReference,
+        )
+      ) {
+        throw new MvpProductionError(
+          "The researched visual reference is malformed.",
+          "PRODUCTION_PLAN_INVALID",
+          false,
+        );
+      }
       return Object.freeze({
         promptBlueprint: safeText(row.promptBlueprint, "The locked shot prompt"),
+        realWorldReferenceAssetVersionId: researchReference,
         shotNumber: row.shotNumber as number,
       });
     }),
@@ -300,7 +324,7 @@ async function submitJob(job: JobRow): Promise<void> {
         .order("shot_number"),
       client
         .from("preflight_reference_edges")
-        .select("shot_number,reference_ordinal,asset_version_id")
+        .select("shot_number,reference_ordinal,reference_kind,asset_version_id")
         .eq("workspace_id", job.workspace_id)
         .eq("plan_bundle_id", job.plan_bundle_id)
         .not("asset_version_id", "is", null)
@@ -348,14 +372,19 @@ async function submitJob(job: JobRow): Promise<void> {
     );
   }
   const selected = executableShots(shotsResult.data as ShotRow[]);
+  const editorial = editorialShots(edd.payload);
   const prompts = new Map(
-    editorialShots(edd.payload).map((shot) => [shot.shotNumber, shot.promptBlueprint]),
+    editorial.map((shot) => [shot.shotNumber, shot.promptBlueprint]),
   );
-  const referenceByShot = new Map<number, string>();
-  for (const edge of edgesResult.data) {
-    if (edge.asset_version_id && !referenceByShot.has(edge.shot_number)) {
-      referenceByShot.set(edge.shot_number, edge.asset_version_id);
-    }
+  let referenceByShot: ReadonlyMap<number, string>;
+  try {
+    referenceByShot = selectProductionReferences(edgesResult.data, editorial);
+  } catch {
+    throw new MvpProductionError(
+      "The editorial reference does not match the executable reference graph.",
+      "PRODUCTION_REFERENCE_MISMATCH",
+      false,
+    );
   }
   const referenceIds = selected.map((shot) => referenceByShot.get(shot.shot_number));
   if (referenceIds.some((id) => !id)) {

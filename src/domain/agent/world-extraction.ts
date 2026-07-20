@@ -3,6 +3,7 @@ import { compileImagePrompt, type LookDefinition } from "@/domain/look/look-regi
 export const WORLD_EXTRACTION_SCHEMA_VERSION = "genie.world-extraction.v1";
 
 type ContinuityRole = "incidental" | "primary" | "supporting";
+export type RealWorldSubjectKind = "festival" | "none" | "ritual" | "temple";
 
 export type ExtractedCharacterForm = Readonly<{
   agePresentation: string;
@@ -41,6 +42,7 @@ export type ExtractedLocation = Readonly<{
   lightingMode: string;
   namedTemple: boolean;
   realPlaceName: string | null;
+  realWorldSubjectKind: RealWorldSubjectKind;
   researchRequired: boolean;
   sacredDetails: readonly string[];
   timeAndAtmosphere: string;
@@ -234,11 +236,13 @@ function parseLocation(value: unknown, index: number): ExtractedLocation {
     "lightingMode",
     "namedTemple",
     "realPlaceName",
+    "realWorldSubjectKind",
     "researchRequired",
     "sacredDetails",
     "timeAndAtmosphere",
   ] as const;
-  if (!exactObject(value, keys)) {
+  const legacyKeys = keys.filter((item) => item !== "realWorldSubjectKind");
+  if (!exactObject(value, keys) && !exactObject(value, legacyKeys)) {
     throw new WorldExtractionError(`${label} is not exact.`);
   }
   const input = value as Record<string, unknown>;
@@ -248,11 +252,22 @@ function parseLocation(value: unknown, index: number): ExtractedLocation {
     input.realPlaceName === null
       ? null
       : text(input.realPlaceName, `${label}.realPlaceName`, 300);
+  const realWorldSubjectKind =
+    input.realWorldSubjectKind === undefined
+      ? namedTemple
+        ? "temple"
+        : "none"
+      : String(input.realWorldSubjectKind);
   if (
-    (namedTemple && (!realPlaceName || !researchRequired)) ||
-    (!namedTemple && (realPlaceName !== null || researchRequired))
+    !["festival", "none", "ritual", "temple"].includes(realWorldSubjectKind) ||
+    (realWorldSubjectKind === "none" &&
+      (namedTemple || realPlaceName !== null || researchRequired)) ||
+    (realWorldSubjectKind === "temple" &&
+      (!namedTemple || !realPlaceName || !researchRequired)) ||
+    (["festival", "ritual"].includes(realWorldSubjectKind) &&
+      (namedTemple || !realPlaceName || !researchRequired))
   ) {
-    throw new WorldExtractionError(`${label} temple evidence binding is invalid.`);
+    throw new WorldExtractionError(`${label} real-world evidence binding is invalid.`);
   }
   return Object.freeze({
     architectureAndEra: text(
@@ -277,6 +292,7 @@ function parseLocation(value: unknown, index: number): ExtractedLocation {
     lightingMode: text(input.lightingMode, `${label}.lightingMode`, 240),
     namedTemple,
     realPlaceName,
+    realWorldSubjectKind: realWorldSubjectKind as RealWorldSubjectKind,
     researchRequired,
     sacredDetails: textArray(input.sacredDetails, `${label}.sacredDetails`, 16),
     timeAndAtmosphere: text(input.timeAndAtmosphere, `${label}.timeAndAtmosphere`, 500),
@@ -429,19 +445,25 @@ export function compileLocationAnchorPrompt(
   look: LookDefinition,
   templeReferencesVerified = false,
 ): Readonly<{ negativePrompt: string; prompt: string }> {
-  if (location.namedTemple && !templeReferencesVerified) {
+  if (location.researchRequired && !templeReferencesVerified) {
     throw new WorldExtractionError(
-      "A named temple requires verified photographic references before generation.",
+      "A real-world subject requires verified photographic references before generation.",
     );
   }
+  const populatedRealWorldSubject = ["festival", "ritual"].includes(
+    location.realWorldSubjectKind,
+  );
   const frame = promptText(
-    `Vertical 9:16 empty canonical location anchor for ${location.displayName}. ` +
+    `Vertical 9:16 ${populatedRealWorldSubject ? "canonical documentary reference plate" : "empty canonical location anchor"} for ${location.displayName}. ` +
       `Environment: ${location.environmentDescription}. Architecture and era: ${location.architectureAndEra}. ` +
       `Sacred details: ${location.sacredDetails.join("; ") || "none specified"}. ` +
       `Time and atmosphere: ${location.timeAndAtmosphere}. Framing: ${location.framing}. ` +
       `Camera: ${location.cameraAngle}. Lighting: ${location.lightingMode}. ` +
       `Continuity locks: ${location.continuityDirectives.join("; ") || "preserve all architectural and spatial features"}. ` +
-      `No people, respectful Hindu devotional-film depiction, historically coherent, no typography, no watermark.`,
+      (populatedRealWorldSubject
+        ? `Use the supplied public photographs as factual visual evidence for the documented ${location.realWorldSubjectKind}; preserve authentic setting, actions, dress, objects, and spatial relationships while avoiding identifiable-face invention. `
+        : "No people. ") +
+      `Respectful Hindu devotional-film depiction, historically coherent, no typography, no watermark.`,
   );
   return Object.freeze({
     negativePrompt: look.negativePolicy.promptTail,
