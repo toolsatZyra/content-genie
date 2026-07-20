@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   environment: vi.fn(),
   fail: vi.fn(),
   fetch: vi.fn(),
+  falRecovery: vi.fn(),
   policy: vi.fn(),
   promote: vi.fn(),
   quarantine: vi.fn(),
@@ -49,6 +50,11 @@ vi.mock("@/server/narration-ingest", () => ({
 vi.mock("@/server/preflight-auto-reconciler", () => ({
   ensurePlanEvaluationRun: mocks.plan,
 }));
+vi.mock("@/server/fal-result-recovery", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("@/server/fal-result-recovery")>();
+  return { ...original, recoverNextCompletedFalResult: mocks.falRecovery };
+});
 
 import { RemoteFetchPolicyError } from "@/security/remote-fetch";
 import { SandboxMediaScannerError } from "@/server/sandbox-media-scanner";
@@ -90,6 +96,11 @@ describe("provider output secure-ingest cron", () => {
     vi.resetAllMocks();
     mocks.environment.mockReturnValue({ cronSecret: secret, environment: "test" });
     mocks.narration.mockResolvedValue(null);
+    mocks.falRecovery.mockResolvedValue({
+      checked: false,
+      providerRequestId: null,
+      recovered: false,
+    });
     mocks.plan.mockResolvedValue({
       configurationCandidateId: "30000000-0000-4000-8000-000000000014",
       preflightRunId: "30000000-0000-4000-8000-000000000015",
@@ -150,6 +161,9 @@ describe("provider output secure-ingest cron", () => {
       claimed: 1,
       completed: 1,
       failed: 0,
+      falRecoveryChecked: false,
+      falRecoveryProviderRequestId: null,
+      falRecovered: false,
       narrationCompleted: null,
       narrationJobId: null,
       ok: true,
@@ -188,6 +202,9 @@ describe("provider output secure-ingest cron", () => {
       claimed: 1,
       completed: 0,
       failed: 1,
+      falRecoveryChecked: false,
+      falRecoveryProviderRequestId: null,
+      falRecovered: false,
       narrationCompleted: null,
       narrationJobId: null,
       ok: true,
@@ -287,11 +304,38 @@ describe("provider output secure-ingest cron", () => {
       claimed: 0,
       completed: 0,
       failed: 0,
+      falRecoveryChecked: false,
+      falRecoveryProviderRequestId: null,
+      falRecovered: false,
       narrationCompleted: true,
       narrationJobId: "30000000-0000-4000-8000-000000000013",
       ok: true,
       planQueued: true,
       planRunId: "30000000-0000-4000-8000-000000000015",
     });
+  });
+
+  it("uses an idle invocation to recover a completed FAL result before narration", async () => {
+    mocks.claim.mockReset().mockResolvedValue(null);
+    mocks.falRecovery.mockResolvedValue({
+      checked: true,
+      providerRequestId: claim.providerRequestId,
+      recovered: true,
+    });
+    const result = await GET(request());
+    await expect(result.json()).resolves.toEqual({
+      claimed: 0,
+      completed: 0,
+      failed: 0,
+      falRecoveryChecked: true,
+      falRecoveryProviderRequestId: claim.providerRequestId,
+      falRecovered: true,
+      narrationCompleted: null,
+      narrationJobId: null,
+      ok: true,
+      planQueued: false,
+      planRunId: null,
+    });
+    expect(mocks.narration).not.toHaveBeenCalled();
   });
 });

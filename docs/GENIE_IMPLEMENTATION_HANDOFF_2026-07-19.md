@@ -1084,7 +1084,38 @@ Proportionate pre-deploy evidence is green: formatting, lint, type checking,
 skip, the two focused Atrium/Series and World accept/recast browser journeys,
 and the secret-canary production build. Supabase preview confirms all new
 functions and run-binding columns, and preview/production privilege probes
-confirm no `anon` or `authenticated` execution. Explicit GitHub push,
-automatic Vercel verification, and completed Ep 1 replacement-candidate proof
-remain the final steps for this batch. This does not complete the broader
-phase gates.
+confirm no `anon` or `authenticated` execution.
+
+Commit `8fa57c27e447a0e73184930ce2c5fc751a98deda` was pushed explicitly to
+GitHub `main`. Automatic production deployment
+`dpl_3VVLjStLRc5DBcb14SGDSNVZ4DRo` reached READY and the canonical alias served
+that exact deployment; the health route returned production `ok`.
+
+The live legacy request then exposed two narrow replay ambiguities that are
+now corrected in preview and production. `world_regeneration_preflight_resume`
+accepts the episode configuration's legitimate `preflight` state after the
+queued recast creates its run, and
+`world_regeneration_decision_disambiguation` qualifies the regeneration
+decision field rather than colliding with the PL/pgSQL output variable.
+
+Ep 1's replacement is no longer queued or generating. Authoritative production
+proof now shows request `4edbd5d4-be6c-4a71-b923-bc428153cf44` `completed`,
+run `bee1e4d5-2c35-47ea-b802-9a2108c64a3b` `succeeded`, job
+`e3cc4cdb-58bc-571f-bae7-4f3ab446cc39` `promoted`, provider request
+`630ad078-76a4-4f3e-8dd8-0818b7dc84f3` `succeeded`, immutable World version
+`d977013e-4756-4fec-b7d7-f059ea62c8d8`, and promoted asset version
+`e0c7d4a5-20d6-4e01-977b-f3f9835e7193`. The Mithila location selection is
+`review_required` at aggregate version 3, intentionally with no selected
+version until the owner chooses `Accept anchor`.
+
+FAL completed the generation normally, but its signed webhook was rejected
+three times with 401. The exact completed result was recovered once through
+the existing request-bound authenticated polling authority, without a second
+generation or second spend. Migration `fal_authenticated_poll_reconciler` and
+the secure-ingest worker now make that fallback automatic and bounded: only a
+service-role worker can select one aged accepted FAL image request, the result
+is fetched with the provider credential, and the output must still pass the
+provider inbox, private quarantine, media scan, and atomic promotion path.
+Preview and production privilege probes show service execution only. Focused
+fallback/webhook/ingest tests pass 12/12, and type checking, lint, and formatting
+remain green. This does not complete the broader phase gates.

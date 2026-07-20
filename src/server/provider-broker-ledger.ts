@@ -199,6 +199,37 @@ export async function getFalWebhookBinding(providerRequestId: string): Promise<{
   };
 }
 
+export type FalAuthenticatedPollCandidate = Readonly<{
+  empty: false;
+  externalJobId: string;
+  ok: true;
+  providerRequestId: string;
+}>;
+
+export async function getNextFalAuthenticatedPollCandidate(input: {
+  environment: string;
+  minimumAgeSeconds?: number;
+}): Promise<FalAuthenticatedPollCandidate | null> {
+  const value = await rpc("get_next_fal_authenticated_poll_candidate", {
+    p_environment: input.environment,
+    p_minimum_age_seconds: input.minimumAgeSeconds ?? 45,
+  });
+  if (exactObject(value, ["empty", "ok"])) {
+    const record = value as Record<string, unknown>;
+    if (record.empty === true && record.ok === true) return null;
+  }
+  if (
+    !exactObject(value, ["empty", "externalJobId", "ok", "providerRequestId"]) ||
+    (value as Record<string, unknown>).empty !== false ||
+    (value as Record<string, unknown>).ok !== true ||
+    typeof (value as Record<string, unknown>).externalJobId !== "string" ||
+    typeof (value as Record<string, unknown>).providerRequestId !== "string"
+  ) {
+    throw new ProviderBrokerLedgerError("FAL poll recovery claim is malformed.");
+  }
+  return value as FalAuthenticatedPollCandidate;
+}
+
 export type FalWebhookRecordResult = Readonly<{
   aggregateVersion: number;
   candidateIds: readonly string[];

@@ -29,6 +29,10 @@ import {
 } from "@/server/sandbox-media-scanner";
 import { processNextNarrationIngest } from "@/server/narration-ingest";
 import { ensurePlanEvaluationRun } from "@/server/preflight-auto-reconciler";
+import {
+  FalResultRecoveryError,
+  recoverNextCompletedFalResult,
+} from "@/server/fal-result-recovery";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -167,7 +171,30 @@ export async function GET(request: Request) {
       }
     }
 
-    const narration = claimed === 0 ? await processNextNarrationIngest() : null;
+    let falRecovery = {
+      checked: false,
+      providerRequestId: null as string | null,
+      recovered: false,
+    };
+    if (claimed === 0) {
+      try {
+        falRecovery = await recoverNextCompletedFalResult({
+          environment: cron.environment,
+        });
+      } catch (error) {
+        console.error("FAL authenticated result recovery failed safely", {
+          errorMessage:
+            error instanceof FalResultRecoveryError
+              ? error.message
+              : "Unexpected FAL recovery failure.",
+          errorName: error instanceof Error ? error.name : "UnknownError",
+        });
+      }
+    }
+    const narration =
+      claimed === 0 && !falRecovery.recovered
+        ? await processNextNarrationIngest()
+        : null;
     let planQueued = false;
     let planRunId: string | null = null;
     if (narration?.completed) {
@@ -186,6 +213,9 @@ export async function GET(request: Request) {
         claimed,
         completed,
         failed,
+        falRecoveryChecked: falRecovery.checked,
+        falRecoveryProviderRequestId: falRecovery.providerRequestId,
+        falRecovered: falRecovery.recovered,
         narrationCompleted: narration?.completed ?? null,
         narrationJobId: narration?.jobId ?? null,
         ok: true,
