@@ -28,11 +28,20 @@ function parseJwks(value: unknown): readonly FalJwk[] {
       record.kty !== "OKP" ||
       record.crv !== "Ed25519" ||
       typeof record.x !== "string" ||
-      !/^[A-Za-z0-9_-]{43}$/u.test(record.x)
+      !/^[A-Za-z0-9_-]{43}=?$/u.test(record.x)
     ) {
       return [];
     }
-    return [{ crv: "Ed25519", kty: "OKP", x: record.x } as const];
+    return [
+      {
+        crv: "Ed25519",
+        kty: "OKP",
+        // FAL currently publishes padded base64url while JWK consumers expect
+        // the canonical unpadded representation. Accept both wire forms and
+        // normalize before handing the key to Node's crypto implementation.
+        x: record.x.replace(/=$/u, ""),
+      } as const,
+    ];
   });
   if (parsed.length < 1) {
     throw new FalWebhookError("FAL JWKS has no supported key.", true);

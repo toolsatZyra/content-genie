@@ -22,7 +22,8 @@ describe("FAL webhook signature verifier", () => {
     const signedHeaders = new Headers(unsignedHeaders);
     signedHeaders.set("x-fal-webhook-signature", signature);
     const jwksBytes = JSON.stringify({
-      keys: [{ crv: "Ed25519", kty: "OKP", x: jwk.x }],
+      // The live FAL JWKS currently pads its 32-byte Ed25519 x coordinate.
+      keys: [{ crv: "Ed25519", kty: "OKP", x: `${jwk.x}=` }],
     });
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(jwksBytes, {
