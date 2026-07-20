@@ -828,15 +828,38 @@ separate retry defects that narrow local mocks had not exercised:
   the next worker received a higher fencing token with the same input
   manifest, proving retry authority is durable without minting a second input.
 
-The second live attempt reached OpenAI but exceeded the old 180-second request
-window. The recovery candidate keeps the same model, strict schema, immutable
-script binding, cultural fields, output cap, ledger, and parser, while using
-medium reasoning and a World-only 240-second request window within the
-five-minute cron boundary. A successful retry also resets the system progress
-row to `extracting`, so the UI no longer remains falsely failed while a fresh
-worker is active. Type checking, lint, four focused unit files / 12 tests,
-static preflight/provider policy, and the canary production build pass. The
-exact stage is held in its reversible `created` retry state until this recovery
-candidate is deployed; it has one remaining attempt. Resume only that run and
-stage after the exact deployment is READY, then preserve the resulting live
-entity/provider evidence here.
+The second live attempt reached OpenAI but exceeded the 180-second request
+window. Commit `2ba6f3c` deployed READY as Vercel deployment
+`dpl_C2qGSH3B7KLaeb2UtXM78pehU6w2` with retry-manifest reuse, medium reasoning,
+and a temporary World-only 240-second client request window. A live recovery
+immediately proved that widening invalid: the database model-call ledger
+correctly permits exactly 180 seconds. The client is therefore restored to the
+ledger-bound 180-second maximum; no execution authority was widened.
+
+At medium reasoning the next exact live attempt completed inside 180 seconds
+and identified Rama, Sita, King Janaka, Sage Vishvamitra, Parashurama, the
+assembled kings and warriors, the royal assembly hall of Mithila, the approach
+to Mithila, Shiva's great bow, and Parashurama's axe. It first failed closed on
+an ambiguity that referenced a non-canonical key. The strict provider schema
+and instructions now require ambiguity references to use only an extracted
+entity's exact `canonicalKey`, permit the already supported `prop` ambiguity
+kind, and use an empty list for scope-wide ambiguity. A further retry completed
+the same extraction and persisted entity-by-entity progress, including both
+props, without spending provider authority.
+
+That retry exposed one final semantic defect: two quoted declarations inside
+the narrator-read immutable Hindi prose were classified as separately performed
+dialogue. Launch remains one selected narrator reading every immutable word;
+quote marks alone do not create character actors, dialogue performance, or lip
+sync. The extraction contract now marks quoted narrator prose as narration-only
+and reserves dialogue/lip-sync flags for explicit separate character voices or
+on-screen mouth-synced performance. A focused regression test binds that rule.
+
+The World screen now presents a clean `Retry World` recovery action only when
+there are failed progress rows, no active work, and no generated anchors. It
+starts a new fenced run while retaining the prior attempt as audit evidence and
+never mutates the script. A successful retry resets the system progress row to
+`extracting`, so users see the current agent and item-level progress instead of
+a stale failure. The next operational step is to deploy this correction, start
+a new run for the same Ep 1, and preserve its provider-dispatch and UI evidence
+here.

@@ -153,6 +153,7 @@ export function WorldStudio({
       ACTIVE_PROGRESS_STATES.has(item.state) &&
       (item.itemKind !== "system" || item.state === "extracting"),
   );
+  const failedProgress = projection.progress.filter((item) => item.state === "failed");
   const focusedProgress =
     activeProgress.find((item) => item.state === "secure_ingest") ??
     activeProgress.find((item) => item.state === "generating") ??
@@ -329,6 +330,33 @@ export function WorldStudio({
               type="button"
             >
               World
+            </button>
+          </div>
+        </div>
+      ) : allEntities.length === 0 &&
+        activeProgress.length === 0 &&
+        failedProgress.length > 0 ? (
+        <div className="world-empty">
+          <div className="monica-orbit" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+            <span>C</span>
+          </div>
+          <div>
+            <small>Casting Director · Recovery Agent</small>
+            <h2>The locked script is safe. World needs a fresh pass.</h2>
+            <p>
+              Retry from the same immutable script and confirmed look. Genie will keep
+              the prior attempt as audit evidence and continue in a new fenced run.
+            </p>
+            <button
+              className="creation-primary"
+              disabled={!canEdit || working}
+              onClick={onStart}
+              type="button"
+            >
+              Retry World
             </button>
           </div>
         </div>

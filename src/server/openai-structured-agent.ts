@@ -7,7 +7,6 @@ const schemaNamePattern = /^[a-z][a-z0-9_]{2,63}$/u;
 export type OpenAiStructuredAgentRequest = Readonly<{
   instructions: string;
   input: string;
-  maximumDurationMs?: number;
   maxOutputTokens?: number;
   model?: string;
   reasoningEffort?: "high" | "low" | "medium";
@@ -26,7 +25,7 @@ export type OpenAiStructuredAgentResult = Readonly<{
 
 export type PreparedOpenAiStructuredAgentRequest = Readonly<{
   bodyText: string;
-  maximumDurationMs: number;
+  maximumDurationMs: 180_000;
   maximumResponseBytes: 131_072;
   maximumTokens: number;
   model: string;
@@ -143,13 +142,6 @@ export function prepareOpenAiStructuredAgentRequest(
       "contract",
     );
   }
-  const maximumDurationMs = request.maximumDurationMs ?? 180_000;
-  if (boundedInteger(maximumDurationMs, 30_000, 240_000) === null) {
-    throw new OpenAiStructuredAgentError(
-      "Agent duration limit is invalid.",
-      "contract",
-    );
-  }
   const model = request.model ?? "gpt-5.6-sol";
   if (!/^[A-Za-z0-9][A-Za-z0-9_.-]{1,100}$/u.test(model)) {
     throw new OpenAiStructuredAgentError("Agent model is invalid.", "contract");
@@ -174,7 +166,7 @@ export function prepareOpenAiStructuredAgentRequest(
   const requestHash = createHash("sha256").update(bodyText).digest("hex");
   return Object.freeze({
     bodyText,
-    maximumDurationMs,
+    maximumDurationMs: 180_000,
     maximumResponseBytes: 131_072,
     maximumTokens: maxOutputTokens,
     model,

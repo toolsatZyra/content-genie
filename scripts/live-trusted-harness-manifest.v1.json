@@ -18,7 +18,7 @@
     {
       "path": "pnpm-lock.yaml",
       "role": "dependency-lock",
-      "sha256": "4d719cd40b13f3eedcfa435496544ea3c473e9aabdae84ef474be51ed4061502"
+      "sha256": "235160616655621eed469cae961cae83c902018815413055b4e00b4260bff684"
     },
     {
       "path": "pnpm-workspace.yaml",
@@ -423,7 +423,7 @@
     {
       "path": "supabase/migrations/20260719073700_phase2_authenticated_voice_canaries.sql",
       "role": "phase2-migration",
-      "sha256": "110af0a883d7a8d3bd7b4b927474f9a9e30d2f6f7ae7f863f73bc22995adaa96"
+      "sha256": "d5f6573ff5c3c83d7ac96ffbac1abbfa55cf25dde185aab276dfbba4db5ba1a2"
     },
     {
       "path": "supabase/migrations/20260719073800_phase2_prelock_narration_dispatch.sql",
@@ -488,32 +488,32 @@
     {
       "path": "supabase/migrations/20260719075000_phase2_source_world_pair_pins.sql",
       "role": "phase2-migration",
-      "sha256": "a61471fd7ce245a19682a8bfa0e5d13ec7b233a801315efdacbd844612d34009"
+      "sha256": "d9435de175fc5881ceca916e60efcb100eeb344c06bb14be8eb1ca88e15e3b6d"
     },
     {
       "path": "supabase/migrations/20260719075100_phase2_audio_identity_execution_input.sql",
       "role": "phase2-migration",
-      "sha256": "cb0fbc728e329441e88a10825fdccfa185fdb9080d8aff406aaf120fe00fb190"
+      "sha256": "a211dc6ef9cd343c479cd1725a117916c22c42e0d7512df195778ee76e5f0b2d"
     },
     {
       "path": "supabase/migrations/20260719075200_phase2_current_agent_and_evaluator_binding.sql",
       "role": "phase2-migration",
-      "sha256": "6127723a7e6b2cd9a0998e963ae8220652244627271f224c8788be9995018ca4"
+      "sha256": "70b9a580353b6c53c7fbf90c3e4b1e719af236c2bb29247ace12e6625546ed11"
     },
     {
       "path": "supabase/migrations/20260719075300_phase2_provider_request_retained_duration.sql",
       "role": "phase2-migration",
-      "sha256": "2d2e793072bd5c8fc52e01d2cec004297ef20d88543a5fa96e920e21f8afd3dc"
+      "sha256": "d949281628c72d37c7cf2ebc38d8ec9d08c8243becd895c963a0586cb744750d"
     },
     {
       "path": "supabase/migrations/20260719075400_phase2_authenticated_video_profiles.sql",
       "role": "phase2-migration",
-      "sha256": "b8f2025d6f4066208390b6b9886b5bf6760833cb9270fcc82a1ebbf942e3254a"
+      "sha256": "e8ad0b15d9b7b340fda4fbbd4ff5e92a3a9a844a1222db19ed9eed68071ce240"
     },
     {
       "path": "supabase/migrations/20260719075500_phase2_executable_plan_input_consensus.sql",
       "role": "phase2-migration",
-      "sha256": "6d98d0560ef06aa8e8ec2224dc145c91c33d82311563e4fa2a4d2ae32393687f"
+      "sha256": "e7a339c1728a009cb9960e97d8b43072a8f659b4d236de9c326ee05ad6dc0b43"
     },
     {
       "path": "supabase/migrations/20260719075600_phase2_plan_resume_read_model.sql",
@@ -568,12 +568,12 @@
     {
       "path": "supabase/migrations/20260719195650_phase2_script_rubric_foundation.sql",
       "role": "phase2-migration",
-      "sha256": "4e247ab29abd36331d3b867c48b80d97c7d44bb7589ba2caa3409fe5d9839507"
+      "sha256": "e93083db813f201d21370bdd28f8fce4bf7d53851e18ed9c5a2f0d634c4f021b"
     },
     {
       "path": "supabase/migrations/20260719215715_phase2_script_rubric_fk_index.sql",
       "role": "phase2-migration",
-      "sha256": "0ef30bf12a09aa19f0c80853826d27277d0ab1396e6c34a019e7b22293f7a844"
+      "sha256": "84de16052af44621506233334245eab8422014a35c580c3d8a90655be65c268d"
     },
     {
       "path": "supabase/migrations/20260719223000_phase2_broker_key_overlap_security.sql",
@@ -608,7 +608,7 @@
     {
       "path": "supabase/tests/phase2_zero_spend_foundation.test.sql",
       "role": "pgtap-source",
-      "sha256": "53b7ac63dd2ee9a138c703c5fdc9c6fe17dd2bc5af935a2ec2a5989fafc6d19b"
+      "sha256": "b7effd6745907277afbba87bc55d7e08cf03cc0b1c5112d8e00edb39a8d05950"
     },
     {
       "path": "tests/live/phase1-live.spec.ts",
@@ -658,9 +658,9 @@
       "testFile": "phase2_world_cultural.test.sql"
     },
     {
-      "hardenedQuerySha256": "40952a07c89aae6825f6e81be0e7cdf22317b2cc81617d1cfb9a3242c648505a",
+      "hardenedQuerySha256": "ca25060e85a4384a83731709d5aeae1b4deaf7f1519b4cca8fec756ad496ef60",
       "plannedAssertions": 178,
-      "sourceSha256": "53b7ac63dd2ee9a138c703c5fdc9c6fe17dd2bc5af935a2ec2a5989fafc6d19b",
+      "sourceSha256": "b7effd6745907277afbba87bc55d7e08cf03cc0b1c5112d8e00edb39a8d05950",
       "testFile": "phase2_zero_spend_foundation.test.sql"
     }
   ],

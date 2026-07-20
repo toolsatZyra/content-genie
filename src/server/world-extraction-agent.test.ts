@@ -130,7 +130,6 @@ describe("ledgered World Extraction", () => {
       toolName: "source.extract",
     });
     expect(mocks.agent.mock.calls[0]?.[1]).toMatchObject({
-      maximumDurationMs: 240_000,
       maxOutputTokens: 12_000,
       model: "gpt-5.6-sol",
       reasoningEffort: "medium",
@@ -150,6 +149,28 @@ describe("ledgered World Extraction", () => {
   });
 
   it("uses only structured-output schema keywords accepted by the provider", () => {
-    expect(JSON.stringify(WORLD_EXTRACTION_JSON_SCHEMA)).not.toContain('"uniqueItems"');
+    const serialized = JSON.stringify(WORLD_EXTRACTION_JSON_SCHEMA);
+    expect(serialized).not.toContain('"uniqueItems"');
+    expect(serialized).toContain('"prop"');
+    expect(serialized).toContain("Never use formKey");
+  });
+
+  it("defines quoted prose as selected-narrator delivery rather than lip-sync", async () => {
+    const script = 'Janaka announced: "Sita will marry Rama."';
+    const scriptSha256 = createHash("sha256").update(script).digest("hex");
+    mocks.agent.mockResolvedValue({
+      output: extraction,
+      requestHash: "c".repeat(64),
+      responseId: "resp_quote",
+      responseRequestId: "req_quote",
+    });
+
+    await extractWorldFromLockedScript({ authority, script, scriptSha256 });
+
+    expect(mocks.agent.mock.calls[0]?.[1]).toMatchObject({
+      instructions: expect.stringContaining(
+        "Quoted speech inside narrator-read prose is therefore still narrationOnly true",
+      ),
+    });
   });
 });
