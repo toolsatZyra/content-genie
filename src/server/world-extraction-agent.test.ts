@@ -173,4 +173,23 @@ describe("ledgered World Extraction", () => {
       ),
     });
   });
+
+  it("keeps generically named sacred props usable without inventing iconography", async () => {
+    const script = "Rama lifted Shiva's great bow.";
+    const scriptSha256 = createHash("sha256").update(script).digest("hex");
+    mocks.agent.mockResolvedValue({
+      output: extraction,
+      requestHash: "d".repeat(64),
+      responseId: "resp_generic_prop",
+      responseRequestId: "req_generic_prop",
+    });
+
+    await extractWorldFromLockedScript({ authority, script, scriptSha256 });
+
+    expect(mocks.agent.mock.calls[0]?.[1]).toMatchObject({
+      instructions: expect.stringContaining(
+        "The absence of a more specific name is not a blocking ambiguity",
+      ),
+    });
+  });
 });

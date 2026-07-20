@@ -863,3 +863,27 @@ never mutates the script. A successful retry resets the system progress row to
 a stale failure. The next operational step is to deploy this correction, start
 a new run for the same Ep 1, and preserve its provider-dispatch and UI evidence
 here.
+
+Deployment `dpl_J6wX4FPiiSqxE1CGcnCdS29GuVYR` is READY for commit `541dff7`
+and owns the canonical production alias. Ep 1 run 2 proved the corrected scope
+contract live: it returned narration-only, no dialogue, and no lip sync, while
+extracting six character forms, two locations, Shiva's bow, and Parashurama's
+axe. Two additional defects were then closed without provider spend:
+
+- `phase3_world_extraction_cross_attempt_replay` lets a fenced retry reuse an
+  immutable extraction only inside the same run, authority epoch, and exact
+  input-manifest hash. Preview and production both have the migration.
+- `phase3_provider_capability_registration_disambiguation` qualifies the
+  Nano Banana generation/edit capability column that PL/pgSQL otherwise
+  confused with its local record variable. Preview and production both have
+  the migration, and a production registration now returns the expected
+  verified capability at exactly USD 0.12 per image.
+
+Run 3 (`c733fbde-e3a8-4978-bf14-1642b7d69349`) passed launch scope and
+completed extraction but stopped before spend because it treated the absence
+of the proper name Pinaka as a blocking ambiguity for the script's generic
+"Shiva's great bow." The contract now preserves the exact generic sacred-prop
+identity, forbids invented proper names or iconography, and does not block only
+because the immutable script is less specific. The next live run must prove
+provider jobs are dispatched from that rule before this recovery is called
+complete.
