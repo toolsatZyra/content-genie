@@ -594,22 +594,35 @@ export async function promoteProviderWorldAnchor(input: {
   const assetVersionId = randomUUID();
   const worldVersionId = randomUUID();
   const finalObjectName = `${input.claim.workspaceId}/${context.assetKind}/${input.claim.targetAssetId}/${assetVersionId}/source`;
-  const upload = await client.storage
-    .from("workspace-media")
-    .upload(finalObjectName, input.scanned.outputBytes, {
+  const workspaceMedia = client.storage.from("workspace-media");
+  const upload = await workspaceMedia.upload(
+    finalObjectName,
+    input.scanned.outputBytes,
+    {
       cacheControl: "0",
       contentType: input.scanned.magicMime,
       metadata: { sha256: input.scanned.outputSha256 },
       upsert: false,
-    });
+    },
+  );
   if (upload.error) {
     throw new ProviderBrokerLedgerError(
       "Sanitized provider media could not be stored.",
     );
   }
-  const storageVersion =
-    upload.data.id ??
-    createHash("sha256").update(input.scanned.outputBytes).digest("hex");
+  const receipt = await workspaceMedia.info(finalObjectName);
+  if (
+    receipt.error ||
+    receipt.data.id !== upload.data.id ||
+    typeof receipt.data.version !== "string" ||
+    receipt.data.version.length < 1
+  ) {
+    await workspaceMedia.remove([finalObjectName]).catch(() => undefined);
+    throw new ProviderBrokerLedgerError(
+      "Sanitized provider storage receipt is invalid.",
+    );
+  }
+  const storageVersion = receipt.data.version;
   try {
     const promotion = await rpc("command_promote_world_anchor_quarantine", {
       p_asset_kind: context.assetKind,
@@ -636,10 +649,7 @@ export async function promoteProviderWorldAnchor(input: {
     );
     return Object.freeze({ assetVersionId, worldVersionId });
   } catch (error) {
-    await client.storage
-      .from("workspace-media")
-      .remove([finalObjectName])
-      .catch(() => undefined);
+    await workspaceMedia.remove([finalObjectName]).catch(() => undefined);
     throw error;
   }
 }

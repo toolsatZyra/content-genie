@@ -112,16 +112,29 @@ async function uploadOrVerify(
   contentType: string,
 ): Promise<string> {
   const expectedHash = createHash("sha256").update(bytes).digest("hex");
-  const upload = await client.storage.from(bucket).upload(objectName, bytes, {
+  const storage = client.storage.from(bucket);
+  const upload = await storage.upload(objectName, bytes, {
     cacheControl: "0",
     contentType,
     metadata: { sha256: expectedHash },
     upsert: false,
   });
   if (!upload.error) {
-    return upload.data.id ?? expectedHash;
+    const receipt = await storage.info(objectName);
+    if (
+      receipt.error ||
+      receipt.data.id !== upload.data.id ||
+      typeof receipt.data.version !== "string" ||
+      receipt.data.version.length < 1
+    ) {
+      throw new WorldUploadProcessingError(
+        "Media storage receipt was invalid.",
+        "upload.storage_receipt_invalid",
+      );
+    }
+    return receipt.data.version;
   }
-  const existing = await client.storage.from(bucket).download(objectName);
+  const existing = await storage.download(objectName);
   if (existing.error) {
     throw new WorldUploadProcessingError(
       "Media could not enter isolated storage.",
@@ -135,7 +148,18 @@ async function uploadOrVerify(
       "upload.storage_conflict",
     );
   }
-  return expectedHash;
+  const receipt = await storage.info(objectName);
+  if (
+    receipt.error ||
+    typeof receipt.data.version !== "string" ||
+    receipt.data.version.length < 1
+  ) {
+    throw new WorldUploadProcessingError(
+      "Existing media storage receipt was invalid.",
+      "upload.storage_receipt_invalid",
+    );
+  }
+  return receipt.data.version;
 }
 
 async function failIntake(

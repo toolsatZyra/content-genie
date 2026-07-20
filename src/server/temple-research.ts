@@ -434,7 +434,18 @@ async function uploadOrVerify(input: {
     metadata: { sha256: contentSha256 },
     upsert: false,
   });
-  if (!upload.error) return upload.data.id ?? contentSha256;
+  if (!upload.error) {
+    const receipt = await storage.info(input.objectName);
+    if (
+      receipt.error ||
+      receipt.data.id !== upload.data.id ||
+      typeof receipt.data.version !== "string" ||
+      receipt.data.version.length < 1
+    ) {
+      throw new TempleResearchError("Temple media storage receipt was invalid.");
+    }
+    return receipt.data.version;
+  }
   const existing = await storage.download(input.objectName);
   if (existing.error) {
     throw new TempleResearchError(
@@ -446,7 +457,15 @@ async function uploadOrVerify(input: {
   if (sha256(bytes) !== contentSha256) {
     throw new TempleResearchError("Temple media storage replay conflicted.");
   }
-  return contentSha256;
+  const receipt = await storage.info(input.objectName);
+  if (
+    receipt.error ||
+    typeof receipt.data.version !== "string" ||
+    receipt.data.version.length < 1
+  ) {
+    throw new TempleResearchError("Temple media storage receipt was invalid.");
+  }
+  return receipt.data.version;
 }
 
 async function findPromotedResearchAsset(
