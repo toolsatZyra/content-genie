@@ -15,7 +15,6 @@ import { useRouter } from "next/navigation";
 
 import { creationAccessForEpisode } from "@/domain/creation";
 import {
-  canArchiveSeries,
   canCreateEpisodeInSeries,
   episodeCreationBlocker,
   episodeStatePresentation,
@@ -31,7 +30,7 @@ import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { AccountPanel } from "@/components/studio/account-panel";
 import { useStudioSearch } from "@/components/studio/use-studio-search";
 
-type StudioView = "atrium" | "series" | "library" | "monica";
+type StudioView = "atrium" | "series" | "library";
 type ComposerMode = "episode" | "series";
 type EpisodeProgressState = "complete" | "current" | "stopped" | "upcoming";
 const subscribeToHydration = (): (() => void) => () => {};
@@ -437,33 +436,6 @@ export function AuthenticatedStudio({
     }
   }
 
-  async function archiveSeries(series: SeriesSummary): Promise<void> {
-    if (!canArchiveSeries(series)) {
-      setCommandStatus(
-        "Series archival is unavailable because its lifecycle projection is not authoritative.",
-      );
-      return;
-    }
-    if (!window.confirm(`Archive “${series.title}”? Its Episodes will be preserved.`)) {
-      return;
-    }
-    setCommandStatus("");
-    try {
-      await sendCommand("series.archive", {
-        expectedVersion: series.aggregateVersion,
-        seriesId: series.id,
-        workspaceId: projection.workspace.id,
-      });
-      router.refresh();
-    } catch (error) {
-      setCommandStatus(error instanceof Error ? error.message : "Archive failed.");
-    }
-  }
-
-  function switchWorkspace(workspaceId: string): void {
-    router.push(`/?workspace=${encodeURIComponent(workspaceId)}`);
-  }
-
   return (
     <main
       className="live-studio-shell"
@@ -485,20 +457,6 @@ export function AuthenticatedStudio({
             <small>by Zyra</small>
           </span>
         </button>
-        <label className="workspace-switcher">
-          <span>Workspace</span>
-          <select
-            aria-label="Current workspace"
-            onChange={(event) => switchWorkspace(event.target.value)}
-            value={projection.workspace.id}
-          >
-            {projection.workspaces.map((workspace) => (
-              <option key={workspace.id} value={workspace.id}>
-                {workspace.name}
-              </option>
-            ))}
-          </select>
-        </label>
         <div className="live-header-actions">
           <button
             aria-label="Open global search"
@@ -542,7 +500,6 @@ export function AuthenticatedStudio({
             ["atrium", "✦", "Atrium"],
             ["series", "◫", "Series"],
             ["library", "◇", "Library"],
-            ["monica", "◉", "Monica"],
           ] as const
         ).map(([id, symbol, label]) => (
           <button
@@ -554,9 +511,6 @@ export function AuthenticatedStudio({
           >
             <span aria-hidden="true">{symbol}</span>
             <span>{label}</span>
-            {id === "monica" && projection.work.length > 0 ? (
-              <em>{projection.work.length}</em>
-            ) : null}
           </button>
         ))}
       </nav>
@@ -569,45 +523,51 @@ export function AuthenticatedStudio({
                 ? "The studio in motion"
                 : view === "series"
                   ? "Creative worlds"
-                  : view === "monica"
-                    ? "Quality command"
-                    : "Finished artefacts"}
+                  : "Finished artefacts"}
             </span>
             <h1>
               {view === "atrium"
                 ? "Your films are in motion."
                 : view === "series"
                   ? "Every story has a world."
-                  : view === "monica"
-                    ? "Monica is watching."
-                    : "The film vault."}
+                  : "The film vault."}
             </h1>
             <p>
               {view === "atrium"
-                ? "Move between Episodes while Genie’s crew works in parallel."
+                ? "Move between Episodes while Genie’s agentic AI crew works in parallel."
                 : view === "series"
                   ? "Inspect the exact active release and pins before creating the next Episode."
-                  : view === "monica"
-                    ? "Assigned reviews and machine-quality signals converge here."
-                    : "Approved masters and exports will appear here once production is enabled."}
+                  : "Approved masters and exports will appear here once production is enabled."}
             </p>
           </div>
-          {view === "atrium" || view === "series" ? (
+          {view === "atrium" ? (
+            <div className="live-heading-actions">
+              <button
+                className="create-button"
+                onClick={() => openComposer("series")}
+                type="button"
+              >
+                <span aria-hidden="true">＋</span>
+                Create Series
+              </button>
+              <button
+                className="create-button"
+                disabled={creatableSeries.length === 0}
+                onClick={() => openComposer("episode")}
+                type="button"
+              >
+                <span aria-hidden="true">＋</span>
+                Create Episode
+              </button>
+            </div>
+          ) : view === "series" ? (
             <button
               className="create-button"
-              onClick={() =>
-                openComposer(
-                  view === "series" || creatableSeries.length === 0
-                    ? "series"
-                    : "episode",
-                )
-              }
+              onClick={() => openComposer("series")}
               type="button"
             >
               <span aria-hidden="true">＋</span>
-              {view === "series" || creatableSeries.length === 0
-                ? "Create Series"
-                : "Create Episode"}
+              Create Series
             </button>
           ) : null}
         </div>
@@ -675,19 +635,11 @@ export function AuthenticatedStudio({
         {view === "series" ? (
           <SeriesWorlds
             episodes={allEpisodes}
-            onArchive={archiveSeries}
             onCreateEpisode={(seriesId) => openComposer("episode", seriesId)}
             onCreateSeries={() => openComposer("series")}
             onSelect={setSelectedSeriesId}
             selectedId={selectedSeries?.id ?? ""}
             series={allSeries}
-          />
-        ) : null}
-
-        {view === "monica" ? (
-          <MonicaInbox
-            work={projection.work}
-            onOpenActivity={() => activityRef.current?.showModal()}
           />
         ) : null}
 
@@ -768,6 +720,7 @@ export function AuthenticatedStudio({
           activities={projection.activities}
           notifications={projection.notifications}
           onClose={() => activityRef.current?.close()}
+          work={projection.work}
         />
       </dialog>
 
@@ -866,7 +819,7 @@ export function AuthenticatedStudio({
       </dialog>
 
       <dialog
-        aria-label="Account and trust"
+        aria-label="Account settings"
         className="live-side-dialog"
         ref={accountRef}
       >
@@ -1145,7 +1098,6 @@ function EpisodeFocus({
 
 function SeriesWorlds({
   episodes,
-  onArchive,
   onCreateEpisode,
   onCreateSeries,
   onSelect,
@@ -1153,7 +1105,6 @@ function SeriesWorlds({
   series,
 }: Readonly<{
   episodes: readonly EpisodeSummary[];
-  onArchive: (series: SeriesSummary) => void;
   onCreateEpisode: (seriesId: string) => void;
   onCreateSeries: () => void;
   onSelect: (id: string) => void;
@@ -1183,7 +1134,6 @@ function SeriesWorlds({
       </h2>
       <div aria-label="Choose a Series" className="series-worlds" role="group">
         {series.map((item, index) => {
-          const itemEpisodes = episodes.filter(({ seriesId }) => seriesId === item.id);
           const selected = selectedSeries.id === item.id;
           return (
             <article
@@ -1214,19 +1164,6 @@ function SeriesWorlds({
                   </p>
                 </span>
               </button>
-              <footer>
-                <span>
-                  <strong>{itemEpisodes.length}</strong> Episodes
-                </span>
-                <span>
-                  <strong>{item.aggregateVersion}</strong> Record / CAS version
-                </span>
-                {canArchiveSeries(item) ? (
-                  <button onClick={() => onArchive(item)} type="button">
-                    Archive
-                  </button>
-                ) : null}
-              </footer>
             </article>
           );
         })}
@@ -1384,55 +1321,16 @@ function SeriesWorlds({
   );
 }
 
-function MonicaInbox({
-  onOpenActivity,
-  work,
-}: Readonly<{ onOpenActivity: () => void; work: StudioProjection["work"] }>) {
-  return (
-    <section className="monica-room">
-      <div className="monica-presence">
-        <span className="monica-eye large" />
-        <span>
-          <small>Quality orchestrator</small>
-          <strong>Monica</strong>
-          <p>Observing the production ledger. No production checks run in Phase 1.</p>
-        </span>
-      </div>
-      <div className="monica-work-list">
-        <header>
-          <h2>Your review queue</h2>
-          <span>{work.length}</span>
-        </header>
-        {work.length === 0 ? (
-          <p>Nothing is waiting for you.</p>
-        ) : (
-          work.map((item) => (
-            <article key={item.id}>
-              <span className="activity-marker attention" />
-              <div>
-                <small>{humanize(item.kind)}</small>
-                <strong>{item.safeSummary}</strong>
-                <p>{humanize(item.state)}</p>
-              </div>
-              <button onClick={onOpenActivity} type="button">
-                Inspect →
-              </button>
-            </article>
-          ))
-        )}
-      </div>
-    </section>
-  );
-}
-
 function ActivityPanel({
   activities,
   notifications,
   onClose,
+  work,
 }: Readonly<{
   activities: StudioProjection["activities"];
   notifications: StudioProjection["notifications"];
   onClose: () => void;
+  work: StudioProjection["work"];
 }>) {
   return (
     <section className="activity-panel">
@@ -1455,6 +1353,21 @@ function ActivityPanel({
           </p>
         </div>
       </div>
+      {work.length > 0 ? (
+        <section aria-labelledby="activity-review-heading" className="activity-reviews">
+          <h3 id="activity-review-heading">Needs you</h3>
+          {work.map((item) => (
+            <article key={item.id}>
+              <span className="activity-marker attention" />
+              <div>
+                <small>{humanize(item.kind)}</small>
+                <strong>{item.safeSummary}</strong>
+                <p>{humanize(item.state)}</p>
+              </div>
+            </article>
+          ))}
+        </section>
+      ) : null}
       <ul>
         {notifications.map((item) => (
           <li key={item.id}>

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { LookupAddress } from "node:dns";
 import { lookup as dnsLookup } from "node:dns/promises";
-import { isIP } from "node:net";
+import { isIP, type LookupFunction } from "node:net";
 import { request as httpsRequest } from "node:https";
 
 export type RemoteFetchClass = "provider_output" | "research_reference";
@@ -266,6 +266,20 @@ export async function validateRemoteRedirectChain(
   return Object.freeze(result);
 }
 
+export function createPinnedLookup(
+  target: Pick<ValidatedRemoteTarget, "address" | "family">,
+): LookupFunction {
+  return (_hostname, options, callback) => {
+    // Node 20+ may request all addresses for family autoselection. Honor both
+    // callback contracts while returning only the one policy-validated address.
+    if (options.all) {
+      callback(null, [{ address: target.address, family: target.family }]);
+      return;
+    }
+    callback(null, target.address, target.family);
+  };
+}
+
 async function fetchHop(
   target: ValidatedRemoteTarget,
   policy: RemoteFetchPolicy,
@@ -283,8 +297,7 @@ async function fetchHop(
           Accept: policy.allowedContentTypes.join(", "),
           "User-Agent": "Genie-Secure-Ingest/1",
         },
-        lookup: (_hostname, _options, callback) =>
-          callback(null, target.address, target.family),
+        lookup: createPinnedLookup(target),
         method: "GET",
         timeout: policy.timeoutMs,
       },

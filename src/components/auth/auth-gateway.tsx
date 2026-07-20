@@ -139,9 +139,7 @@ export function AuthGateway({
             {status}
           </p>
         ) : null}
-        <small>
-          Access is logged. High-consequence reviews require a verified authenticator.
-        </small>
+        <small>Access is logged and limited by your workspace role.</small>
       </section>
     </main>
   );

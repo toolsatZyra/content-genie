@@ -161,10 +161,10 @@ export async function POST(
       const status = prepareError?.code === "42501" ? 403 : 409;
       return reply(
         {
-          code: status === 403 ? "AAL2_REQUIRED" : "WORLD_LOCK_STALE",
+          code: status === 403 ? "WORKSPACE_AUTHORITY_REQUIRED" : "WORLD_LOCK_STALE",
           message:
             status === 403
-              ? "Verify with your authenticator before locking the world."
+              ? "Use a workspace admin account before locking the world."
               : "A World Lock input changed. Refresh Preflight.",
           ok: false,
         },
@@ -209,10 +209,10 @@ export async function POST(
       const status = error.code === "42501" ? 403 : error.code === "40001" ? 409 : 400;
       return reply(
         {
-          code: status === 403 ? "AAL2_REQUIRED" : "WORLD_LOCK_REJECTED",
+          code: status === 403 ? "WORKSPACE_AUTHORITY_REQUIRED" : "WORLD_LOCK_REJECTED",
           message:
             status === 403
-              ? "Verify with your authenticator before locking the world."
+              ? "Use a workspace admin account before locking the world."
               : "Monica found a stale or incomplete World Lock prerequisite.",
           ok: false,
         },

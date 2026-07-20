@@ -96,7 +96,7 @@ export function CreationLaunchpad({
       </div>
       <small>The one deliberate handoff</small>
       <h1 ref={stageHeadingRef} tabIndex={-1}>
-        Lock the world. Release the crew.
+        Lock the world. Release the agentic AI crew.
       </h1>
       <p>
         This atomic action freezes the accepted cast, locations, character sheets,
@@ -136,7 +136,7 @@ export function CreationLaunchpad({
       </button>
       <p className="launchpad-note">
         This is not “start generation.” It is the exact boundary after which the
-        autonomous crew is allowed to spend and produce.
+        autonomous agentic AI crew is allowed to spend and produce.
       </p>
     </section>
   );

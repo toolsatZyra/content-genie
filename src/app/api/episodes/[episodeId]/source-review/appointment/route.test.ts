@@ -69,7 +69,7 @@ describe("cultural reviewer appointment route", () => {
     });
   });
 
-  it("records a bounded all-scope internal appointment under AAL2 DB authority", async () => {
+  it("records a bounded all-scope internal appointment under admin authority", async () => {
     const response = await POST(request(), {
       params: Promise.resolve({ episodeId }),
     });
@@ -89,7 +89,7 @@ describe("cultural reviewer appointment route", () => {
     );
   });
 
-  it("fails closed for widened bodies and AAL2 denial", async () => {
+  it("fails closed for widened bodies and admin authority denial", async () => {
     const widened = await POST(
       request({ episodeId, packetId, workspaceId, role: "admin" }),
       { params: Promise.resolve({ episodeId }) },
@@ -105,7 +105,7 @@ describe("cultural reviewer appointment route", () => {
     });
     expect(denied.status).toBe(403);
     await expect(denied.json()).resolves.toMatchObject({
-      code: "AAL2_OR_ADMIN_REQUIRED",
+      code: "ADMIN_AUTHORITY_REQUIRED",
       ok: false,
     });
   });

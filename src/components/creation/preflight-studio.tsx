@@ -306,8 +306,7 @@ export function PreflightStudio({
                   <p>
                     Activate reviewer responsibility only if you are Zyra’s designated
                     launch decision maker for cultural, theological, regional, rights
-                    and dignity review. A verified authenticator and workspace-admin
-                    role are required.
+                    and dignity review. Workspace-admin role are required.
                   </p>
                   <button
                     className="creation-secondary"
@@ -448,7 +447,7 @@ export function PreflightStudio({
               ? "Quote expired · Monica must reprice"
               : quoteConfirmed
                 ? "You confirmed this ceiling"
-                : "AAL2 confirmation required"}
+                : "Workspace admin confirmation required"}
           </span>
         </header>
         {projection.quote ? (

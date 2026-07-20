@@ -1,37 +1,5 @@
-import { createHmac } from "node:crypto";
-
 import { expect, test } from "@playwright/test";
-
-function decodeBase32(value: string): Buffer {
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-  const bits = [...value.replaceAll(" ", "").toUpperCase()]
-    .map((character) => alphabet.indexOf(character).toString(2).padStart(5, "0"))
-    .join("");
-  return Buffer.from(
-    bits
-      .match(/.{8}/g)
-      ?.map((byte) => String.fromCharCode(Number.parseInt(byte, 2)))
-      .join("") ?? "",
-    "binary",
-  );
-}
-
-function totp(secret: string): string {
-  const counter = Math.floor(Date.now() / 30_000);
-  const message = Buffer.alloc(8);
-  message.writeBigUInt64BE(BigInt(counter));
-  const digest = createHmac("sha1", decodeBase32(secret)).update(message).digest();
-  const offset = digest[digest.length - 1]! & 0x0f;
-  const code =
-    (((digest[offset]! & 0x7f) << 24) |
-      (digest[offset + 1]! << 16) |
-      (digest[offset + 2]! << 8) |
-      digest[offset + 3]!) %
-    1_000_000;
-  return String(code).padStart(6, "0");
-}
-
-test("authenticated owner can organize work, enroll MFA and issue an invitation", async ({
+test("authenticated owner can organize work and issue an invitation", async ({
   browser,
   page,
 }) => {
@@ -110,14 +78,9 @@ test("authenticated owner can organize work, enroll MFA and issue an invitation"
   await expect(page.getByText(seriesTitle, { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Open account settings" }).click();
-  const account = page.getByRole("dialog", { name: "Account and trust" });
-  await account.getByRole("button", { name: "Set up" }).click();
-  const manualKey = await account.getByText(/Manual key:/).textContent();
-  const secret = manualKey?.replace("Manual key:", "").trim();
-  expect(secret).toBeTruthy();
-  await account.getByLabel("Six-digit code").fill(totp(secret!));
-  await account.getByRole("button", { name: "Verify authenticator" }).click();
-  await expect(account.getByText(/Sensitive actions are now unlocked/)).toBeVisible();
+  const account = page.getByRole("dialog", { name: "Account settings" });
+  await expect(account.getByRole("heading", { name: "Account" })).toBeVisible();
+  await expect(account.getByLabel("Role")).toHaveValue("member");
 
   await account
     .getByLabel("Exact email")

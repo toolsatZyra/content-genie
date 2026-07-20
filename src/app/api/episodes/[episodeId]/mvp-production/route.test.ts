@@ -74,7 +74,7 @@ describe("MVP production commands", () => {
     });
   });
 
-  it("maps an AAL2 review rejection without leaking database detail", async () => {
+  it("maps an authority rejection without leaking database detail", async () => {
     mocks.rpc.mockResolvedValue({
       data: null,
       error: { code: "42501", message: "private database detail" },
@@ -95,7 +95,7 @@ describe("MVP production commands", () => {
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({
-      code: "AAL2_REQUIRED",
+      code: "WORKSPACE_AUTHORITY_REQUIRED",
       ok: false,
     });
   });

@@ -175,10 +175,10 @@ export async function POST(
       return reply(
         {
           code:
-            status === 403 ? "AAL2_OR_COMPETENCY_REQUIRED" : "SOURCE_REVIEW_REJECTED",
+            status === 403 ? "REVIEWER_AUTHORITY_REQUIRED" : "SOURCE_REVIEW_REJECTED",
           message:
             status === 403
-              ? "Verify your authenticator and activate the matching reviewer appointment."
+              ? "Use the matching active reviewer appointment."
               : "The evidence or review state changed. Refresh before deciding.",
           ok: false,
         },

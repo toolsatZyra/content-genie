@@ -83,7 +83,7 @@ describe("exact production quote confirmation route", () => {
     });
   });
 
-  it("binds AAL2 confirmation to the exact immutable quote and hard ceiling", async () => {
+  it("binds admin confirmation to the exact immutable quote and hard ceiling", async () => {
     const response = await POST(request(), {
       params: Promise.resolve({ episodeId }),
     });
@@ -109,7 +109,7 @@ describe("exact production quote confirmation route", () => {
     expect(mocks.from).not.toHaveBeenCalled();
   });
 
-  it("fails closed for an out-of-scope quote and for missing AAL2", async () => {
+  it("fails closed for an out-of-scope quote and missing workspace authority", async () => {
     mocks.from.mockImplementationOnce(() => query(null));
     const missing = await POST(request(), {
       params: Promise.resolve({ episodeId }),
@@ -126,7 +126,7 @@ describe("exact production quote confirmation route", () => {
     });
     expect(aal2.status).toBe(403);
     await expect(aal2.json()).resolves.toMatchObject({
-      code: "AAL2_REQUIRED",
+      code: "WORKSPACE_AUTHORITY_REQUIRED",
       ok: false,
     });
   });

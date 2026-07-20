@@ -149,10 +149,10 @@ export async function POST(
       const status = error.code === "42501" ? 403 : error.code === "40001" ? 409 : 400;
       return reply(
         {
-          code: status === 403 ? "AAL2_OR_ADMIN_REQUIRED" : "APPOINTMENT_REJECTED",
+          code: status === 403 ? "ADMIN_AUTHORITY_REQUIRED" : "APPOINTMENT_REJECTED",
           message:
             status === 403
-              ? "Verify your authenticator and use a workspace admin account."
+              ? "Use a workspace admin account."
               : "The reviewer appointment changed. Refresh and try again.",
           ok: false,
         },

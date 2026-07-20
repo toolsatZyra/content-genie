@@ -938,3 +938,60 @@ The owner can refresh the deployed Episode and return to World; the Realtime
 progress rows now describe actual provider work. Do not call the whole project,
 Phase 2, Phase 3, or Phase 4 complete from this recovery. Secure ingest,
 candidate review/World Lock, and the remaining phase gates still apply.
+
+## 19. 2026-07-20 Ep 1 secure-ingest recovery and MVP studio UX batch
+
+All nine Ep 1 Nano Banana requests from preparation
+`c53cbd4d-2704-49a8-b0f1-6409cdcef862` completed at FAL in 31–63 seconds.
+Generation was not slow or still running. The original production callbacks
+returned 401 because FAL's live Ed25519 JWKS `x` value was valid padded
+base64url (44 characters), while the verifier accepted only the unpadded
+43-character form. Commit `65b90e6` accepts both canonical encodings and is
+already live.
+
+FAL did not replay those callbacks after the verifier deployment. Migration
+`fal_authenticated_result_recovery` therefore adds a service-only,
+request-bound authenticated-poll recovery class, and
+`recover-completed-fal-world-jobs.mjs` retrieved the exact nine completed queue
+results without regenerating or spending again. The production requests were
+also rebound from the accidentally selected test provider account to the
+otherwise identical active production account.
+
+The recovery exposed two independent secure-ingest defects:
+
+- there was no active exact-host `provider_output` remote-fetch policy;
+  migration `fal_provider_output_allowlist` installs active policies for all
+  four environments with only `v3b.fal.media` and `cdn.fal.media`;
+- Node 20+ requested the custom HTTPS lookup callback in all-address mode, but
+  the pinned transport returned the legacy single-address shape. This caused
+  `ERR_INVALID_IP_ADDRESS` before any remote bytes were received and was
+  recorded safely as `remote_fetch_network_failed`. The transport now honors
+  both callback forms while returning only the one policy-validated address.
+  A diagnostic against the real recovered Ep 1 URL downloaded the 6,007,600
+  byte PNG successfully, and a focused regression binds the all-address form.
+
+The same batch implements the owner's MVP studio corrections: the global
+workspace switcher and redundant Monica destination are removed; review work
+is available in Activity; Series and Episode cards use compact, consistent
+dimensions; the Series CAS/archive footer is removed; Atrium places matching
+Create Series and Create Episode actions together; the account panel removes
+TOTP enrollment and exposes a single consistently styled Member role; and
+every Episode link resolves its authoritative current creation chamber, with
+completed production resolving to Create. User-facing copy now consistently
+describes the agentic AI crew.
+
+The developer-MVP password-authority migration removes the legacy TOTP gate
+from the three exact interactive commands used by this single-owner workflow
+while preserving authenticated identity, workspace role, immutable ledger,
+spend, fencing, and final-human-release checks. The larger production security
+and calibration contracts remain unchanged.
+
+Pre-deploy evidence for this coherent batch is green: the complete unit run
+passed 84 files / 501 tests before the final transport regression; the focused
+remote-fetch and provider-ingest suite passes 37/37; integration passes 5/5
+with one intentional live-scanner skip; seven focused browser journeys pass;
+type checking, lint, formatting, security, browser/server bundle scan,
+production secretless/fail-closed boot, the Phase 2 database/provider policy
+checks, and canary build pass. Preview and production both have the three new
+migrations. Explicit GitHub push, automatic Vercel verification, and final Ep
+1 asset-promotion evidence remain the immediate next steps for this batch.

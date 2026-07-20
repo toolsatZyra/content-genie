@@ -1329,7 +1329,7 @@ export function CreationStudio({
       worldBuildIdempotencyKey.current = null;
       setSaveState("saved");
       setNotice(
-        "Monica is extracting identities and locations. You can leave this Episode while the crew works.",
+        "Monica is extracting identities and locations. You can leave this Episode while the agentic AI crew works.",
       );
       refreshIntoChamber("world");
     } catch (error) {

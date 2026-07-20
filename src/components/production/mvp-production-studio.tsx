@@ -102,7 +102,7 @@ function stateCopy(state: JobState | undefined): {
   return {
     detail: "The production run is queued. You can leave this page and return later.",
     eyebrow: "World locked",
-    title: "Monica is gathering the crew.",
+    title: "Monica is gathering the agentic AI crew.",
   };
 }
 

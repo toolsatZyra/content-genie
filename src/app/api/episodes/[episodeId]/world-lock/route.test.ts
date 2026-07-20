@@ -154,7 +154,7 @@ describe("atomic first-Episode World Lock route", () => {
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
-  it("fails closed when preparation loses AAL2 or an aggregate pin changes", async () => {
+  it("fails closed when preparation loses workspace authority or an aggregate pin changes", async () => {
     mocks.rpc.mockResolvedValueOnce({
       data: null,
       error: { code: "42501", message: "private detail" },
@@ -163,7 +163,9 @@ describe("atomic first-Episode World Lock route", () => {
       params: Promise.resolve({ episodeId }),
     });
     expect(aal2.status).toBe(403);
-    await expect(aal2.json()).resolves.toMatchObject({ code: "AAL2_REQUIRED" });
+    await expect(aal2.json()).resolves.toMatchObject({
+      code: "WORKSPACE_AUTHORITY_REQUIRED",
+    });
 
     mocks.rpc.mockResolvedValueOnce({
       data: null,

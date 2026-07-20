@@ -193,7 +193,10 @@ export async function POST(
         const status = error.code === "42501" ? 403 : 409;
         return reply(
           {
-            code: status === 403 ? "AAL2_REQUIRED" : "PRODUCTION_RETRY_REJECTED",
+            code:
+              status === 403
+                ? "WORKSPACE_AUTHORITY_REQUIRED"
+                : "PRODUCTION_RETRY_REJECTED",
             ok: false,
           },
           status,
@@ -215,7 +218,8 @@ export async function POST(
       const status = error.code === "42501" ? 403 : 409;
       return reply(
         {
-          code: status === 403 ? "AAL2_REQUIRED" : "MASTER_REVIEW_REJECTED",
+          code:
+            status === 403 ? "WORKSPACE_AUTHORITY_REQUIRED" : "MASTER_REVIEW_REJECTED",
           ok: false,
         },
         status,

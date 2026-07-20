@@ -327,7 +327,7 @@ test("@visual preserves cinematic geometry, targets and mobile continuity", asyn
   await expect(page.locator(".episode-focus")).not.toHaveCSS("outline-style", "none");
 });
 
-test("Phase 1 fixture organizes concurrent Episodes, Series and Monica work", async ({
+test("Phase 1 fixture organizes concurrent Episodes, Series and review work", async ({
   page,
 }) => {
   await mockPhase1Search(page);
@@ -374,11 +374,12 @@ test("Phase 1 fixture organizes concurrent Episodes, Series and Monica work", as
     page.getByRole("button", { name: /Series · active Shiva: The/ }),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: /Monica/ }).click();
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Monica is watching." }),
-  ).toBeVisible();
-  await expect(page.getByText(/theological framing/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Monica" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Open activity and notifications" }).click();
+  const activity = page.getByRole("dialog", { name: "Activity and notifications" });
+  await expect(activity.getByRole("heading", { name: "Needs you" })).toBeVisible();
+  await expect(activity.getByText(/theological framing/i)).toBeVisible();
+  await activity.getByRole("button", { name: "Close activity" }).click();
 
   await page.getByRole("button", { name: "Library" }).click();
   await expect(page.getByText(/intentionally disabled/i)).toBeVisible();
@@ -420,9 +421,7 @@ test("Phase 1 Series selection exposes exact release pins and preselects Episode
     details.getByText(/Male narrator.*elevenlabs-male-hindi-devotional-v1/),
   ).toBeVisible();
   await expect(details.getByText(/Version 3/)).toBeVisible();
-  await expect(
-    page.getByText("Record / CAS version", { exact: false }).first(),
-  ).toBeVisible();
+  await expect(page.getByText("Record / CAS version", { exact: false })).toHaveCount(0);
   await expect(details.getByRole("heading", { name: /Episodes 2/ })).toBeVisible();
   for (const episode of projection.episodes) {
     await expect(details.getByText(episode.title, { exact: true })).toBeVisible();

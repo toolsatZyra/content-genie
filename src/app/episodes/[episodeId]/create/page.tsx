@@ -77,10 +77,7 @@ const creationChambers = [
 function preferredInitialChamber(
   projection: CreationProjection,
   requested: string | undefined,
-): CreationChamber | undefined {
-  if (!requested || !creationChambers.includes(requested as CreationChamber)) {
-    return undefined;
-  }
+): CreationChamber {
   const configuration = projection.configuration;
   const look = configuration
     ? findLookByVersionId(configuration.lookVersionId)
@@ -116,12 +113,41 @@ function preferredInitialChamber(
     voice: Boolean(projection.script),
     world: lookReady,
   };
-  const requestedIndex = creationChambers.indexOf(requested as CreationChamber);
-  for (let index = requestedIndex; index >= 0; index -= 1) {
-    const chamber = creationChambers[index];
-    if (chamber && allowed[chamber]) return chamber;
+
+  if (requested && creationChambers.includes(requested as CreationChamber)) {
+    const requestedIndex = creationChambers.indexOf(requested as CreationChamber);
+    for (let index = requestedIndex; index >= 0; index -= 1) {
+      const chamber = creationChambers[index];
+      if (chamber && allowed[chamber]) return chamber;
+    }
   }
-  return undefined;
+
+  const createWorkflowStates = new Set([
+    "approved",
+    "awaiting_final_review",
+    "blocked",
+    "delayed",
+    "delivered",
+    "paused",
+    "pending_qualified_review",
+    "producing",
+    "ready_to_produce",
+    "release_blocked",
+    "retrying",
+  ]);
+  if (allowed.create || createWorkflowStates.has(projection.episode.workflowState)) {
+    return "create";
+  }
+  if (allowed.preflight) return "preflight";
+  if (lookReady) return "world";
+  if (
+    allowed.look &&
+    projection.configuration?.voiceConfirmation.origin === "human_confirmed"
+  ) {
+    return "look";
+  }
+  if (allowed.voice) return "voice";
+  return "script";
 }
 
 export default async function CreationPage({
@@ -312,19 +338,9 @@ export default async function CreationPage({
         };
       }
     }
-    const fixtureDefaultChamber: CreationChamber | undefined =
-      query.fixture === "phase2-world"
-        ? "world"
-        : query.fixture === "phase2-world-ready" ||
-            query.fixture === "phase2-preflight" ||
-            query.fixture === "phase2-preflight-blocked"
-          ? "preflight"
-          : query.fixture === "phase2-world-lock" || query.fixture === "phase2-running"
-            ? "create"
-            : undefined;
     const initialChamber = preferredInitialChamber(
       fixtureProjection,
-      query.resumeCreation ?? fixtureDefaultChamber,
+      query.resumeCreation,
     );
     return (
       <CreationStudio

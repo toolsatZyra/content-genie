@@ -34,7 +34,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 export const runtime = "nodejs";
 
-const MAX_CANDIDATES_PER_INVOCATION = 1;
+const MAX_CANDIDATES_PER_INVOCATION = 3;
 const LEASE_SECONDS = 300;
 const imageContentTypes = ["image/jpeg", "image/png", "image/webp"] as const;
 

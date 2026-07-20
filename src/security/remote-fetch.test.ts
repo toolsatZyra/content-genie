@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createPinnedLookup,
   isBlockedRemoteAddress,
   parseRemoteFetchUrl,
   RemoteFetchPolicyError,
@@ -69,6 +70,20 @@ describe("remote fetch and SSRF policy", () => {
     expect(target.hostname).toBe("cdn.provider.example");
     expect(target.resolvedAddressHashes).toHaveLength(2);
     expect(target.resolvedAddressHashes[0]).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("honors Node's all-address lookup callback without weakening the DNS pin", async () => {
+    const lookup = createPinnedLookup({ address: "8.8.8.8", family: 4 });
+    await new Promise<void>((resolve, reject) => {
+      lookup("cdn.provider.example", { all: true }, (error, addresses) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        expect(addresses).toEqual([{ address: "8.8.8.8", family: 4 }]);
+        resolve();
+      });
+    });
   });
 
   it("rejects any blocked answer, including mixed public/private DNS", async () => {

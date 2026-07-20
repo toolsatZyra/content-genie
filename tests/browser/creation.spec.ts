@@ -120,6 +120,26 @@ test.describe("Living Cinema creation flow", () => {
     ).toEqual([]);
   });
 
+  test("opens each Episode at its authoritative current chamber", async ({ page }) => {
+    await page.goto(`/episodes/${episodeId}/create?fixture=phase2-world`);
+    const worldRail = page.getByRole("navigation", {
+      name: "Episode creation chambers",
+    });
+    await expect(worldRail.getByRole("button", { name: /World/ })).toHaveAttribute(
+      "aria-current",
+      "step",
+    );
+
+    await page.goto(`/episodes/${episodeId}/create?fixture=phase2-delivered`);
+    const deliveredRail = page.getByRole("navigation", {
+      name: "Episode creation chambers",
+    });
+    await expect(deliveredRail.getByRole("button", { name: /Create/ })).toHaveAttribute(
+      "aria-current",
+      "step",
+    );
+  });
+
   test("preserves Atrium context and makes later or closed lifecycle setup read-only", async ({
     page,
   }) => {
@@ -1742,7 +1762,9 @@ test.describe("Living Cinema creation flow", () => {
 
     await page.goto(`/episodes/${episodeId}/create?fixture=phase2-world-lock`);
     await expect(
-      page.getByRole("heading", { name: "Lock the world. Release the crew." }),
+      page.getByRole("heading", {
+        name: "Lock the world. Release the agentic AI crew.",
+      }),
     ).toBeFocused();
     await page.getByRole("button", { name: /Confirm World Lock/ }).click();
     await expect.poll(() => worldLock).not.toBeNull();

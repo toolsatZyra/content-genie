@@ -131,10 +131,13 @@ export async function POST(
       const status = error.code === "42501" ? 403 : error.code === "40001" ? 409 : 400;
       return reply(
         {
-          code: status === 403 ? "AAL2_REQUIRED" : "QUOTE_CONFIRMATION_REJECTED",
+          code:
+            status === 403
+              ? "WORKSPACE_AUTHORITY_REQUIRED"
+              : "QUOTE_CONFIRMATION_REJECTED",
           message:
             status === 403
-              ? "Verify with your authenticator before confirming the production ceiling."
+              ? "Use a workspace admin account before confirming the production ceiling."
               : "The quote changed or expired. Refresh Preflight.",
           ok: false,
         },
