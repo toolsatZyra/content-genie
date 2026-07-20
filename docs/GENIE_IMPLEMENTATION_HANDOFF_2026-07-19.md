@@ -1119,3 +1119,13 @@ provider inbox, private quarantine, media scan, and atomic promotion path.
 Preview and production privilege probes show service execution only. Focused
 fallback/webhook/ingest tests pass 12/12, and type checking, lint, and formatting
 remain green. This does not complete the broader phase gates.
+
+Follow-up commit `14342e5163b01007746d343da533f2c5b3bfb291` was pushed
+explicitly to GitHub `main`. Automatic Vercel deployment
+`dpl_7ciWAnJJuoQVLN5zQPFQttr5gYQs` reached READY, owns
+`content-genie-three.vercel.app`, and serves the exact commit. Canonical health
+is HTTP 200 with production `ok`, and the post-deploy runtime-error query is
+empty. An authenticated Ep 1 browser probe resolves directly to World with
+nine cards, nine image elements, one replacement `Accept anchor` action, zero
+recasting cards, no stale `Ready` label, no application overlay, and no browser
+page errors.
