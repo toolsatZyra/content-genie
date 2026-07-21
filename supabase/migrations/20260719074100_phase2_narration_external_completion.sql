@@ -24,7 +24,7 @@ begin
     or (run.kind='narration_clock' and not exists(select 1 from private.narration_generation_jobs job
       where job.preflight_run_id=run.id and job.stage_attempt_id=attempt.id
         and job.provider_request_id is not null and job.capability_grant_id is not null
-        and job.state='dispatching'))
+        and job.state in ('dispatching','quarantined','scanning')))
     or run.kind not in ('world_anchor','narration_clock')
   then raise exception 'provider external wait is stale' using errcode='40001'; end if;
   update public.preflight_stage_attempts set state='waiting_external',trigger_task_id=p_trigger_task_id,
