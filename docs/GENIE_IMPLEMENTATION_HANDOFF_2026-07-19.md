@@ -1129,3 +1129,39 @@ empty. An authenticated Ep 1 browser probe resolves directly to World with
 nine cards, nine image elements, one replacement `Accept anchor` action, zero
 recasting cards, no stale `Ready` label, no application overlay, and no browser
 page errors.
+
+## 22. 2026-07-21 Ep 1 accepted-World Preflight recovery
+
+After the owner accepted all nine Ep 1 World anchors, the UI correctly showed
+`09 of 09 anchored` but kept Preflight disabled because no verified World
+reference pack existed. Production inspection showed six accepted character
+selections, three accepted location/prop selections, zero character sheets,
+and zero reference packs. The final-accept route had attempted assembly but
+silently converted the error into `ready: false`.
+
+The root cause was a stale application projection name. Reference-pack
+assembly selected `character_manifest_hash`, while the authoritative Phase 2
+schema exposes `character_versions.identity_manifest_hash`. Commit
+`e6419017a451e8de5563345c831a7739645418f1` corrects that field mapping and
+adds an authenticated, idempotent `world-finalize` boundary. When all anchors
+are accepted, the World footer now enables Preflight and truthfully explains
+that Genie will assemble the missing pack during the transition. The creation
+studio retains the same idempotency key for ambiguous transport retries, runs
+reference-pack and source-cultural preparation, and then reloads the
+authoritative Preflight chamber.
+
+Focused route and identity-pack tests pass 3/3. Formatting, lint, type checking,
+integration 5/5 with one intentional live-scanner skip, and the secret-canary
+production build are green. The commit was pushed explicitly to GitHub `main`.
+Automatic production deployment `dpl_FJeYnE5M1KG2VUBzCFtk8mcTG63c` reached
+READY, owns `content-genie-three.vercel.app`, and serves the exact commit.
+
+Authenticated production recovery of Ep 1 is complete. The formerly disabled
+Preflight action was enabled and invoked. Authoritative production data now
+contains six verified `character_sheet_versions`, one verified
+`world_reference_pack_versions` row
+`9b0cab9c-7d68-5603-9aa5-2b297ea95a36`, and one `source_review_packets` row
+`7ba18541-1d10-5942-b517-c7619d46f763`. The source packet's machine verdict is
+`qualified_review_required`, as designed. A clean authenticated reload opens
+Ep 1 directly at stage 5, Preflight, with `Activate reviewer responsibility`
+as the next explicit owner action. No provider spend authority exists yet.
