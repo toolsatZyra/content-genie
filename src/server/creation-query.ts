@@ -66,6 +66,14 @@ interface WorldProgressRow {
   world_entity_id: string | null;
 }
 
+interface PreflightRunRow {
+  created_at: string;
+  id: string;
+  kind: string;
+  run_number: number | string;
+  state: string;
+}
+
 function projectWorldProgress(
   rows: readonly WorldProgressRow[],
 ): readonly CreationWorldProgressItem[] {
@@ -190,7 +198,7 @@ export async function loadCreationProjection(
       }
     : null;
   const configurationCandidateId = configuration?.id;
-  const [readinessResult, sourceReviewResult, latestWorldRunResult] =
+  const [readinessResult, sourceReviewResult, preflightRunsResult] =
     configurationCandidateId
       ? await Promise.all([
           client
@@ -207,13 +215,11 @@ export async function loadCreationProjection(
             .maybeSingle(),
           client
             .from("preflight_runs")
-            .select("id")
+            .select("id,kind,run_number,state,created_at")
             .eq("workspace_id", episode.workspace_id)
             .eq("configuration_candidate_id", configurationCandidateId)
-            .eq("kind", "world_anchor")
             .order("run_number", { ascending: false })
-            .limit(1)
-            .maybeSingle(),
+            .limit(20),
         ])
       : [
           { data: null, error: null },
@@ -222,8 +228,10 @@ export async function loadCreationProjection(
         ];
   if (readinessResult.error) throw readinessResult.error;
   if (sourceReviewResult.error) throw sourceReviewResult.error;
-  if (latestWorldRunResult.error) throw latestWorldRunResult.error;
-  const worldProgressResult = latestWorldRunResult.data
+  if (preflightRunsResult.error) throw preflightRunsResult.error;
+  const preflightRuns = (preflightRunsResult.data ?? []) as readonly PreflightRunRow[];
+  const latestWorldRun = preflightRuns.find((run) => run.kind === "world_anchor");
+  const worldProgressResult = latestWorldRun
     ? await client
         .from("world_build_progress_items")
         .select(
@@ -231,7 +239,7 @@ export async function loadCreationProjection(
         )
         .eq("workspace_id", episode.workspace_id)
         .eq("configuration_candidate_id", configurationCandidateId)
-        .eq("preflight_run_id", latestWorldRunResult.data.id)
+        .eq("preflight_run_id", latestWorldRun.id)
         .order("sort_order", { ascending: true })
     : { data: null, error: null };
   if (worldProgressResult.error) throw worldProgressResult.error;
@@ -244,6 +252,16 @@ export async function loadCreationProjection(
         },
       })
     : emptyCreationReadinessProjection;
+  const failureKind = readinessBase.preflight.failure?.stageKey.split(".", 1)[0];
+  const latestFailureKindRun = failureKind
+    ? preflightRuns.find((run) => run.kind === failureKind)
+    : undefined;
+  const staleFailure = Boolean(
+    readinessBase.preflight.failure &&
+    latestFailureKindRun &&
+    Date.parse(latestFailureKindRun.created_at) >
+      Date.parse(readinessBase.preflight.failure.failedAt),
+  );
   const progress = projectWorldProgress(
     (worldProgressResult.data ?? []) as readonly WorldProgressRow[],
   );
@@ -292,7 +310,9 @@ export async function loadCreationProjection(
           revisionNumber: script.revision_number,
         }
       : null,
-    preflight: readiness.preflight,
+    preflight: staleFailure
+      ? { ...readiness.preflight, failure: null }
+      : readiness.preflight,
     world: readiness.world,
   };
 }

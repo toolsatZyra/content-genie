@@ -123,7 +123,15 @@ function successfulResults(
       error: null,
     },
     preflight_runs: {
-      data: { id: "10000000-0000-4000-8000-000000000099" },
+      data: [
+        {
+          created_at: "2026-07-19T10:05:00.000Z",
+          id: "10000000-0000-4000-8000-000000000099",
+          kind: "world_anchor",
+          run_number: 1,
+          state: "succeeded",
+        },
+      ],
       error: null,
     },
     world_build_progress_items: {
@@ -265,6 +273,64 @@ describe("the creation projection query", () => {
       LOOKS.map((look) => look.versionId).sort(),
     );
     expect(availability?.[lookVersionId]).toBe("active");
+  });
+
+  it("suppresses a terminal failure superseded by a newer run of the same kind", async () => {
+    const results = successfulResults();
+    results.creation_readiness_projections = {
+      data: {
+        preflight: {
+          audioIdentity: null,
+          failure: {
+            attemptNo: 2,
+            code: "immutable-preparation-restart",
+            failedAt: "2026-07-19T10:04:00.000Z",
+            stageKey: "world_anchor.root",
+          },
+          masterClock: null,
+          plan: null,
+          productionRun: null,
+          qc: null,
+          quote: null,
+        },
+        world: { characters: [], locations: [], referencePack: null },
+      },
+      error: null,
+    };
+
+    const { client } = fakeClient(results);
+    const projection = await loadCreationProjection(client, user, episodeId);
+
+    expect(projection?.preflight.failure).toBeNull();
+  });
+
+  it("retains the current run's terminal failure", async () => {
+    const results = successfulResults();
+    results.creation_readiness_projections = {
+      data: {
+        preflight: {
+          audioIdentity: null,
+          failure: {
+            attemptNo: 2,
+            code: "plan-quality-blocked",
+            failedAt: "2026-07-19T10:06:00.000Z",
+            stageKey: "plan_evaluation.root",
+          },
+          masterClock: null,
+          plan: null,
+          productionRun: null,
+          qc: null,
+          quote: null,
+        },
+        world: { characters: [], locations: [], referencePack: null },
+      },
+      error: null,
+    };
+
+    const { client } = fakeClient(results);
+    const projection = await loadCreationProjection(client, user, episodeId);
+
+    expect(projection?.preflight.failure?.code).toBe("plan-quality-blocked");
   });
 
   it("projects untouched defaults as awaiting human confirmation", async () => {
