@@ -99,8 +99,12 @@ export async function executePreflightControl(input: {
     }
     const providerDispatches = await prepareNarrationProviderDispatches({
       audioIdentitySelectionId,
+      configurationCandidateId: executionInput.configurationCandidateId,
       envelope: input.envelope,
+      episodeId: executionInput.episodeId,
       exactText: executionInput.processingText,
+      policyVersionId: executionInput.policyVersionId,
+      scriptRevisionId: executionInput.scriptRevisionId,
       voiceVersionId: executionInput.voiceVersionId,
     });
     return Object.freeze({

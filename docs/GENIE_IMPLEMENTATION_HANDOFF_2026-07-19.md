@@ -1165,3 +1165,80 @@ contains six verified `character_sheet_versions`, one verified
 `qualified_review_required`, as designed. A clean authenticated reload opens
 Ep 1 directly at stage 5, Preflight, with `Activate reviewer responsibility`
 as the next explicit owner action. No provider spend authority exists yet.
+
+## 23. 2026-07-21 Ep 1 autonomous Preflight and production completion
+
+The owner activated Ep 1 Preflight, after which the remaining path was repaired
+without another owner click. The durable narration run succeeded with an exact
+60,029 ms narration clock and 260 timing segments. The cinematic planning
+sequence then produced final bundle `21d6ae17-5f42-5691-b9a8-b78da2ed201e`,
+consensus `d9d37049-71c6-42dd-ba20-22e18a5eeb9c`, quote
+`cfee0e7b-dcb1-596c-b8e7-291a3d9ab820`, and confirmation
+`ee7ae33b-2d0c-44b6-a8e7-6c98e6113185`. Expected production cost is USD
+25.406 with an exact USD 35.87313 authority ceiling, below the USD 50 product
+invariant.
+
+The final World Lock failures were three independent stale-contract defects,
+not a user decision gap: aggregate registries lagged user-facing episode
+versions; an approved cultural decision was still rejected because historical
+machine findings were treated as current blockers; and the provider-reference
+guard ignored the later composited `input_strategy`. Migrations
+`core_aggregate_version_consistency`, `world_lock_approved_cultural_review`,
+and `world_lock_provider_input_strategy` close those boundaries. World Lock
+created series release `db58272e-1631-5a71-b490-609109e82628` and production
+run `6d337e77-39e1-54fa-9467-83af609ace9b`.
+
+The production worker then exposed one PostgREST boundary error: the
+application attempted to query the private clip ledger directly. Migration
+`mvp_production_clip_worker_view` supplies a security-invoker, service-role-only
+worker projection. Commit `5648005` containing this batch was pushed explicitly
+to GitHub `main`; Vercel deployment `dpl_EcuzSFKE2bxtCy1H6QXgr5iurUFC`
+reached READY on that exact commit and owns the canonical alias.
+
+Authoritative production evidence now shows 21 of 21 clips complete, zero clip
+failures, a 60,029 ms 1080x1920 master with SHA-256
+`c2ea450df017f3f32912108cae74600b5dd35e70ab68214854c5a444f555a717`,
+job state `review_ready`, and master state `pending_review`. Ep 1 therefore
+opens at the final Create chamber and is waiting only for the invariant final
+human review; it is no longer blocked in Preflight.
+
+## 24. 2026-07-21 ElevenLabs V3 delivery-direction batch
+
+ElevenLabs V3 delivery preparation is implemented as an additive sidecar. The
+locked script remains the exact spoken-word source. A restricted, ledgered
+`audio.delivery` agent may add only supported narration tags, punctuation
+controls, and English CAPS emphasis to a separate delivery copy. Every source
+Unicode scalar must survive exactly once and in order; an immutable mapping
+converts ElevenLabs delivery-character timestamps back to the original script
+timeline. `[thoughtful]` is not in the allowed tag set and is explicitly
+rejected, including at the opening. Natural V3 settings are pinned to stability
+0.5, similarity boost 0.82, style 0, and speaker boost enabled.
+
+Preview and production contain migrations `elevenlabs_v3_delivery_agent_enum`
+and `elevenlabs_v3_delivery_contract`. The follow-up
+`elevenlabs_v3_delivery_control_hardening` migration and provider adapter prove
+that mapped source characters are unchanged except for permitted English CAPS,
+and that null-map insertions match only the pinned tag/punctuation grammar;
+arbitrary inserted spoken text is rejected. Both configured identities passed real
+authenticated `eleven_v3` timestamped-audio canaries: the male receipt is
+40,586 bytes and the female receipt is 35,570 bytes, both expiring 2026-08-20.
+The production capability command returns verified V3 capabilities for both
+voices at the existing bounded 88-cent request ceiling. Retry-safe manifest
+reuse prevents a sealed delivery sidecar from being reinterpreted.
+
+Pre-push evidence for this coherent batch is green: formatting, full lint,
+route-aware type checking, 88 unit files / 519 tests, integration 5/5 with one
+intentional live-scanner skip, the secret-canary production build, the focused
+V3 delivery/alignment suite, both real V3 canaries, and preview/production
+migration application. The RLS/policy suite reached the regenerated trusted
+harness boundary; its only live database portion is intentionally skipped when
+the isolated harness is not active. Explicit GitHub push, automatic Vercel verification,
+and post-deploy production smoke evidence remain next for this batch.
+
+The owner-requested MVP gate reassessment also removed Vitest's blanket
+per-file percentage rule. Aggregate thresholds remain enforced at 90%
+statements/functions/lines and 80% branches, while changed high-risk behavior
+still requires focused tests. This avoids blocking an internal MVP because an
+unrelated read projection falls below an arbitrary per-file percentage despite
+the suite's strong aggregate coverage; it does not relax any media, cultural,
+security, budget, or release-quality threshold.

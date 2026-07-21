@@ -13,6 +13,7 @@ import {
 import { postgresJsonbText } from "@/server/world-anchor-provider";
 
 type LedgeredAgentToolName =
+  | "audio.delivery"
   | "audio.pronunciation"
   | "edd.plan"
   | "plan.evaluate"

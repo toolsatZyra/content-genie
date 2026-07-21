@@ -10,6 +10,7 @@ import {
 } from "@/domain/provider/broker-contract";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { issueProviderCapabilityToken } from "@/server/provider-capability-issuer";
+import { createNarrationDelivery } from "@/server/narration-delivery";
 import type { PreflightTaskEnvelope } from "../../trigger/preflight-contract";
 
 const elevenLabsSchemaRawSha256 =
@@ -161,30 +162,104 @@ async function ensureNarrationCapabilities(input: {
 }
 
 function providerPayload(input: {
-  exactText: string;
+  deliveryMap: readonly (number | null)[];
+  deliveryText: string;
+  deliveryTextSha256: string;
   externalVoiceId: string;
+  sourceText: string;
+  sourceTextSha256: string;
   targetAssetId: string;
 }) {
   return Object.freeze({
-    modelId: "eleven_multilingual_v2",
+    deliveryMap: input.deliveryMap,
+    deliveryTextSha256: input.deliveryTextSha256,
+    modelId: "eleven_v3",
     outputFormat: "mp3_44100_128",
+    sourceText: input.sourceText,
+    sourceTextSha256: input.sourceTextSha256,
     targetAssetId: input.targetAssetId,
-    text: input.exactText,
+    text: input.deliveryText,
     voiceId: input.externalVoiceId,
     voiceSettings: Object.freeze({
       similarityBoost: 0.82,
-      stability: 0.42,
-      style: 0.35,
+      stability: 0.5,
+      style: 0,
       useSpeakerBoost: true,
     }),
   });
 }
 
+const providerPayloadKeys = [
+  "deliveryMap",
+  "deliveryTextSha256",
+  "modelId",
+  "outputFormat",
+  "sourceText",
+  "sourceTextSha256",
+  "targetAssetId",
+  "text",
+  "voiceId",
+  "voiceSettings",
+] as const;
+
+function validateExistingProviderPayload(
+  value: unknown,
+  expected: Readonly<{
+    externalVoiceId: string;
+    sourceText: string;
+    targetAssetId: string;
+  }>,
+): Readonly<Record<string, unknown>> {
+  if (!exactObject(value, providerPayloadKeys)) {
+    throw new NarrationProviderError("Existing narration delivery is malformed.");
+  }
+  const payload = value as Record<string, unknown>;
+  const deliveryText = payload.text;
+  const deliveryMap = payload.deliveryMap;
+  if (
+    payload.modelId !== "eleven_v3" ||
+    payload.outputFormat !== "mp3_44100_128" ||
+    payload.sourceText !== expected.sourceText ||
+    payload.sourceTextSha256 !== sha256(expected.sourceText) ||
+    payload.targetAssetId !== expected.targetAssetId ||
+    payload.voiceId !== expected.externalVoiceId ||
+    typeof deliveryText !== "string" ||
+    payload.deliveryTextSha256 !== sha256(deliveryText) ||
+    !Array.isArray(deliveryMap)
+  ) {
+    throw new NarrationProviderError("Existing narration delivery conflicts.");
+  }
+  const sourceScalars = Array.from(expected.sourceText);
+  const deliveryScalars = Array.from(deliveryText);
+  const mapped = deliveryMap.filter((item): item is number => typeof item === "number");
+  if (
+    deliveryScalars.length < 1 ||
+    deliveryScalars.length > 5_000 ||
+    deliveryMap.length !== deliveryScalars.length ||
+    deliveryMap.some(
+      (item) =>
+        item !== null &&
+        (!Number.isSafeInteger(item) || item < 0 || item >= sourceScalars.length),
+    ) ||
+    mapped.length !== sourceScalars.length ||
+    mapped.some((item, index) => item !== index)
+  ) {
+    throw new NarrationProviderError(
+      "Existing narration delivery changed the locked script.",
+    );
+  }
+  return Object.freeze(payload);
+}
+
 export async function prepareNarrationProviderDispatches(
   input: Readonly<{
     audioIdentitySelectionId: string;
+    configurationCandidateId: string;
     envelope: PreflightTaskEnvelope;
+    episodeId: string;
     exactText: string;
+    policyVersionId: string;
+    scriptRevisionId: string;
     voiceVersionId: string;
   }>,
 ): Promise<readonly NarrationProviderDispatch[]> {
@@ -197,6 +272,29 @@ export async function prepareNarrationProviderDispatches(
   );
   const targetAssetId = deterministicUuid(`job:${jobId}:narration-asset`);
   const capabilityJti = deterministicUuid(`job:${jobId}:capability-jti`);
+  const existingPayload = await rpc("get_existing_narration_delivery", {
+    p_preflight_run_id: input.envelope.preflightRunId,
+  });
+  const payload =
+    existingPayload === null
+      ? providerPayload({
+          ...(await createNarrationDelivery({
+            configurationCandidateId: input.configurationCandidateId,
+            envelope: input.envelope,
+            episodeId: input.episodeId,
+            policyVersionId: input.policyVersionId,
+            scriptRevisionId: input.scriptRevisionId,
+            sourceText: input.exactText,
+          })),
+          externalVoiceId: capability.externalVoiceId,
+          sourceText: input.exactText,
+          targetAssetId,
+        })
+      : validateExistingProviderPayload(existingPayload, {
+          externalVoiceId: capability.externalVoiceId,
+          sourceText: input.exactText,
+          targetAssetId,
+        });
   await rpc("command_prepare_narration_job", {
     p_asr_provider_capability_id: capability.asrCapabilityId,
     p_audio_identity_selection_id: input.audioIdentitySelectionId,
@@ -205,11 +303,7 @@ export async function prepareNarrationProviderDispatches(
     p_job_id: jobId,
     p_preflight_run_id: input.envelope.preflightRunId,
     p_provider_capability_id: capability.capabilityId,
-    p_provider_payload: providerPayload({
-      exactText: input.exactText,
-      externalVoiceId: capability.externalVoiceId,
-      targetAssetId,
-    }),
+    p_provider_payload: payload,
     p_stage_attempt_id: input.envelope.stageAttemptId,
     p_target_asset_id: targetAssetId,
   });

@@ -287,6 +287,9 @@ function falPayload(
 
 function elevenLabsPayload(manifest: ProviderDispatchManifest): {
   body: Record<string, unknown>;
+  deliveryMap: readonly (number | null)[];
+  deliveryText: string;
+  sourceText: string;
   targetAssetId: string;
   voiceId: string;
 } {
@@ -294,8 +297,12 @@ function elevenLabsPayload(manifest: ProviderDispatchManifest): {
     manifest.provider !== "elevenlabs" ||
     manifest.operation !== "gen_speech" ||
     !exactObject(manifest.payload, [
+      "deliveryMap",
+      "deliveryTextSha256",
       "modelId",
       "outputFormat",
+      "sourceText",
+      "sourceTextSha256",
       "targetAssetId",
       "text",
       "voiceId",
@@ -306,6 +313,7 @@ function elevenLabsPayload(manifest: ProviderDispatchManifest): {
   }
   const payload = manifest.payload as Record<string, unknown>;
   if (
+    payload.modelId !== "eleven_v3" ||
     payload.outputFormat !== "mp3_44100_128" ||
     typeof payload.voiceId !== "string" ||
     !/^[A-Za-z0-9]{20}$/u.test(payload.voiceId) ||
@@ -319,13 +327,56 @@ function elevenLabsPayload(manifest: ProviderDispatchManifest): {
     throw new ProviderAdapterError("ElevenLabs speech policy is invalid.");
   }
   const settings = payload.voiceSettings as Record<string, unknown>;
-  if (typeof settings.useSpeakerBoost !== "boolean") {
-    throw new ProviderAdapterError("ElevenLabs speaker boost is invalid.");
+  const deliveryText = boundedText(payload.text, "text", 5_000);
+  const sourceText = boundedText(payload.sourceText, "sourceText", 5_000);
+  const deliveryScalars = Array.from(deliveryText);
+  const sourceScalars = Array.from(sourceText);
+  const deliveryMap = payload.deliveryMap;
+  const sourceHash = createHash("sha256").update(sourceText, "utf8").digest("hex");
+  const deliveryHash = createHash("sha256").update(deliveryText, "utf8").digest("hex");
+  const mappedControls = Array.isArray(deliveryMap)
+    ? deliveryScalars.filter((_, index) => deliveryMap[index] === null).join("")
+    : "";
+  if (
+    typeof settings.useSpeakerBoost !== "boolean" ||
+    settings.stability !== 0.5 ||
+    settings.style !== 0 ||
+    payload.sourceTextSha256 !== sourceHash ||
+    payload.deliveryTextSha256 !== deliveryHash ||
+    /^\s*\[thoughtful\]/iu.test(deliveryText) ||
+    !Array.isArray(deliveryMap) ||
+    deliveryMap.length !== deliveryScalars.length ||
+    deliveryMap.some(
+      (value) =>
+        value !== null &&
+        (!Number.isSafeInteger(value) || value < 0 || value >= sourceScalars.length),
+    ) ||
+    deliveryMap
+      .filter((value): value is number => value !== null)
+      .some((value, index) => value !== index) ||
+    deliveryMap.filter((value) => value !== null).length !== sourceScalars.length ||
+    deliveryMap.some((sourceIndex, deliveryIndex) => {
+      if (sourceIndex === null || sourceIndex === undefined) return false;
+      const sourceScalar = sourceScalars[sourceIndex]!;
+      const deliveryScalar = deliveryScalars[deliveryIndex]!;
+      return (
+        deliveryScalar !== sourceScalar &&
+        !(
+          /^[A-Za-z]$/u.test(sourceScalar) &&
+          deliveryScalar === sourceScalar.toUpperCase()
+        )
+      );
+    }) ||
+    !/^(?:(?:\[(?:curious|excited|exhales|sighs|whispers)\] )|,|\.{3}|!)*$/u.test(
+      mappedControls,
+    )
+  ) {
+    throw new ProviderAdapterError("ElevenLabs V3 delivery policy is invalid.");
   }
   return {
     body: {
       model_id: boundedText(payload.modelId, "modelId", 100),
-      text: boundedText(payload.text, "text", 20_000),
+      text: deliveryText,
       voice_settings: {
         similarity_boost: finiteNumber(
           settings.similarityBoost,
@@ -338,12 +389,20 @@ function elevenLabsPayload(manifest: ProviderDispatchManifest): {
         use_speaker_boost: settings.useSpeakerBoost,
       },
     },
+    deliveryMap: Object.freeze([...(deliveryMap as (number | null)[])]),
+    deliveryText,
+    sourceText,
     targetAssetId: uuid(payload.targetAssetId, "targetAssetId"),
     voiceId: payload.voiceId,
   };
 }
 
-function parseSpeechAlignment(value: unknown, exactText: string): SpeechAlignment {
+function parseSpeechAlignment(
+  value: unknown,
+  deliveryText: string,
+  sourceText: string,
+  deliveryMap: readonly (number | null)[],
+): SpeechAlignment {
   if (
     !exactObject(value, [
       "character_end_times_seconds",
@@ -372,7 +431,7 @@ function parseSpeechAlignment(value: unknown, exactText: string): SpeechAlignmen
     characters.some(
       (character) => typeof character !== "string" || character.length < 1,
     ) ||
-    characters.join("") !== exactText
+    characters.join("") !== deliveryText
   ) {
     throw new ProviderAdapterError(
       "ElevenLabs alignment does not cover the exact narration text.",
@@ -402,10 +461,36 @@ function parseSpeechAlignment(value: unknown, exactText: string): SpeechAlignmen
     }
     previousStart = start;
   }
+  const sourceScalars = Array.from(sourceText);
+  const sourceStarts = new Array<number>(sourceScalars.length);
+  const sourceEnds = new Array<number>(sourceScalars.length);
+  for (let index = 0; index < deliveryMap.length; index += 1) {
+    const sourceIndex = deliveryMap[index];
+    if (sourceIndex === null) continue;
+    if (sourceIndex === undefined) {
+      throw new ProviderAdapterError(
+        "ElevenLabs alignment cannot be mapped to the immutable narration.",
+        "unknown",
+        "elevenlabs.accept_response_invalid",
+      );
+    }
+    sourceStarts[sourceIndex] = starts[index] as number;
+    sourceEnds[sourceIndex] = ends[index] as number;
+  }
+  if (
+    sourceStarts.some((value) => typeof value !== "number") ||
+    sourceEnds.some((value) => typeof value !== "number")
+  ) {
+    throw new ProviderAdapterError(
+      "ElevenLabs alignment cannot be mapped to the immutable narration.",
+      "unknown",
+      "elevenlabs.accept_response_invalid",
+    );
+  }
   return Object.freeze({
-    characterEndTimesSeconds: Object.freeze([...(ends as number[])]),
-    characters: Object.freeze([...(characters as string[])]),
-    characterStartTimesSeconds: Object.freeze([...(starts as number[])]),
+    characterEndTimesSeconds: Object.freeze(sourceEnds),
+    characters: Object.freeze(sourceScalars),
+    characterStartTimesSeconds: Object.freeze(sourceStarts),
   });
 }
 
@@ -597,7 +682,9 @@ export async function submitProviderAdapter(
   }
   const alignment = parseSpeechAlignment(
     outputRecord.alignment,
-    manifest.payload.text as string,
+    speech.deliveryText,
+    speech.sourceText,
+    speech.deliveryMap,
   );
   return Object.freeze({
     alignment,

@@ -1,8 +1,20 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { submitProviderAdapter } from "./provider-adapters";
 
 const id = (suffix: string) => `10000000-0000-4000-8000-${suffix.padStart(12, "0")}`;
+const narrationSource = "Shiva";
+const narrationControl = "[curious] ";
+const narrationDelivery = `${narrationControl}SHIVA!`;
+const narrationMap = [
+  ...Array.from(narrationControl, () => null),
+  ...Array.from(narrationSource, (_, index) => index),
+  null,
+];
+const hash = (value: string) =>
+  createHash("sha256").update(value, "utf8").digest("hex");
 
 function manifest(provider: "fal" | "elevenlabs") {
   return {
@@ -13,7 +25,7 @@ function manifest(provider: "fal" | "elevenlabs") {
     expectedCostMinor: 25,
     inputManifestHash: "a".repeat(64),
     maximumCostMinor: 25,
-    modelKey: provider === "fal" ? "fal-ai/nano-banana-2" : "eleven_multilingual_v2",
+    modelKey: provider === "fal" ? "fal-ai/nano-banana-2" : "eleven_v3",
     operation: provider === "fal" ? "gen_image" : "gen_speech",
     payload:
       provider === "fal"
@@ -30,15 +42,19 @@ function manifest(provider: "fal" | "elevenlabs") {
             thinkingLevel: "high",
           }
         : {
-            modelId: "eleven_multilingual_v2",
+            deliveryMap: narrationMap,
+            deliveryTextSha256: hash(narrationDelivery),
+            modelId: "eleven_v3",
             outputFormat: "mp3_44100_128",
+            sourceText: narrationSource,
+            sourceTextSha256: hash(narrationSource),
             targetAssetId: id("2"),
-            text: "भगवान शिव कैलाश पर ध्यान में लीन थे।",
+            text: narrationDelivery,
             voiceId: "b0oby86k6n7Uh5LZcOBR",
             voiceSettings: {
-              similarityBoost: 0.8,
-              stability: 0.45,
-              style: 0.35,
+              similarityBoost: 0.82,
+              stability: 0.5,
+              style: 0,
               useSpeakerBoost: true,
             },
           },
@@ -106,8 +122,7 @@ describe("narrow provider adapters", () => {
       Buffer.from("ID3safe-audio-fixture"),
       Buffer.alloc(64),
     ]);
-    const text = String(manifest("elevenlabs").payload.text);
-    const characters = Array.from(text);
+    const characters = Array.from(narrationDelivery);
     const responseBody = JSON.stringify({
       alignment: {
         character_end_times_seconds: characters.map((_, index) => (index + 1) * 0.05),
@@ -139,9 +154,42 @@ describe("narrow provider adapters", () => {
     if (result.kind === "quarantine_bytes") {
       expect(result.bytes).toEqual(bytes);
       expect(result.targetAssetId).toBe(id("2"));
-      expect(result.alignment.characters.join("")).toBe(text);
+      expect(result.alignment.characters.join("")).toBe(narrationSource);
     }
     expect(String(fetchMock.mock.calls[0]![0])).toContain("/with-timestamps?");
+
+    const base = manifest("elevenlabs");
+    const replacedWord = narrationDelivery.replace("SHIVA", "XHIVA");
+    await expect(
+      submitProviderAdapter(
+        {
+          ...base,
+          payload: {
+            ...base.payload,
+            deliveryTextSha256: hash(replacedWord),
+            text: replacedWord,
+          },
+        },
+        secrets,
+        vi.fn<typeof fetch>(),
+      ),
+    ).rejects.toThrow(/delivery policy/u);
+
+    const forbiddenControl = narrationDelivery.replace("curious", "mocking");
+    await expect(
+      submitProviderAdapter(
+        {
+          ...base,
+          payload: {
+            ...base.payload,
+            deliveryTextSha256: hash(forbiddenControl),
+            text: forbiddenControl,
+          },
+        },
+        secrets,
+        vi.fn<typeof fetch>(),
+      ),
+    ).rejects.toThrow(/delivery policy/u);
   });
 
   it("submits a bounded Nano Banana edit only from promoted signed references", async () => {

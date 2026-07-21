@@ -113,6 +113,10 @@ const expectedPhase2MigrationVersions = [
   "20260719080200",
   "20260719080300",
   "20260719080400",
+  "20260719165003",
+  "20260719195650",
+  "20260719215715",
+  "20260719223000",
 ] as const;
 const trustedHarnessSha256 = createHash("sha256")
   .update(JSON.stringify(trustedHarnessManifestJson))

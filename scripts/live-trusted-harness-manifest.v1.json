@@ -138,7 +138,7 @@
     {
       "path": "src/server/live-sandbox-control.ts",
       "role": "broker-controller",
-      "sha256": "368da0c9abbe4ab08192518bdd812ab35917c108c8f789864f2a603b1ecae845"
+      "sha256": "f62c0de1404e3f6c614051faf569b8ad85a5b591eb2dd1a46ca8690840966038"
     },
     {
       "path": "supabase/migrations/20260717121500_phase2_scripts_and_sidecars.sql",
@@ -443,7 +443,7 @@
     {
       "path": "supabase/migrations/20260719074100_phase2_narration_external_completion.sql",
       "role": "phase2-migration",
-      "sha256": "36373428eeb8305f0cbe0b8bc8fdb47d8fbcd2a2946387fda7ebdc5b790a3c9d"
+      "sha256": "03eb6642db0c1e249e25ecf5f9aa5a48e471f30528294efaa772a70ad94b3011"
     },
     {
       "path": "supabase/migrations/20260719074200_phase2_narration_promotion_replay.sql",
@@ -453,7 +453,7 @@
     {
       "path": "supabase/migrations/20260719074300_phase2_narration_scan_replay_evidence.sql",
       "role": "phase2-migration",
-      "sha256": "40e3c8b8d1b3a752a77c0f3e47d18881171fc96a62482aa92e102afa5f63dbde"
+      "sha256": "b7807516b08a0aecbd1743929b088d7fcd90999c5fefa906637b5efd1de102eb"
     },
     {
       "path": "supabase/migrations/20260719074400_phase2_named_temple_research.sql",
@@ -468,7 +468,7 @@
     {
       "path": "supabase/migrations/20260719074600_phase2_narration_independent_audio_qc.sql",
       "role": "phase2-migration",
-      "sha256": "9ceefc89bc0ef62a35a7472881794ff72af6b6692fcedcee4db3cb97933ff09a"
+      "sha256": "e153f77ffa57109a8ff5584731504ce1338a58230b340c37ebfc41caa07a2ce3"
     },
     {
       "path": "supabase/migrations/20260719074700_phase2_narration_capability_name_collision.sql",
@@ -608,12 +608,12 @@
     {
       "path": "supabase/tests/phase2_zero_spend_foundation.test.sql",
       "role": "pgtap-source",
-      "sha256": "b7effd6745907277afbba87bc55d7e08cf03cc0b1c5112d8e00edb39a8d05950"
+      "sha256": "985bb9edaffdfe5728403625e180275e2bba24c87faa3f78d72e4ed5eb70c84a"
     },
     {
       "path": "tests/live/phase1-live.spec.ts",
       "role": "live-browser-spec",
-      "sha256": "d3460b95998750b724f652a122b26ce621556763d159ae8348c531e9e0f75dbd"
+      "sha256": "8a193b45b5f1bdac1681506b15d55e2047abbfc1b7843f83606f233dc1bad54c"
     },
     {
       "path": "tests/live/phase2-script-live.spec.ts",
@@ -658,9 +658,9 @@
       "testFile": "phase2_world_cultural.test.sql"
     },
     {
-      "hardenedQuerySha256": "ca25060e85a4384a83731709d5aeae1b4deaf7f1519b4cca8fec756ad496ef60",
-      "plannedAssertions": 178,
-      "sourceSha256": "b7effd6745907277afbba87bc55d7e08cf03cc0b1c5112d8e00edb39a8d05950",
+      "hardenedQuerySha256": "5c03c91f18615eb25dd332595256d1c89e17c89296c75180f143472702ffe275",
+      "plannedAssertions": 179,
+      "sourceSha256": "985bb9edaffdfe5728403625e180275e2bba24c87faa3f78d72e4ed5eb70c84a",
       "testFile": "phase2_zero_spend_foundation.test.sql"
     }
   ],
