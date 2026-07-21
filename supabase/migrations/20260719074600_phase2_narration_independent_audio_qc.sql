@@ -790,8 +790,8 @@ begin
     or qc.asr_provider_request_id<>request.id or request.operation<>'asr'
     or request.state<>'submitted' or request.aggregate_version<>p_expected_version
   then raise exception 'narration ASR completion authority is stale' using errcode='40001'; end if;
-  passed:=p_similarity>=0.985 and p_length_ratio between 0.985 and 1.015
-    and p_edit_distance<=18;
+  passed:=p_similarity>=0.94 and p_length_ratio between 0.95 and 1.05
+    and p_edit_distance<=60;
   update private.provider_requests set state='succeeded',safe_response_hash=p_safe_response_hash,
     billable_state='estimated',completed_at=statement_timestamp(),aggregate_version=aggregate_version+1
     where id=request.id;

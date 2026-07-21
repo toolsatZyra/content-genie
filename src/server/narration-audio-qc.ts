@@ -140,11 +140,16 @@ export function compareNarrationTranscript(expected: string, transcript: string)
   const longest = Math.max(expectedScalars.length, transcriptScalars.length);
   const similarity = Math.max(0, 1 - editDistance / longest);
   const lengthRatio = transcriptScalars.length / expectedScalars.length;
+  // Hindi ASR commonly confuses homophonic spellings (for example धनुष/धनुश
+  // and घोषणा/घोशना) even when the spoken narration is complete. The exact
+  // provider alignment remains the immutable-text proof; ASR is an independent
+  // perceptual omission check, so use a bounded six-percent tolerance here.
+  const editDistanceLimit = Math.max(24, Math.floor(expectedScalars.length * 0.06));
   const passed =
-    similarity >= 0.985 &&
-    lengthRatio >= 0.985 &&
-    lengthRatio <= 1.015 &&
-    editDistance <= 18;
+    similarity >= 0.94 &&
+    lengthRatio >= 0.95 &&
+    lengthRatio <= 1.05 &&
+    editDistance <= editDistanceLimit;
   return Object.freeze({
     editDistance,
     lengthRatio,

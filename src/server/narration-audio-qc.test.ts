@@ -29,6 +29,18 @@ describe("independent narration audio QC", () => {
     ).toBe(false);
   });
 
+  it("accepts bounded Hindi ASR spelling variants without accepting omissions", () => {
+    const expected =
+      "राजा जनक ने भगवान शिव का विशाल धनुष सामने रख कर घोषणा की। ऋषि विश्वामित्र ने राम की ओर देखा। धनुष दो टुकड़ों में टूट गया।";
+    const commonAsrRendering =
+      "राजा जनक ने भगवान शिव का विशाल धनुश सामने रख कर घोशना की। ऋषि विश्वामित्र ने राम की ओर देखा। धनुश दो टुकडों में टूट गया।";
+
+    expect(compareNarrationTranscript(expected, commonAsrRendering).passed).toBe(true);
+    expect(compareNarrationTranscript(expected, "राजा जनक ने घोषणा की।").passed).toBe(
+      false,
+    );
+  });
+
   it("accepts only the exact bounded judge contract", () => {
     const evidence = {
       delhiAccentPass: true,
