@@ -530,6 +530,7 @@ describe("executable cinematic plan agent", () => {
     expect(JSON.stringify(mocks.agent.mock.calls[0]![1].schema)).not.toContain(
       "uniqueItems",
     );
+    expect(mocks.agent.mock.calls[0]![1].reasoningEffort).toBe("medium");
   });
 
   it("rejects a researched photograph repeated before its alternatives", async () => {
