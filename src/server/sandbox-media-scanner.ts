@@ -434,7 +434,16 @@ export async function scanAndReencodeNarrationAudio(input: {
     await commandOutput(
       sandbox,
       "sudo",
-      ["dnf", "install", "-y", "ffmpeg-free", "clamav", "clamav-update"],
+      [
+        "dnf",
+        "install",
+        "-y",
+        "ffmpeg-free",
+        "jack-audio-connection-kit",
+        "lame-libs",
+        "clamav",
+        "clamav-update",
+      ],
       "scanner.audio_install_failed",
       180_000,
     );

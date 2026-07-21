@@ -119,7 +119,16 @@ describe("sandbox media scanner input envelope", () => {
     expect(mocks.runCommand).toHaveBeenNthCalledWith(
       2,
       "sudo",
-      ["dnf", "install", "-y", "ffmpeg-free", "clamav", "clamav-update"],
+      [
+        "dnf",
+        "install",
+        "-y",
+        "ffmpeg-free",
+        "jack-audio-connection-kit",
+        "lame-libs",
+        "clamav",
+        "clamav-update",
+      ],
       { timeoutMs: 180_000 },
     );
     expect(mocks.stop).toHaveBeenCalledOnce();
