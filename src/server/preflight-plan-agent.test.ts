@@ -682,6 +682,10 @@ describe("executable cinematic plan agent", () => {
       priorPlanBundleId: plans[0]!.p_plan_bundle_id,
       repairAvailable: true,
     });
+    expect(repairInput.repair.priorCreativePlan.edd.shots[0]).not.toHaveProperty(
+      "promptBlueprint",
+    );
+    expect(mocks.agent.mock.calls[3]![1].input.length).toBeLessThan(100_000);
   });
 
   it("stops after exactly two blocked automatic repairs", async () => {

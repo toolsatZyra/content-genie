@@ -1053,8 +1053,33 @@ async function directPlan(
               "Produce a materially improved successor. Correct every evidence-backed gate or finding without changing script, timing windows, World IDs, cultural/source bounds, or qualified provider rules.",
             priorCreativePlan: {
               beats: repair.priorPlan.beats,
-              composition: repair.priorPlan.composition,
-              edd: repair.priorPlan.edd,
+              composition: {
+                aspectRatio: record(repair.priorPlan.composition, "Prior composition")
+                  .aspectRatio,
+                shots: (
+                  record(repair.priorPlan.composition, "Prior composition")
+                    .shots as readonly Readonly<Record<string, unknown>>[]
+                ).map(
+                  ({ cameraMotion, emotionalRead, framing, shotNumber, staging }) => ({
+                    cameraMotion,
+                    emotionalRead,
+                    framing,
+                    shotNumber,
+                    staging,
+                  }),
+                ),
+              },
+              edd: {
+                shots: (
+                  record(repair.priorPlan.edd, "Prior EDD").shots as readonly Readonly<
+                    Record<string, unknown>
+                  >[]
+                ).map(({ narrativeFunction, shotNumber, visualIntent }) => ({
+                  narrativeFunction,
+                  shotNumber,
+                  visualIntent,
+                })),
+              },
               routing: repair.priorPlan.routing,
               shots: repair.priorPlan.shots,
               sound: repair.priorPlan.sound,
