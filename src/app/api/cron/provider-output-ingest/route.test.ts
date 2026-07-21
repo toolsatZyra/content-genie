@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   recordFetch: vi.fn(),
   scan: vi.fn(),
   narration: vi.fn(),
+  nextPlan: vi.fn(),
   plan: vi.fn(),
 }));
 
@@ -48,6 +49,7 @@ vi.mock("@/server/narration-ingest", () => ({
   processNextNarrationIngest: mocks.narration,
 }));
 vi.mock("@/server/preflight-auto-reconciler", () => ({
+  ensureNextPlanEvaluationRun: mocks.nextPlan,
   ensurePlanEvaluationRun: mocks.plan,
 }));
 vi.mock("@/server/fal-result-recovery", async (importOriginal) => {
@@ -96,6 +98,7 @@ describe("provider output secure-ingest cron", () => {
     vi.resetAllMocks();
     mocks.environment.mockReturnValue({ cronSecret: secret, environment: "test" });
     mocks.narration.mockResolvedValue(null);
+    mocks.nextPlan.mockResolvedValue(null);
     mocks.falRecovery.mockResolvedValue({
       checked: false,
       providerRequestId: null,
@@ -310,6 +313,22 @@ describe("provider output secure-ingest cron", () => {
       narrationCompleted: true,
       narrationJobId: "30000000-0000-4000-8000-000000000013",
       ok: true,
+      planQueued: true,
+      planRunId: "30000000-0000-4000-8000-000000000015",
+    });
+  });
+
+  it("resumes a completed narration whose plan enqueue was interrupted", async () => {
+    mocks.claim.mockReset().mockResolvedValue(null);
+    mocks.nextPlan.mockResolvedValue({
+      configurationCandidateId: "30000000-0000-4000-8000-000000000014",
+      preflightRunId: "30000000-0000-4000-8000-000000000015",
+      shouldTrigger: true,
+      state: "queued",
+    });
+    const result = await GET(request());
+    await expect(result.json()).resolves.toMatchObject({
+      narrationCompleted: null,
       planQueued: true,
       planRunId: "30000000-0000-4000-8000-000000000015",
     });

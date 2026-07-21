@@ -338,3 +338,29 @@ export async function ensurePlanEvaluationRun(
     state: run.state as string,
   });
 }
+
+export async function ensureNextPlanEvaluationRun(): Promise<Awaited<
+  ReturnType<typeof ensurePlanEvaluationRun>
+> | null> {
+  const client = createAdminSupabaseClient();
+  const { data, error } = await client
+    .from("preflight_runs")
+    .select("id,workspace_id")
+    .eq("kind", "narration_clock")
+    .eq("state", "succeeded")
+    .order("completed_at", { ascending: false })
+    .limit(10);
+  if (error) {
+    throw new PreflightAutoReconcilerError(
+      "Completed narration reconciliation failed.",
+    );
+  }
+  for (const run of data ?? []) {
+    const plan = await ensurePlanEvaluationRun({
+      narrationPreflightRunId: run.id,
+      workspaceId: run.workspace_id,
+    });
+    if (plan.shouldTrigger) return plan;
+  }
+  return null;
+}

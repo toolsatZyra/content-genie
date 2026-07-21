@@ -28,7 +28,10 @@ import {
   scanAndReencodeWorldImage,
 } from "@/server/sandbox-media-scanner";
 import { processNextNarrationIngest } from "@/server/narration-ingest";
-import { ensurePlanEvaluationRun } from "@/server/preflight-auto-reconciler";
+import {
+  ensureNextPlanEvaluationRun,
+  ensurePlanEvaluationRun,
+} from "@/server/preflight-auto-reconciler";
 import {
   FalResultRecoveryError,
   recoverNextCompletedFalResult,
@@ -197,11 +200,13 @@ export async function GET(request: Request) {
         : null;
     let planQueued = false;
     let planRunId: string | null = null;
-    if (narration?.completed) {
-      const plan = await ensurePlanEvaluationRun({
-        narrationPreflightRunId: narration.narrationPreflightRunId,
-        workspaceId: narration.workspaceId,
-      });
+    const plan = narration?.completed
+      ? await ensurePlanEvaluationRun({
+          narrationPreflightRunId: narration.narrationPreflightRunId,
+          workspaceId: narration.workspaceId,
+        })
+      : await ensureNextPlanEvaluationRun();
+    if (plan) {
       planRunId = plan.preflightRunId;
       if (plan.shouldTrigger) {
         planQueued = true;
