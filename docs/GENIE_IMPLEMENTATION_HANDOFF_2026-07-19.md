@@ -1232,8 +1232,12 @@ intentional live-scanner skip, the secret-canary production build, the focused
 V3 delivery/alignment suite, both real V3 canaries, and preview/production
 migration application. The RLS/policy suite reached the regenerated trusted
 harness boundary; its only live database portion is intentionally skipped when
-the isolated harness is not active. Explicit GitHub push, automatic Vercel verification,
-and post-deploy production smoke evidence remain next for this batch.
+the isolated harness is not active. Commit
+`aa49bbd402d868599d41885e3d958c8626c0d002` was pushed explicitly to GitHub
+`main`. Automatic Vercel deployment `dpl_D6JmWMautcmbix9sW3xeGtSWTzso`
+reached READY, the canonical alias resolved to that exact commit, and the
+production health route returned HTTP 200 with `ok: true`. The post-deploy
+runtime-error query was empty.
 
 The owner-requested MVP gate reassessment also removed Vitest's blanket
 per-file percentage rule. Aggregate thresholds remain enforced at 90%
