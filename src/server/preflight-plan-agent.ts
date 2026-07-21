@@ -1104,6 +1104,7 @@ Every array must cover the supplied numbered windows exactly once and in order. 
       timeline.beats.length,
       timeline.shots.length,
     ),
+    model: "gpt-5.6-terra" as const,
     modelRequestHash: generated.requestHash,
     providerRequestIdHash:
       generated.responseRequestId === null ? null : sha256(generated.responseRequestId),
@@ -1446,7 +1447,7 @@ function materializePlan(
     story: Object.freeze({
       ...generated.director.story,
       directorEvidence: {
-        model: "gpt-5.6-sol",
+        model: generated.model,
         modelRequestHash: generated.modelRequestHash,
         providerRequestIdHash: generated.providerRequestIdHash,
         providerResponseIdHash: generated.providerResponseIdHash,
@@ -1861,6 +1862,37 @@ async function evaluatePlan(
   materialized: MaterializedPlan,
   model: "gpt-5.6-sol" | "gpt-5.6-terra",
 ) {
+  const requestSlots = materialized.plan.requestSlots as readonly Readonly<
+    Record<string, unknown>
+  >[];
+  const references = materialized.plan.references as readonly Readonly<
+    Record<string, unknown>
+  >[];
+  const evaluationPlan = Object.freeze({
+    beats: materialized.plan.beats,
+    composition: materialized.plan.composition,
+    edd: materialized.plan.edd,
+    references: references.map((reference) => ({
+      referenceKind: reference.referenceKind,
+      referenceOrdinal: reference.referenceOrdinal,
+      requiresUpstreamSuccess: reference.requiresUpstreamSuccess,
+      shotNumber: reference.shotNumber,
+      sourceShotNumber: reference.sourceShotNumber,
+    })),
+    requestSlots: requestSlots.map((slot) => ({
+      durationMs: slot.durationMs,
+      inputStrategy: slot.inputStrategy,
+      referenceCount: slot.referenceCount,
+      retainedDurationMs: slot.retainedDurationMs,
+      shotNumber: slot.shotNumber,
+      slotKind: slot.slotKind,
+    })),
+    routing: materialized.plan.routing,
+    safety: materialized.plan.safety,
+    shots: materialized.plan.shots,
+    sound: materialized.plan.sound,
+    story: materialized.plan.story,
+  });
   const output = await runLedgeredOpenAiStructuredAgent(
     {
       configurationCandidateId: input.configurationCandidateId,
@@ -1879,7 +1911,7 @@ async function evaluatePlan(
       input: JSON.stringify({
         culturalPolicyHash: input.sourceReview.policyHash,
         immutableScriptHash: input.processingTextSha256,
-        plan: materialized.plan,
+        plan: evaluationPlan,
         planHash: materialized.planHash,
         rubric: input.rubric.parameters.map(({ baseWeight, parameterId }) => ({
           baseWeight,

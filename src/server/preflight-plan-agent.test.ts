@@ -535,6 +535,11 @@ describe("executable cinematic plan agent", () => {
       maxOutputTokens: 10_000,
       model: "gpt-5.6-terra",
     });
+    const evaluatorInput = JSON.parse(mocks.agent.mock.calls[1]![1].input as string);
+    expect(evaluatorInput.plan.requestSlots[0]).not.toHaveProperty(
+      "capabilityVersionId",
+    );
+    expect(evaluatorInput.plan.references[0]).not.toHaveProperty("contentHash");
   });
 
   it("rejects a researched photograph repeated before its alternatives", async () => {
