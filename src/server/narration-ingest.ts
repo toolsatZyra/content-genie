@@ -334,14 +334,14 @@ async function promoteNarration(
   }
   const assetVersionId = deterministicUuid(`job:${claim.jobId}:promoted-audio-v1`);
   const finalObjectName = `${claim.workspaceId}/narration/${claim.targetAssetId}/${assetVersionId}/source`;
-  await client.storage.from("workspace-media").remove([finalObjectName]);
-  const upload = await client.storage
-    .from("workspace-media")
-    .upload(finalObjectName, scanned.outputBytes, {
-      cacheControl: "0",
-      contentType: scanned.magicMime,
-      upsert: false,
-    });
+  const workspaceMedia = client.storage.from("workspace-media");
+  await workspaceMedia.remove([finalObjectName]);
+  const upload = await workspaceMedia.upload(finalObjectName, scanned.outputBytes, {
+    cacheControl: "0",
+    contentType: scanned.magicMime,
+    metadata: { sha256: scanned.outputSha256 },
+    upsert: false,
+  });
   if (upload.error) {
     throw new NarrationIngestError(
       "Sanitized narration could not be stored.",
@@ -349,6 +349,21 @@ async function promoteNarration(
       true,
     );
   }
+  const receipt = await workspaceMedia.info(finalObjectName);
+  if (
+    receipt.error ||
+    receipt.data.id !== upload.data.id ||
+    typeof receipt.data.version !== "string" ||
+    receipt.data.version.length < 1
+  ) {
+    await workspaceMedia.remove([finalObjectName]).catch(() => undefined);
+    throw new NarrationIngestError(
+      "Sanitized narration storage receipt is invalid.",
+      "narration.storage_receipt_invalid",
+      true,
+    );
+  }
+  const storageVersion = receipt.data.version;
   try {
     const promotion = await rpc("command_promote_quarantine_asset", {
       p_asset_kind: "narration",
@@ -356,7 +371,7 @@ async function promoteNarration(
       p_final_object_name: finalObjectName,
       p_ingest_attestation_id: attestationId,
       p_quarantine_asset_version_id: claim.quarantineAssetVersionId,
-      p_storage_version: upload.data.id ?? scanned.outputSha256,
+      p_storage_version: storageVersion,
       p_workspace_id: claim.workspaceId,
     });
     if (
@@ -391,7 +406,9 @@ async function promoteNarration(
       });
       return assetVersionId;
     }
-    await client.storage.from("workspace-media").remove([finalObjectName]);
+    // Once promotion has been attempted, retain a harmless orphan if the
+    // ledger did not commit. A timeout can arrive after commit, and the next
+    // deterministic retry will reconcile or replace this exact path.
     throw error;
   }
 }
