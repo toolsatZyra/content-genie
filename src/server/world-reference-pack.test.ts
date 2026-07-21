@@ -6,8 +6,8 @@ describe("anchor-derived character identity pack", () => {
   it("keeps the clean promoted anchor authoritative and derives bounded inspection crops", () => {
     const result = buildAnchorDerivedIdentityPack({
       anchor_asset_version_id: "b1850000-0000-4000-8000-000000000001",
-      character_manifest_hash: "a".repeat(64),
       id: "b1860000-0000-4000-8000-000000000001",
+      identity_manifest_hash: "a".repeat(64),
       prompt_sha256: "b".repeat(64),
     });
 

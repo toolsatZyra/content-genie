@@ -29,8 +29,8 @@ type CharacterSelectionRow = Readonly<{
 
 type CharacterVersionRow = Readonly<{
   anchor_asset_version_id: string;
-  character_manifest_hash: string;
   id: string;
+  identity_manifest_hash: string;
   prompt_sha256: string;
 }>;
 
@@ -74,7 +74,7 @@ export function buildAnchorDerivedIdentityPack(input: CharacterVersionRow) {
         "A single clean identity anchor is used for generation; deterministic crops provide inspection views without multi-pose collage drift.",
     },
     schemaVersion: "genie.anchor-derived-character-sheet.v1",
-    sourceCharacterManifestHash: input.character_manifest_hash,
+    sourceCharacterManifestHash: input.identity_manifest_hash,
     sourcePromptSha256: input.prompt_sha256,
   } as const;
   const cropManifestHash = sha256(postgresJsonbText(cropManifest));
@@ -140,7 +140,7 @@ export async function ensureWorldReferencePack(input: {
     characterVersionIds.length
       ? client
           .from("character_versions")
-          .select("id,anchor_asset_version_id,character_manifest_hash,prompt_sha256")
+          .select("id,anchor_asset_version_id,identity_manifest_hash,prompt_sha256")
           .eq("workspace_id", input.workspaceId)
           .in("id", characterVersionIds)
       : Promise.resolve({ data: [], error: null }),
@@ -245,7 +245,7 @@ export async function ensureWorldReferencePack(input: {
     characters: characterVersions
       .map((version) => ({
         anchorAssetVersionId: version.anchor_asset_version_id,
-        characterManifestHash: version.character_manifest_hash,
+        characterManifestHash: version.identity_manifest_hash,
         characterVersionId: version.id,
         identityPackVersionId: sheetByCharacter.get(version.id)!,
       }))

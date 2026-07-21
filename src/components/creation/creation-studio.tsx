@@ -358,6 +358,7 @@ export function CreationStudio({
   const voiceIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
   const lookIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
   const worldBuildIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
+  const worldFinalizeIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
   const worldIdempotencyKeys = useRef(new Map<string, RetainedIdempotencyAttempt>());
   const worldUploadIdempotencyKeys = useRef(
     new Map<string, RetainedIdempotencyAttempt>(),
@@ -468,6 +469,22 @@ export function CreationStudio({
     lookHumanConfirmed &&
     voiceHumanConfirmed;
   const worldEntities = [...projection.world.characters, ...projection.world.locations];
+  const allWorldAnchorsAccepted =
+    worldEntities.length > 0 &&
+    projection.world.characters.every(
+      (item) =>
+        item.state === "accepted" ||
+        optimisticAcceptedWorldKeys.has(
+          worldEntityKey({ entityKind: "character", item }),
+        ),
+    ) &&
+    projection.world.locations.every(
+      (item) =>
+        item.state === "accepted" ||
+        optimisticAcceptedWorldKeys.has(
+          worldEntityKey({ entityKind: "location", item }),
+        ),
+    );
   const activeWorldProgress = projection.world.progress.some((item) =>
     item.itemKind === "system"
       ? item.state === "extracting"
@@ -482,9 +499,7 @@ export function CreationStudio({
         ].includes(item.state),
   );
   const worldReady =
-    worldEntities.length > 0 &&
-    worldEntities.every(({ state }) => state === "accepted") &&
-    projection.world.referencePack?.state === "verified";
+    allWorldAnchorsAccepted && projection.world.referencePack?.state === "verified";
   const preflightReady =
     projection.preflight.failure === null &&
     projection.preflight.sourceReview?.status === "approved" &&
@@ -1617,6 +1632,71 @@ export function CreationStudio({
     }
   }
 
+  async function continueToPreflight(): Promise<void> {
+    if (
+      !canEditCreation ||
+      !projection.configuration ||
+      !allWorldAnchorsAccepted ||
+      working
+    ) {
+      return;
+    }
+    if (worldReady) {
+      setChamber("preflight");
+      return;
+    }
+    const payload = {
+      configurationCandidateId: projection.configuration.id,
+      episodeId: projection.episode.id,
+      workspaceId: projection.episode.workspaceId,
+    };
+    const requestBody = JSON.stringify(payload);
+    const attempt = retainIdempotencyAttempt(
+      worldFinalizeIdempotencyKey.current,
+      requestBody,
+    );
+    worldFinalizeIdempotencyKey.current = attempt;
+    setWorking(true);
+    setSaveState("saving");
+    setNotice("");
+    try {
+      const response = await fetch(
+        `/api/episodes/${encodeURIComponent(projection.episode.id)}/world-finalize`,
+        {
+          body: requestBody,
+          cache: "no-store",
+          headers: {
+            "content-type": "application/json",
+            "x-idempotency-key": attempt.key,
+          },
+          method: "POST",
+        },
+      );
+      await readCommandResponse(
+        response,
+        "The accepted World reference pack could not be assembled.",
+      );
+      worldFinalizeIdempotencyKey.current = null;
+      setSaveState("saved");
+      setNotice("Reference pack assembled. Preflight is ready.");
+      refreshIntoChamber("preflight");
+    } catch (error) {
+      if (error instanceof CommandMutationError && error.definitive) {
+        worldFinalizeIdempotencyKey.current = null;
+        setSaveState("rejected");
+        setNotice(error.message);
+      } else {
+        setSaveState("unconfirmed");
+        setNotice(
+          "Reference-pack assembly is being reconciled. Retrying Preflight is safe and will not duplicate work.",
+        );
+      }
+      router.refresh();
+    } finally {
+      setWorking(false);
+    }
+  }
+
   async function decideSourceReview(
     decision: "approve" | "block",
     rationale: string,
@@ -2445,7 +2525,7 @@ export function CreationStudio({
           <WorldStudio
             canEdit={canEditCreation}
             onAccept={(entity) => void decideWorldCandidate(entity, "accept", null)}
-            onContinue={() => setChamber("preflight")}
+            onContinue={() => void continueToPreflight()}
             onStart={() => void beginWorldBuild()}
             onRegenerate={(entity, revisedPromptText) =>
               void decideWorldCandidate(entity, "regenerate", revisedPromptText)

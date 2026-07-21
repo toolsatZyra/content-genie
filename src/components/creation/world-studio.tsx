@@ -208,6 +208,8 @@ export function WorldStudio({
     allEntities.length > 0 &&
     acceptedCount === allEntities.length &&
     projection.referencePack?.state === "verified";
+  const anchorsAccepted =
+    allEntities.length > 0 && acceptedCount === allEntities.length;
 
   useEffect(() => {
     if (!editing) return;
@@ -519,12 +521,14 @@ export function WorldStudio({
           <span>
             {worldReady
               ? "Every accepted anchor is versioned and ready for preflight."
-              : "Monica proceeds only when every anchor and its reference pack agree."}
+              : anchorsAccepted
+                ? "All anchors are accepted. Genie will assemble the reference pack now."
+                : "Monica proceeds only when every anchor and its reference pack agree."}
           </span>
         </div>
         <button
           className="creation-primary"
-          disabled={!worldReady || working}
+          disabled={!anchorsAccepted || working}
           onClick={onContinue}
           type="button"
         >
