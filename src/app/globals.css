@@ -1779,7 +1779,7 @@ textarea:focus-visible {
   margin: 0 auto;
   max-width: var(--creation-max);
   min-height: calc(100vh - 138px);
-  padding: clamp(48px, 7vw, 100px) clamp(24px, 5vw, 82px);
+  padding: clamp(24px, 3vw, 46px) clamp(24px, 5vw, 82px) 80px;
   position: relative;
 }
 
@@ -1820,7 +1820,7 @@ textarea:focus-visible {
 .script-chamber > header,
 .voice-chamber > header,
 .look-heading {
-  margin: 0 auto 34px;
+  margin: 0 auto 26px;
   max-width: 760px;
   text-align: center;
 }
@@ -1828,7 +1828,7 @@ textarea:focus-visible {
 .creation-stage h1 {
   font-family: var(--font-display);
   scroll-margin-top: 154px;
-  font-size: clamp(40px, 5.4vw, 72px);
+  font-size: clamp(36px, 4.4vw, 60px);
   font-weight: 500;
   letter-spacing: -0.045em;
   line-height: 0.98;
@@ -1838,7 +1838,7 @@ textarea:focus-visible {
 .creation-stage header p,
 .future-chamber p {
   color: var(--muted);
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.65;
   margin: 0 auto;
   max-width: 690px;
@@ -2631,7 +2631,7 @@ textarea:focus-visible {
   }
 
   .creation-stage {
-    padding: 42px 16px 90px;
+    padding: 28px 16px 90px;
   }
 
   .agent-activity {
@@ -2642,7 +2642,7 @@ textarea:focus-visible {
   }
 
   .creation-stage h1 {
-    font-size: 43px;
+    font-size: 38px;
   }
 
   .script-canvas textarea,
@@ -5037,7 +5037,7 @@ em.state-chip {
   display: flex;
   gap: clamp(28px, 6vw, 90px);
   justify-content: space-between;
-  margin-bottom: 48px;
+  margin-bottom: 32px;
 }
 
 .world-heading > div:first-child,
@@ -5054,7 +5054,7 @@ em.state-chip {
 .preflight-heading p,
 .launchpad-chamber > p {
   color: var(--muted);
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.65;
 }
 
@@ -6214,7 +6214,8 @@ em.state-chip {
 
 .production-quote > header small,
 .production-quote > header > span,
-.production-quote > footer small {
+.production-quote > footer small,
+.preflight-auto-status {
   color: var(--faint);
   font-size: 9px;
   font-weight: 800;
@@ -6435,6 +6436,23 @@ em.state-chip {
   justify-content: center;
   padding: 20px;
   width: 208px;
+}
+
+.launch-world-lock[role="status"] {
+  animation: launchpad-status-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes launchpad-status-pulse {
+  0%,
+  100% {
+    box-shadow: 0 24px 70px rgba(197, 133, 54, 0.2);
+    transform: scale(1);
+  }
+
+  50% {
+    box-shadow: 0 24px 82px rgba(239, 190, 104, 0.34);
+    transform: scale(1.025);
+  }
 }
 
 .launch-world-lock > span {

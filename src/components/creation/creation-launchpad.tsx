@@ -1,18 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import type { RefObject } from "react";
 
 import type { CreationPreflightProjection } from "@/domain/creation-readiness";
 
 interface CreationLaunchpadProps {
-  readonly canEdit: boolean;
   readonly episodeId: string;
-  readonly onLock: () => void;
   readonly preflight: CreationPreflightProjection;
   readonly stageHeadingRef: RefObject<HTMLHeadingElement | null>;
-  readonly working: boolean;
-  readonly worldReady: boolean;
 }
 
 function usd(microusd: number): string {
@@ -20,25 +18,17 @@ function usd(microusd: number): string {
 }
 
 export function CreationLaunchpad({
-  canEdit,
   episodeId,
-  onLock,
   preflight,
   stageHeadingRef,
-  working,
-  worldReady,
 }: CreationLaunchpadProps) {
+  const router = useRouter();
   const run = preflight.productionRun;
-  const readyToLock =
-    worldReady &&
-    preflight.failure === null &&
-    preflight.sourceReview?.status === "approved" &&
-    preflight.audioIdentity?.state === "verified" &&
-    preflight.masterClock?.state === "verified" &&
-    preflight.plan?.state === "qc_passed" &&
-    preflight.qc?.verdict === "pass" &&
-    preflight.quote?.confirmed === true &&
-    preflight.quote.expired === false;
+
+  useEffect(() => {
+    if (!run) return;
+    router.replace(`/episodes/${episodeId}/production`);
+  }, [episodeId, router, run]);
 
   if (run) {
     return (
@@ -74,8 +64,8 @@ export function CreationLaunchpad({
           </div>
         </div>
         <p className="launchpad-note">
-          You can leave this Episode. The Atrium will surface progress and notify you
-          when review is needed.
+          Opening the live production room automatically. The Atrium will continue to
+          surface progress and notify you when final review is needed.
         </p>
         <Link
           className="creation-primary launchpad-production-link"
@@ -94,12 +84,12 @@ export function CreationLaunchpad({
         <i />
         <span>◇</span>
       </div>
-      <small>The one deliberate handoff</small>
+      <small>Autonomous production handoff</small>
       <h1 ref={stageHeadingRef} tabIndex={-1}>
-        Lock the world. Release the agentic AI crew.
+        Monica is sealing the production baton.
       </h1>
       <p>
-        This atomic action freezes the accepted cast, locations, character sheets,
+        The agentic AI crew is freezing the accepted cast, locations, character sheets,
         narration identity, master clock, shot graph, QC consensus and exact spending
         ceiling. If any byte changed, Monica rejects the lock instead of guessing.
       </p>
@@ -120,23 +110,14 @@ export function CreationLaunchpad({
           <small>Clock · graph · QC · quote</small>
         </div>
       </div>
-      <button
-        className="launch-world-lock"
-        disabled={!canEdit || working || !readyToLock}
-        onClick={onLock}
-        type="button"
-      >
+      <div className="launch-world-lock" aria-live="polite" role="status">
         <span aria-hidden="true">✦</span>
-        <strong>{working ? "Locking every dependency…" : "Confirm World Lock"}</strong>
-        <small>
-          {readyToLock
-            ? "Atomic · irreversible · production-authorizing"
-            : "Waiting for verified preflight evidence"}
-        </small>
-      </button>
+        <strong>Locking every verified dependency…</strong>
+        <small>Atomic · bounded · production-authorizing</small>
+      </div>
       <p className="launchpad-note">
-        This is not “start generation.” It is the exact boundary after which the
-        autonomous agentic AI crew is allowed to spend and produce.
+        No click is required. When the immutable run is present, this screen opens the
+        live production room. Final exact-master approval remains yours.
       </p>
     </section>
   );

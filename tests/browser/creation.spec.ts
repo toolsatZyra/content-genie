@@ -1707,7 +1707,7 @@ test.describe("Living Cinema creation flow", () => {
     );
   });
 
-  test("shows Monica's evidence and confirms only the exact quote ceiling", async ({
+  test("shows Monica's evidence and autonomously seals only the exact quote ceiling", async ({
     page,
   }) => {
     let confirmation: Record<string, unknown> | null = null;
@@ -1724,7 +1724,6 @@ test.describe("Living Cinema creation flow", () => {
     ).toBeFocused();
     await expect(page.getByLabel("Exact production quote")).toContainText("$32.60");
     await expect(page.getByText("No unresolved deterministic gates.")).toBeVisible();
-    await page.getByRole("button", { name: "Confirm exact ceiling" }).click();
     await expect.poll(() => confirmation).not.toBeNull();
     expect(confirmation).toEqual({
       episodeId,
@@ -1745,9 +1744,7 @@ test.describe("Living Cinema creation flow", () => {
       }),
     ).toBeVisible();
     await expect(page.getByText("No spend", { exact: true })).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Confirm exact ceiling" }),
-    ).toBeDisabled();
+    await expect(page.getByText("Agent sequence in progress")).toBeVisible();
     await expect(page.getByRole("button", { name: /Confirm World Lock/ })).toHaveCount(
       0,
     );
@@ -1763,10 +1760,9 @@ test.describe("Living Cinema creation flow", () => {
     await page.goto(`/episodes/${episodeId}/create?fixture=phase2-world-lock`);
     await expect(
       page.getByRole("heading", {
-        name: "Lock the world. Release the agentic AI crew.",
+        name: "Monica is sealing the production baton.",
       }),
     ).toBeFocused();
-    await page.getByRole("button", { name: /Confirm World Lock/ }).click();
     await expect.poll(() => worldLock).not.toBeNull();
     expect(worldLock).toEqual({
       configurationCandidateId: "10000000-0000-4000-8000-000000000120",
@@ -1782,13 +1778,6 @@ test.describe("Living Cinema creation flow", () => {
     page,
   }) => {
     await page.goto(`/episodes/${episodeId}/create?fixture=phase2-running`);
-    await expect(
-      page.getByRole("heading", { name: "Monica has the baton." }),
-    ).toBeFocused();
-    await expect(page.getByText("queued", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Confirm World Lock/ })).toHaveCount(
-      0,
-    );
-    await expectActionTargetsAtLeast44(page);
+    await page.waitForURL(new RegExp(`/episodes/${episodeId}/production`));
   });
 });

@@ -1,18 +1,12 @@
 "use client";
 
-import { useState, type RefObject } from "react";
+import type { RefObject } from "react";
 
 import type { CreationPreflightProjection } from "@/domain/creation-readiness";
 
 interface PreflightStudioProps {
-  readonly canEdit: boolean;
-  readonly onAppointReviewer: () => void;
-  readonly onConfirmQuote: () => void;
-  readonly onContinue: () => void;
-  readonly onSourceReview: (decision: "approve" | "block", rationale: string) => void;
   readonly projection: CreationPreflightProjection;
   readonly stageHeadingRef: RefObject<HTMLHeadingElement | null>;
-  readonly working: boolean;
 }
 
 function usd(microusd: number): string {
@@ -67,17 +61,7 @@ function terminalFailureCopy(code: string): Readonly<{
   };
 }
 
-export function PreflightStudio({
-  canEdit,
-  onAppointReviewer,
-  onConfirmQuote,
-  onContinue,
-  onSourceReview,
-  projection,
-  stageHeadingRef,
-  working,
-}: PreflightStudioProps) {
-  const [reviewRationale, setReviewRationale] = useState("");
+export function PreflightStudio({ projection, stageHeadingRef }: PreflightStudioProps) {
   const sourceReview = projection.sourceReview;
   const terminalFailure = projection.failure
     ? terminalFailureCopy(projection.failure.code)
@@ -182,8 +166,9 @@ export function PreflightStudio({
           <p>
             Specialist agents bind voice, timing, cultural evidence, shot grammar,
             reference order and provider capability into one immutable production plan.
-            You make the one qualified cultural-evidence decision, then approve the
-            exact spending ceiling—not Monica’s internal craft decisions.
+            After your accepted World, Monica advances every verified dependency and the
+            exact spending ceiling autonomously. You retain final exact-master approval
+            before release.
           </p>
         </div>
         <div
@@ -222,7 +207,7 @@ export function PreflightStudio({
       >
         <header>
           <div>
-            <small>Human authority · exact evidence set</small>
+            <small>Cultural Guardian · exact evidence set</small>
             <h2>Culture, theology and dignity review</h2>
           </div>
           <span>{sourceReview?.status.replaceAll("_", " ") ?? "assembling"}</span>
@@ -301,58 +286,11 @@ export function PreflightStudio({
               </details>
             </div>
             {sourceReview.status === "pending_qualified_review" ? (
-              sourceReview.competencies.length === 0 ? (
-                <div className="source-review-attestation">
-                  <p>
-                    Activate reviewer responsibility only if you are Zyra’s designated
-                    launch decision maker for cultural, theological, regional, rights
-                    and dignity review. Workspace-admin role are required.
-                  </p>
-                  <button
-                    className="creation-secondary"
-                    disabled={!canEdit || working}
-                    onClick={onAppointReviewer}
-                    type="button"
-                  >
-                    Activate reviewer responsibility
-                  </button>
-                </div>
-              ) : (
-                <div className="source-review-decision">
-                  <label htmlFor="source-review-rationale">
-                    Decision rationale
-                    <textarea
-                      id="source-review-rationale"
-                      maxLength={4000}
-                      onChange={(event) => setReviewRationale(event.target.value)}
-                      placeholder="State what you checked, the interpretation accepted, and any bounded caveats."
-                      value={reviewRationale}
-                    />
-                  </label>
-                  <div>
-                    <button
-                      className="creation-secondary is-danger"
-                      disabled={
-                        !canEdit || working || reviewRationale.trim().length < 2
-                      }
-                      onClick={() => onSourceReview("block", reviewRationale)}
-                      type="button"
-                    >
-                      Block this evidence set
-                    </button>
-                    <button
-                      className="creation-primary"
-                      disabled={
-                        !canEdit || working || reviewRationale.trim().length < 2
-                      }
-                      onClick={() => onSourceReview("approve", reviewRationale)}
-                      type="button"
-                    >
-                      Approve exact evidence set
-                    </button>
-                  </div>
-                </div>
-              )
+              <p className="source-review-final" aria-live="polite">
+                {sourceReview.competencies.length === 0
+                  ? "The Cultural Guardian is activating the owner-authorized MVP review scope."
+                  : "The Cultural Guardian is checking the exact evidence packet now. No click is needed."}
+              </p>
             ) : (
               <p className="source-review-final">
                 {sourceReady
@@ -446,8 +384,8 @@ export function PreflightStudio({
             {projection.quote?.expired
               ? "Quote expired · Monica must reprice"
               : quoteConfirmed
-                ? "You confirmed this ceiling"
-                : "Workspace admin confirmation required"}
+                ? "Ceiling sealed automatically"
+                : "Standing MVP authority pending"}
           </span>
         </header>
         {projection.quote ? (
@@ -518,25 +456,13 @@ export function PreflightStudio({
               ? `Expires ${expiry(projection.quote.expiresAt)} UTC`
               : "No spend authority exists yet"}
           </small>
-          {!quoteConfirmed ? (
-            <button
-              className="creation-primary"
-              disabled={!canEdit || working || !automatedReady || !projection.quote}
-              onClick={onConfirmQuote}
-              type="button"
-            >
-              Confirm exact ceiling
-            </button>
-          ) : (
-            <button
-              className="creation-primary"
-              disabled={working}
-              onClick={onContinue}
-              type="button"
-            >
-              Create
-            </button>
-          )}
+          <span className="preflight-auto-status" aria-live="polite">
+            {quoteConfirmed
+              ? "World Lock handoff in progress"
+              : automatedReady
+                ? "Sealing the exact ceiling"
+                : "Agent sequence in progress"}
+          </span>
         </footer>
       </section>
     </section>

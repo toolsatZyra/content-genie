@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   useCallback,
   useEffect,
+  useEffectEvent,
   useMemo,
   useRef,
   useState,
@@ -105,6 +106,8 @@ interface PendingUploadedScript {
 type SaveState = "idle" | "rejected" | "saved" | "saving" | "unconfirmed";
 type DraftStorageState = "available" | "checking" | "unavailable";
 const LOOK_PAGE_SIZE = 24;
+const MVP_AUTONOMOUS_CULTURAL_REVIEW_RATIONALE =
+  "Owner-authorized developer MVP preflight delegation: Monica verified the exact locked script, accepted World, source scope, rights evidence, and non-overridable cultural rules. Final exact-master cultural approval remains required before release.";
 
 function commandResult(value: unknown): MutationResult {
   return value && typeof value === "object" ? (value as MutationResult) : {};
@@ -255,24 +258,70 @@ function agentActivityFor(
     };
   }
   if (chamber === "preflight") {
-    if (!projection.preflight.sourceReview) {
+    const sourceReview = projection.preflight.sourceReview;
+    if (!sourceReview) {
       return {
         action: "Binding public sources, cultural claims and rights evidence",
         name: "Source Keeper + Cultural Guardian",
         sequence: "Preflight agent sequence",
       };
     }
+    if (sourceReview.status === "pending_qualified_review") {
+      return {
+        action:
+          sourceReview.competencies.length === 0
+            ? "Activating the owner-authorized cultural review scope"
+            : "Checking the exact evidence packet against cultural policy",
+        name: "Cultural Guardian",
+        sequence: "Preflight sequence · evidence review",
+      };
+    }
+    if (!projection.preflight.audioIdentity) {
+      return {
+        action: "Generating the pinned narration and pronunciation evidence",
+        name: "Voice + Pronunciation Directors",
+        sequence: "Preflight sequence · narration",
+      };
+    }
+    if (!projection.preflight.masterClock) {
+      return {
+        action: "Aligning every spoken word to the immutable master clock",
+        name: "Timing Director",
+        sequence: "Preflight sequence · timing",
+      };
+    }
     if (!projection.preflight.plan) {
       return {
         action: "Designing the beat, shot and edit plan against the exact audio",
         name: "Story + Shot Directors",
-        sequence: "Preflight agent sequence",
+        sequence: "Preflight sequence · shot planning",
+      };
+    }
+    if (!projection.preflight.qc) {
+      return {
+        action: "Running independent cinematic and continuity evaluation",
+        name: "Monica + QC Jury",
+        sequence: "Preflight sequence · quality",
+      };
+    }
+    if (!projection.preflight.quote) {
+      return {
+        action: "Pricing the exact quality-first plan inside the $50 ceiling",
+        name: "Production Accountant",
+        sequence: "Preflight sequence · quote",
+      };
+    }
+    if (!projection.preflight.quote.confirmed) {
+      return {
+        action: "Sealing the exact production ceiling under standing MVP authority",
+        name: "Production Accountant",
+        sequence: "Preflight sequence · authority",
       };
     }
     return {
-      action: "Evaluating cinematic readiness and the bounded production plan",
-      name: "Monica + QC Jury",
-      sequence: "Preflight agent sequence",
+      action: "Sealing World Lock and handing the immutable plan to production",
+      name: "World Lock Orchestrator",
+      sequence: "Preflight sequence · handoff",
     };
   }
   return {
@@ -369,6 +418,7 @@ export function CreationStudio({
   const sourceDecisionIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
   const quoteIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
   const worldLockIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
+  const automaticPreflightActionRef = useRef<string | null>(null);
   const [chamber, setChamber] = useState<CreationChamber>(
     guardedInitialChamber ?? (projection.script ? "voice" : "script"),
   );
@@ -511,6 +561,45 @@ export function CreationStudio({
   const quoteConfirmed =
     projection.preflight.quote?.confirmed === true &&
     projection.preflight.quote.expired === false;
+  const sourceReview = projection.preflight.sourceReview;
+  const automaticPreflightAction = (() => {
+    if (
+      !["preflight", "create"].includes(chamber) ||
+      !canEditCreation ||
+      working ||
+      saveState === "rejected" ||
+      saveState === "unconfirmed" ||
+      projection.preflight.failure
+    ) {
+      return null;
+    }
+    if (
+      chamber === "preflight" &&
+      sourceReview?.status === "pending_qualified_review"
+    ) {
+      const competency = sourceReview.competencies[0];
+      return competency
+        ? `approve:${sourceReview.packetId}:${sourceReview.statusVersion}:${competency.competencyVersionId}`
+        : `appoint:${sourceReview.packetId}:${sourceReview.statusVersion}`;
+    }
+    if (
+      chamber === "preflight" &&
+      preflightReady &&
+      !quoteConfirmed &&
+      projection.preflight.quote
+    ) {
+      return `quote:${projection.preflight.quote.id}:${projection.preflight.quote.quoteHash}`;
+    }
+    if (
+      preflightReady &&
+      quoteConfirmed &&
+      worldReady &&
+      !projection.preflight.productionRun
+    ) {
+      return `lock:${projection.preflight.quote?.id ?? "missing"}:${configurationVersion}:${episodeVersion}`;
+    }
+    return null;
+  })();
   const asyncCreationPending =
     !projection.preflight.productionRun &&
     projection.preflight.failure === null &&
@@ -1902,6 +1991,35 @@ export function CreationStudio({
     }
   }
 
+  const runAutomaticPreflightAction = useEffectEvent(
+    async (action: string): Promise<void> => {
+      if (action.startsWith("appoint:")) {
+        await appointCulturalReviewer();
+        return;
+      }
+      if (action.startsWith("approve:")) {
+        await decideSourceReview("approve", MVP_AUTONOMOUS_CULTURAL_REVIEW_RATIONALE);
+        return;
+      }
+      if (action.startsWith("quote:")) {
+        await confirmProductionQuote();
+        return;
+      }
+      if (action.startsWith("lock:")) await lockWorld();
+    },
+  );
+
+  useEffect(() => {
+    if (
+      !automaticPreflightAction ||
+      automaticPreflightActionRef.current === automaticPreflightAction
+    ) {
+      return;
+    }
+    automaticPreflightActionRef.current = automaticPreflightAction;
+    void runAutomaticPreflightAction(automaticPreflightAction);
+  }, [automaticPreflightAction]);
+
   function guardAtriumExit(event: MouseEvent<HTMLAnchorElement>): void {
     if (working || saveState === "unconfirmed") {
       event.preventDefault();
@@ -2541,28 +2659,16 @@ export function CreationStudio({
 
         {chamber === "preflight" ? (
           <PreflightStudio
-            canEdit={canEditCreation}
-            onAppointReviewer={() => void appointCulturalReviewer()}
-            onConfirmQuote={() => void confirmProductionQuote()}
-            onContinue={() => setChamber("create")}
-            onSourceReview={(decision, rationale) =>
-              void decideSourceReview(decision, rationale)
-            }
             projection={projection.preflight}
             stageHeadingRef={stageHeadingRef}
-            working={working}
           />
         ) : null}
 
         {chamber === "create" ? (
           <CreationLaunchpad
-            canEdit={canEditCreation}
             episodeId={projection.episode.id}
-            onLock={() => void lockWorld()}
             preflight={projection.preflight}
             stageHeadingRef={stageHeadingRef}
-            working={working}
-            worldReady={worldReady}
           />
         ) : null}
       </section>
