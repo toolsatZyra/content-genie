@@ -537,7 +537,7 @@ select throws_ok(
     )
   $command$,
   '42501',
-  'aal2 required',
+  'AAL2 authenticated authority required',
   'AAL1 cannot create an invitation'
 );
 

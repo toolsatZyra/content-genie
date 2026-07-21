@@ -681,6 +681,30 @@ generated = JSON.parse(
 const implementationObligation = generated.requirements
   .find((item) => item.id === "GEN-PROD-002")
   .obligations.find((item) => item.checkpoint === "phase2");
+const phase2ImplementationObligations = generated.requirements.flatMap(
+  (requirement) =>
+    (requirement.obligations ?? []).filter(
+      (obligation) => obligation.checkpoint === "phase2",
+    ),
+);
+const phase2ImplementationObligationIds = phase2ImplementationObligations
+  .map(({ obligationId }) => obligationId)
+  .sort();
+const phase2ImplementationWorkPackages = [
+  ...new Set(
+    phase2ImplementationObligations.flatMap(
+      (obligation) => obligation.workPackages,
+    ),
+  ),
+].sort();
+assert.equal(phase2ImplementationObligationIds.length, 96);
+assert.deepEqual(
+  phase2ImplementationWorkPackages,
+  Array.from(
+    { length: 14 },
+    (_, index) => `P2-${String(index + 1).padStart(2, "0")}`,
+  ),
+);
 const implementationGeneratedAt = new Date().toISOString();
 const implementationArtifactRelativePath =
   "docs/evidence/phase2/test.implementation.json";
@@ -754,32 +778,30 @@ writeJson(implementationRemoteRelativePath, {
     validationError: null,
   },
 });
-const implementationReviews = [
-  ["acceptance", "implementation-acceptance-reviewer"],
-  ["security", "implementation-security-reviewer"],
-  ["ui-ux", "implementation-ui-reviewer"],
-].map(([scope, reviewerId]) => {
-  const relativePath = `docs/evidence/phase2/test-cold-review.${scope}.v1.json`;
-  writeJson(relativePath, {
-    candidateCommit: implementationCommit,
-    candidateTree: implementationTree,
-    disposition: "passed",
-    findings: [],
-    openP0: 0,
-    openP1: 0,
-    openP2: 0,
-    reviewedAt: implementationGeneratedAt,
-    reviewerId,
-    schemaVersion: "genie-cold-review.v1",
-    scope,
-  });
-  return {
-    artifact: artifactFor(relativePath),
-    reviewedAt: implementationGeneratedAt,
-    reviewerId,
-    scope,
-  };
-});
+const implementationReviewRelativePath =
+  "docs/evidence/phase2/test-cold-review.comprehensive.v2.json";
+const implementationReviewReport = {
+  candidateCommit: implementationCommit,
+  candidateTree: implementationTree,
+  coverage: ["acceptance", "media", "security", "ui-ux"],
+  disposition: "passed",
+  findings: [],
+  openP0: 0,
+  openP1: 0,
+  openP2: 0,
+  reviewedAt: implementationGeneratedAt,
+  reviewerId: "implementation-comprehensive-reviewer",
+  reviewType: "independent-context-minimized-comprehensive",
+  schemaVersion: "genie-cold-review.v2",
+};
+writeJson(implementationReviewRelativePath, implementationReviewReport);
+const implementationReview = {
+  artifact: artifactFor(implementationReviewRelativePath),
+  coverage: implementationReviewReport.coverage,
+  reviewedAt: implementationGeneratedAt,
+  reviewerId: implementationReviewReport.reviewerId,
+  reviewType: implementationReviewReport.reviewType,
+};
 const implementationArtifact = {
   boundFiles: implementationBindings
     .map((binding) => ({
@@ -799,14 +821,14 @@ const implementationArtifact = {
     command: ["pnpm", "precheckpoint-gates"],
     tree: implementationTree,
   },
-  obligationIds: ["GEN-PROD-002@phase2"],
+  obligationIds: phase2ImplementationObligationIds,
   remoteLiveSuite: {
     artifact: artifactFor(implementationRemoteRelativePath),
     completedAt: implementationGeneratedAt,
   },
-  reviews: implementationReviews,
-  schemaVersion: "genie-implementation-evidence.v2",
-  workPackages: ["P2-01", "P2-02", "P2-03"],
+  review: implementationReview,
+  schemaVersion: "genie-implementation-evidence.v3",
+  workPackages: phase2ImplementationWorkPackages,
 };
 writeJson(implementationArtifactRelativePath, implementationArtifact);
 const implementationArtifactPath = path.join(
@@ -827,6 +849,34 @@ const implementationEntry = {
   verifiedAt: implementationGeneratedAt,
   workPackages: implementationObligation.workPackages,
 };
+writeEvidence({ "GEN-PROD-002@phase2": implementationEntry });
+runGenerator(true);
+
+const incompleteImplementationObligations = structuredClone(
+  implementationArtifact,
+);
+incompleteImplementationObligations.obligationIds.pop();
+writeJson(
+  implementationArtifactRelativePath,
+  incompleteImplementationObligations,
+);
+implementationEntry.evidence[0].sha256 = digestFile(implementationArtifactPath);
+writeEvidence({ "GEN-PROD-002@phase2": implementationEntry });
+runGenerator(false, /invalid implementation evidence/);
+
+const incompleteImplementationReview = structuredClone(implementationArtifact);
+incompleteImplementationReview.review.coverage = [
+  "acceptance",
+  "security",
+  "ui-ux",
+];
+writeJson(implementationArtifactRelativePath, incompleteImplementationReview);
+implementationEntry.evidence[0].sha256 = digestFile(implementationArtifactPath);
+writeEvidence({ "GEN-PROD-002@phase2": implementationEntry });
+runGenerator(false, /typed comprehensive review evidence/);
+
+writeJson(implementationArtifactRelativePath, implementationArtifact);
+implementationEntry.evidence[0].sha256 = digestFile(implementationArtifactPath);
 writeEvidence({ "GEN-PROD-002@phase2": implementationEntry });
 runGenerator(true);
 

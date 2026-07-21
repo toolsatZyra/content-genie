@@ -49,7 +49,7 @@ function parse(value: unknown) {
   if (
     !Number.isInteger(row.hardCeilingMicrousd) ||
     Number(row.hardCeilingMicrousd) < 0 ||
-    Number(row.hardCeilingMicrousd) > 50_000_000
+    Number(row.hardCeilingMicrousd) > Number.MAX_SAFE_INTEGER
   )
     throw new QuoteConfirmationContractError("hardCeilingMicrousd is invalid.");
   return row as {

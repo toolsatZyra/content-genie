@@ -466,7 +466,7 @@ select is(
   2::smallint,
   'new script revisions receive the v2 8 KiB size policy'
 );
-select lives_ok(
+select throws_ok(
   $$
     insert into public.script_revisions
     select (
@@ -637,6 +637,7 @@ select is(
     'command_accept_invitation',
     'command_activate_broker_client_key',
     'command_add_broker_client_key',
+    'command_answer_mvp_repair_clarification',
     'command_appoint_cultural_reviewer',
     'command_archive_series',
     'command_authorize_micro_quote',
@@ -653,6 +654,7 @@ select is(
     'command_lock_first_episode_world',
     'command_offboard_member',
     'command_prepare_world_upload',
+    'command_record_mvp_master_cultural_decision',
     'command_register_broker_client',
     'command_retry_mvp_production',
     'command_review_mvp_master',
@@ -3557,13 +3559,24 @@ select throws_ok(
       'rubric-plan-missing-0001',repeat('c',64)
     )
   $command$,
-  'planning remains available when an older Episode predates advisory rubric advice'
+  '55000',
+  'completed advisory script rubric is required before planning',
+  'planning fails closed until completed advisory script-rubric evidence exists'
 );
 select is(
   (
     select script_rubric_run_id
     from public.preflight_runs
-    where idempotency_key = 'rubric-plan-missing-0001'
+    where workspace_id = '91100000-0000-4000-8000-000000000001'
+      and episode_id = '94000000-0000-4000-8000-000000000004'
+      and configuration_candidate_id = (
+        select id from public.episode_configuration_candidates
+        where episode_id = '94000000-0000-4000-8000-000000000004'
+        order by created_at desc limit 1
+      )
+      and kind = 'plan_evaluation'
+    order by run_number desc
+    limit 1
   ),
   null::uuid,
   'an absent advisory rubric is represented honestly rather than fabricated'

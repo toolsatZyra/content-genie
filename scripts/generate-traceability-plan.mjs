@@ -3,7 +3,11 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
 
-import { assertPhase2PromotionInputs } from "./phase2-implementation-evidence-policy.mjs";
+import {
+  PHASE2_REVIEW_COVERAGE,
+  PHASE2_REVIEW_TYPE,
+  assertPhase2PromotionInputs,
+} from "./phase2-implementation-evidence-policy.mjs";
 
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
@@ -32,6 +36,8 @@ const statusVocabulary = [
 ];
 const allowedStatuses = new Set(statusVocabulary);
 const persistedStatuses = new Set(statusVocabulary.slice(1));
+const reportStaleEvidence = process.env.GENIE_TRACEABILITY_REPORT_STALE === "1";
+const staleEvidenceDiagnostics = [];
 const sha256 = (value) =>
   crypto.createHash("sha256").update(value).digest("hex");
 const canonicalDefinitionHash = ({
@@ -1120,6 +1126,38 @@ if (new Set(requirementIds).size !== requirementIds.length) {
   throw new Error("Traceability requirement IDs must be unique");
 }
 
+const phase2ImplementationObligationIds = requirementPlans
+  .flatMap((requirement) =>
+    requirement.obligations
+      .filter((obligation) => obligation.checkpoint === "phase2")
+      .map(() => `${requirement.id}@phase2`),
+  )
+  .sort();
+const phase2ImplementationWorkPackages = [
+  ...new Set(
+    requirementPlans.flatMap((requirement) =>
+      requirement.obligations
+        .filter((obligation) => obligation.checkpoint === "phase2")
+        .flatMap((obligation) => obligation.workPackages),
+    ),
+  ),
+].sort();
+const expectedPhase2WorkPackages = Array.from(
+  { length: 14 },
+  (_, index) => `P2-${String(index + 1).padStart(2, "0")}`,
+);
+if (
+  phase2ImplementationObligationIds.length !== 96 ||
+  new Set(phase2ImplementationObligationIds).size !==
+    phase2ImplementationObligationIds.length ||
+  JSON.stringify(phase2ImplementationWorkPackages) !==
+    JSON.stringify(expectedPhase2WorkPackages)
+) {
+  throw new Error(
+    "Phase 2 implementation evidence contract must cover exactly 96 obligations and P2-01 through P2-14.",
+  );
+}
+
 const evidenceEntries = evidenceSource.entries ?? {};
 const expectedEvidenceKeys = new Set();
 
@@ -1269,7 +1307,7 @@ const validateImplementationEvidenceManifest = (
     artifact,
     null,
     obligationId,
-    "genie-implementation-evidence.v2",
+    "genie-implementation-evidence.v3",
   );
   if (
     !exactKeys(manifest, [
@@ -1281,7 +1319,7 @@ const validateImplementationEvidenceManifest = (
       "localGates",
       "obligationIds",
       "remoteLiveSuite",
-      "reviews",
+      "review",
       "schemaVersion",
       "workPackages",
     ]) ||
@@ -1289,13 +1327,12 @@ const validateImplementationEvidenceManifest = (
     manifest.disposition !== "implemented_unverified" ||
     manifest.generatedAt !== recordedAt ||
     !Array.isArray(manifest.obligationIds) ||
-    manifest.obligationIds.length < 1 ||
     new Set(manifest.obligationIds).size !== manifest.obligationIds.length ||
     !manifest.obligationIds.includes(obligationId) ||
-    JSON.stringify([...manifest.obligationIds].sort()) !==
-      JSON.stringify(manifest.obligationIds) ||
+    JSON.stringify(manifest.obligationIds) !==
+      JSON.stringify(phase2ImplementationObligationIds) ||
     JSON.stringify(manifest.workPackages) !==
-      JSON.stringify(["P2-01", "P2-02", "P2-03"]) ||
+      JSON.stringify(phase2ImplementationWorkPackages) ||
     typeof manifest.generatedAt !== "string" ||
     Number.isNaN(Date.parse(manifest.generatedAt)) ||
     Date.parse(manifest.generatedAt) > Date.now()
@@ -1434,35 +1471,35 @@ const validateImplementationEvidenceManifest = (
   if (manifest.remoteLiveSuite.completedAt !== remoteLiveSuite.finishedAt) {
     throw new Error(`${obligationId} has mismatched remote live-suite evidence`);
   }
-  if (!Array.isArray(manifest.reviews)) {
-    throw new Error(`${obligationId} lacks typed cold-review evidence`);
+  if (
+    !exactKeys(manifest.review, [
+      "artifact",
+      "coverage",
+      "reviewedAt",
+      "reviewerId",
+      "reviewType",
+    ]) ||
+    JSON.stringify(manifest.review.coverage) !==
+      JSON.stringify(PHASE2_REVIEW_COVERAGE) ||
+    manifest.review.reviewType !== PHASE2_REVIEW_TYPE
+  ) {
+    throw new Error(`${obligationId} lacks typed comprehensive review evidence`);
   }
-  const reviewReports = manifest.reviews.map((review) => {
-    if (
-      !exactKeys(review, [
-        "artifact",
-        "reviewedAt",
-        "reviewerId",
-        "scope",
-      ])
-    ) {
-      throw new Error(`${obligationId} has malformed cold-review evidence`);
-    }
-    const report = readEvidenceJson(
-      review.artifact,
-      null,
-      obligationId,
-      "genie-cold-review.v1",
-    );
-    if (
-      review.reviewedAt !== report.reviewedAt ||
-      review.reviewerId !== report.reviewerId ||
-      review.scope !== report.scope
-    ) {
-      throw new Error(`${obligationId} has mismatched cold-review evidence`);
-    }
-    return report;
-  });
+  const reviewReport = readEvidenceJson(
+    manifest.review.artifact,
+    null,
+    obligationId,
+    "genie-cold-review.v2",
+  );
+  if (
+    manifest.review.reviewedAt !== reviewReport.reviewedAt ||
+    manifest.review.reviewerId !== reviewReport.reviewerId ||
+    JSON.stringify(manifest.review.coverage) !==
+      JSON.stringify(reviewReport.coverage) ||
+    manifest.review.reviewType !== reviewReport.reviewType
+  ) {
+    throw new Error(`${obligationId} has mismatched comprehensive review evidence`);
+  }
   assertPhase2PromotionInputs({
     candidateCommit: implementationCommit,
     candidateCommittedAt,
@@ -1470,7 +1507,7 @@ const validateImplementationEvidenceManifest = (
     localGate: gateReport,
     now: Date.parse(manifest.generatedAt),
     remoteLiveSuite,
-    reviews: reviewReports,
+    review: reviewReport,
   });
   if (
     !Array.isArray(manifest.boundFiles) ||
@@ -1512,7 +1549,7 @@ const validateImplementationEvidenceManifest = (
     if (
       !exactKeys(boundFile, ["path", "sha256"]) ||
       typeof boundFile.path !== "string" ||
-      !/^(?:public\/looks|scripts|src|supabase|tests)\/[A-Za-z0-9._/-]+$/.test(
+      !/^(?:(?:public\/looks|scripts|src|supabase|tests|trigger)\/[A-Za-z0-9._/-]+|trigger\.config\.ts)$/.test(
         boundFile.path,
       ) ||
       boundFile.path.includes("..") ||
@@ -2058,9 +2095,16 @@ const materializeObligation = (
       );
     }
     if (evidence.obligationDefinitionHash !== definitionHash) {
-      throw new Error(
-        `${obligationId} evidence is stale for the current obligation definition`,
-      );
+      if (!reportStaleEvidence) {
+        throw new Error(
+          `${obligationId} evidence is stale for the current obligation definition`,
+        );
+      }
+      staleEvidenceDiagnostics.push({
+        expected: definitionHash,
+        obligationId,
+        recorded: evidence.obligationDefinitionHash,
+      });
     }
     if (evidence.status === "verified" && !evidence.commit) {
       throw new Error(`${obligationId} verified status requires a commit`);
@@ -2370,6 +2414,10 @@ const destination = path.join(
   "acceptance",
   "traceability-plan.v1.json",
 );
-fs.mkdirSync(path.dirname(destination), { recursive: true });
-fs.writeFileSync(destination, `${JSON.stringify(output, null, 2)}\n`, "utf8");
-console.log(destination);
+if (reportStaleEvidence) {
+  console.log(JSON.stringify(staleEvidenceDiagnostics, null, 2));
+} else {
+  fs.mkdirSync(path.dirname(destination), { recursive: true });
+  fs.writeFileSync(destination, `${JSON.stringify(output, null, 2)}\n`, "utf8");
+  console.log(destination);
+}

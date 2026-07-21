@@ -43,6 +43,10 @@ import {
   buildPhase2CoordinateUpgradeVerificationSql,
 } from "./phase2-coordinate-upgrade-drill.mjs";
 import {
+  candidateMigrationVersion,
+  loadPhase2CandidateMigrationInventory,
+} from "./phase2-candidate-migration-inventory.mjs";
+import {
   isTransientCliFailureOutput,
   isTransientDatabaseFailureOutput,
   isTransientReadinessStatus,
@@ -676,42 +680,15 @@ try {
   if (phase1MigrationVersions.length === 0) {
     throw new Error("No Phase 1 migrations were found for cloned-schema repair.");
   }
-  const expectedPhase2MigrationFiles = [
-    "20260717121500_phase2_scripts_and_sidecars.sql",
-    "20260717121501_phase2_script_coordinate_hardening.sql",
-    "20260717121600_phase2_looks_voices_and_config.sql",
-    "20260717121601_phase2_0011_look_seed_01.sql",
-    "20260717121602_phase2_0011_look_seed_02.sql",
-    "20260717121603_phase2_0011_look_seed_03.sql",
-    "20260717121604_phase2_0011_look_seed_04.sql",
-    "20260717121605_phase2_0011_look_pack_provenance_correction.sql",
-    "20260717121606_phase2_voice_canary_fail_closed.sql",
-    "20260717121607_phase2_script_coordinate_v2_forward.sql",
-    "20260717121608_phase2_look_policy_baselines.sql",
-    "20260717121609_phase2_live_broker_control_plane.sql",
-    "20260717121610_phase2_episode_release_eligibility.sql",
-    "20260717121611_phase2_checkpoint_adversarial_hardening.sql",
-    "20260717121612_phase2_release_creative_identity_truth.sql",
-  ];
-  const phase2MigrationFiles = (await readdir("supabase/migrations"))
-    .filter((file) => file.endsWith(".sql") && file.includes("_phase2_"))
-    .sort();
-  if (
-    phase2MigrationFiles.length !== expectedPhase2MigrationFiles.length ||
-    phase2MigrationFiles.some(
-      (file, index) => file !== expectedPhase2MigrationFiles[index],
-    )
-  ) {
-    throw new Error("The exact fifteen-file Phase 2 migration sequence is incomplete.");
-  }
-  const expectedPhase2Versions = expectedPhase2MigrationFiles.map(
-    (file) => file.split("_", 1)[0],
+  const expectedPhase2MigrationPaths = await loadPhase2CandidateMigrationInventory();
+  const expectedPhase2Versions = expectedPhase2MigrationPaths.map(
+    candidateMigrationVersion,
   );
   const terminalForwardMigration = "20260717121607";
   const predecessorPhase2Versions = expectedPhase2Versions.filter(
     (version) => version !== terminalForwardMigration,
   );
-  if (!terminalForwardMigration) {
+  if (!expectedPhase2Versions.includes(terminalForwardMigration)) {
     throw new Error("The Phase 2 terminal forward migration is missing.");
   }
   const phase2HistoryQuery = `select version::text as version from supabase_migrations.schema_migrations where version::text = any(array[${expectedPhase2Versions.map((version) => `'${version}'`).join(",")}]) order by version`;

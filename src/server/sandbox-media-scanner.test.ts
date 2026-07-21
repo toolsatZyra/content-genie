@@ -2,8 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
+  readFileToBuffer: vi.fn(),
   runCommand: vi.fn(),
   stop: vi.fn(),
+  updateNetworkPolicy: vi.fn(),
+  writeFiles: vi.fn(),
 }));
 
 vi.mock("@vercel/sandbox", () => ({
@@ -14,6 +17,7 @@ import { launchMediaLimits } from "@/security/media-ingest";
 
 import {
   SandboxMediaScannerError,
+  scanAndReencodeGeneratedVideo,
   scanAndReencodeNarrationAudio,
   scanAndReencodeWorldImage,
 } from "./sandbox-media-scanner";
@@ -53,6 +57,38 @@ function containerPng() {
   ]);
 }
 
+function mp4Fixture() {
+  const bytes = Buffer.alloc(1_200);
+  bytes.writeUInt32BE(24, 0);
+  bytes.write("ftyp", 4, "ascii");
+  bytes.write("isom", 8, "ascii");
+  return bytes;
+}
+
+function commandResult(stdout = "") {
+  return {
+    exitCode: 0,
+    stderr: vi.fn().mockResolvedValue(""),
+    stdout: vi.fn().mockResolvedValue(stdout),
+  };
+}
+
+function queueVideoScan(sourceProbe: string, outputProbe = sourceProbe) {
+  for (const stdout of [
+    "",
+    "",
+    "",
+    "ClamAV 1.4",
+    "ffmpeg version 7",
+    "",
+    sourceProbe,
+    "",
+    outputProbe,
+  ]) {
+    mocks.runCommand.mockResolvedValueOnce(commandResult(stdout));
+  }
+}
+
 async function safeClass(input: Parameters<typeof scanAndReencodeWorldImage>[0]) {
   try {
     await scanAndReencodeWorldImage(input);
@@ -67,8 +103,11 @@ describe("sandbox media scanner input envelope", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.create.mockResolvedValue({
+      readFileToBuffer: mocks.readFileToBuffer,
       runCommand: mocks.runCommand,
       stop: mocks.stop.mockResolvedValue(undefined),
+      updateNetworkPolicy: mocks.updateNetworkPolicy.mockResolvedValue(undefined),
+      writeFiles: mocks.writeFiles.mockResolvedValue(undefined),
     });
   });
 
@@ -131,6 +170,74 @@ describe("sandbox media scanner input envelope", () => {
       ],
       { timeoutMs: 180_000 },
     );
+    expect(mocks.stop).toHaveBeenCalledOnce();
+  });
+
+  it("quarantines, probes, and re-encodes generated video with actual dimensions", async () => {
+    const probe = JSON.stringify({
+      format: { duration: "3.500" },
+      streams: [{ codec_type: "video", duration: "3.500", height: 1280, width: 720 }],
+    });
+    queueVideoScan(probe);
+    const output = mp4Fixture();
+    mocks.readFileToBuffer.mockResolvedValue(output);
+
+    await expect(
+      scanAndReencodeGeneratedVideo({
+        bytes: mp4Fixture(),
+        declaredMime: "video/mp4",
+      }),
+    ).resolves.toMatchObject({
+      durationMs: 3_500,
+      height: 1_280,
+      magicMime: "video/mp4",
+      outputBytes: output,
+      scanEngine: "ClamAV.FFmpeg",
+      width: 720,
+    });
+    expect(mocks.updateNetworkPolicy).toHaveBeenCalledWith("deny-all");
+    expect(mocks.stop).toHaveBeenCalledOnce();
+  });
+
+  it("rejects generated video with any embedded non-video stream", async () => {
+    queueVideoScan(
+      JSON.stringify({
+        format: { duration: "3.500" },
+        streams: [
+          { codec_type: "video", duration: "3.500", height: 1280, width: 720 },
+          { codec_type: "audio", duration: "3.500" },
+        ],
+      }),
+    );
+
+    await expect(
+      scanAndReencodeGeneratedVideo({
+        bytes: mp4Fixture(),
+        declaredMime: "video/mp4",
+      }),
+    ).rejects.toMatchObject({ safeClass: "media.video_stream_rejected" });
+    expect(mocks.readFileToBuffer).not.toHaveBeenCalled();
+    expect(mocks.stop).toHaveBeenCalledOnce();
+  });
+
+  it("rejects output dimensions that do not match the probed provider video", async () => {
+    const sourceProbe = JSON.stringify({
+      format: { duration: "3.500" },
+      streams: [{ codec_type: "video", duration: "3.500", height: 1280, width: 720 }],
+    });
+    const fabricatedOutputProbe = JSON.stringify({
+      format: { duration: "3.500" },
+      streams: [{ codec_type: "video", duration: "3.500", height: 1920, width: 1080 }],
+    });
+    queueVideoScan(sourceProbe, fabricatedOutputProbe);
+
+    await expect(
+      scanAndReencodeGeneratedVideo({
+        bytes: mp4Fixture(),
+        declaredMime: "video/mp4",
+      }),
+    ).rejects.toMatchObject({ safeClass: "media.video_output_mismatch" });
+    expect(mocks.readFileToBuffer).not.toHaveBeenCalled();
     expect(mocks.stop).toHaveBeenCalledOnce();
   });
 });

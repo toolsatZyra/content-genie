@@ -243,10 +243,16 @@ function fixture() {
       narrativeFunction: "Advance cause, reaction, and consequence.",
       realWorldReferenceAssetVersionId: shotNumber % 2 === 1 ? id("31") : id("32"),
       scoreCue: "A restrained motif gains one layer.",
-      sfxCue: "Specific cloth, wind, and environment detail.",
+      sfxCue: "A restrained cloth movement with a short natural decay.",
+      sfxDurationMs: Math.min(
+        1_000,
+        timeline.shots[shotNumber - 1]!.endMs - timeline.shots[shotNumber - 1]!.startMs,
+      ),
+      sfxGainDb: -20,
+      sfxStartOffsetMs: 0,
       shotNumber,
       subjectAction: "The figure reacts with controlled physical detail.",
-      transition: "Motivated visual cut.",
+      transition: "hard_cut",
       visualIntent: "Make the story legible without sound.",
     })),
     story: {
@@ -267,6 +273,30 @@ function fixture() {
     })),
   };
   return { director, evaluator, input, timeline };
+}
+
+function semanticBoundaries(data: ReturnType<typeof fixture>) {
+  const startByScalar = new Map(
+    data.input.alignmentSegments.map((segment) => [
+      segment.startScalar,
+      segment.segmentNumber,
+    ]),
+  );
+  const endByScalar = new Map(
+    data.input.alignmentSegments.map((segment) => [
+      segment.endScalar,
+      segment.segmentNumber,
+    ]),
+  );
+  return {
+    schemaVersion: "genie.semantic-shot-boundaries.v1",
+    shots: data.timeline.shots.map((shot) => ({
+      endSegmentNumber: endByScalar.get(shot.endScalar)!,
+      sceneNumber: shot.beatNumber,
+      shotNumber: shot.shotNumber,
+      startSegmentNumber: startByScalar.get(shot.startScalar)!,
+    })),
+  };
 }
 
 type PersistedPlanParameters = Readonly<{
@@ -410,6 +440,12 @@ describe("executable cinematic plan agent", () => {
     });
     mocks.agent
       .mockResolvedValueOnce({
+        output: semanticBoundaries(data),
+        requestHash: hash("4"),
+        responseId: "resp_boundaries",
+        responseRequestId: "request_boundaries",
+      })
+      .mockResolvedValueOnce({
         output: data.director,
         requestHash: hash("5"),
         responseId: "resp_director",
@@ -527,16 +563,21 @@ describe("executable cinematic plan agent", () => {
         ),
       ).size,
     ).toBe(2);
-    expect(mocks.agent).toHaveBeenCalledTimes(3);
+    expect(mocks.agent).toHaveBeenCalledTimes(4);
     expect(JSON.stringify(mocks.agent.mock.calls[0]![1].schema)).not.toContain(
       "uniqueItems",
     );
-    expect(mocks.agent.mock.calls[0]![1].reasoningEffort).toBe("medium");
-    expect(mocks.agent.mock.calls[0]![1]).toMatchObject({
+    expect(mocks.agent.mock.calls[1]![1].reasoningEffort).toBe("medium");
+    expect(mocks.agent.mock.calls[1]![1]).toMatchObject({
       maxOutputTokens: 10_000,
       model: "gpt-5.6-terra",
     });
-    const evaluatorInput = JSON.parse(mocks.agent.mock.calls[1]![1].input as string);
+    const boundaryInput = JSON.parse(mocks.agent.mock.calls[0]![1].input as string);
+    expect(boundaryInput.planningGuidance).toMatchObject({
+      minimumShotCountGuidance: 20,
+      rule: expect.stringContaining("never a required count"),
+    });
+    const evaluatorInput = JSON.parse(mocks.agent.mock.calls[2]![1].input as string);
     expect(evaluatorInput.plan.requestSlots[0]).not.toHaveProperty(
       "capabilityVersionId",
     );
@@ -545,18 +586,26 @@ describe("executable cinematic plan agent", () => {
 
   it("rejects a researched photograph repeated before its alternatives", async () => {
     const data = fixture();
-    mocks.agent.mockReset().mockResolvedValueOnce({
-      output: {
-        ...data.director,
-        shots: data.director.shots.map((shot) => ({
-          ...shot,
-          realWorldReferenceAssetVersionId: id("31"),
-        })),
-      },
-      requestHash: hash("5"),
-      responseId: "resp_director",
-      responseRequestId: "request_director",
-    });
+    mocks.agent
+      .mockReset()
+      .mockResolvedValueOnce({
+        output: semanticBoundaries(data),
+        requestHash: hash("4"),
+        responseId: "resp_boundaries",
+        responseRequestId: "request_boundaries",
+      })
+      .mockResolvedValueOnce({
+        output: {
+          ...data.director,
+          shots: data.director.shots.map((shot) => ({
+            ...shot,
+            realWorldReferenceAssetVersionId: id("31"),
+          })),
+        },
+        requestHash: hash("5"),
+        responseId: "resp_director",
+        responseRequestId: "request_director",
+      });
 
     await expect(
       executePlanPreflight({
@@ -657,6 +706,12 @@ describe("executable cinematic plan agent", () => {
     mocks.agent
       .mockReset()
       .mockResolvedValueOnce({
+        output: semanticBoundaries(data),
+        requestHash: hash("4"),
+        responseId: "resp_boundaries",
+        responseRequestId: "request_boundaries",
+      })
+      .mockResolvedValueOnce({
         output: data.director,
         requestHash: hash("5"),
         responseId: "resp_director",
@@ -715,7 +770,7 @@ describe("executable cinematic plan agent", () => {
       retryable: true,
     });
     expect(plans).toHaveLength(1);
-    expect(mocks.agent).toHaveBeenCalledTimes(3);
+    expect(mocks.agent).toHaveBeenCalledTimes(4);
 
     resumeBlocked = true;
     const result = await executePlanPreflight(envelope);
@@ -725,8 +780,8 @@ describe("executable cinematic plan agent", () => {
     expect(plans[1]!.p_plan_hash).not.toBe(plans[0]!.p_plan_hash);
     expect(blindGroups).toHaveLength(2);
     expect(blindGroups[1]).not.toBe(blindGroups[0]);
-    expect(mocks.agent).toHaveBeenCalledTimes(6);
-    const repairInput = JSON.parse(mocks.agent.mock.calls[3]![1].input as string);
+    expect(mocks.agent).toHaveBeenCalledTimes(7);
+    const repairInput = JSON.parse(mocks.agent.mock.calls[4]![1].input as string);
     expect(repairInput.immutableScript.exactText).toBe(data.input.processingText);
     expect(repairInput.repair).toMatchObject({
       priorIteration: 1,
@@ -736,7 +791,7 @@ describe("executable cinematic plan agent", () => {
     expect(repairInput.repair.priorCreativePlan.edd.shots[0]).not.toHaveProperty(
       "promptBlueprint",
     );
-    expect(mocks.agent.mock.calls[3]![1].input.length).toBeLessThan(100_000);
+    expect(mocks.agent.mock.calls[4]![1].input.length).toBeLessThan(100_000);
   });
 
   it("honors persisted repair exhaustion before another model call", async () => {
@@ -833,12 +888,20 @@ describe("executable cinematic plan agent", () => {
       return { data: id("50"), error: null };
     });
     const blocked = blockingEvaluator(data, " throughout the repair budget");
-    mocks.agent.mockReset().mockResolvedValueOnce({
-      output: data.director,
-      requestHash: hash("1"),
-      responseId: "director_1",
-      responseRequestId: null,
-    });
+    mocks.agent
+      .mockReset()
+      .mockResolvedValueOnce({
+        output: semanticBoundaries(data),
+        requestHash: hash("0"),
+        responseId: "boundaries_1",
+        responseRequestId: null,
+      })
+      .mockResolvedValueOnce({
+        output: data.director,
+        requestHash: hash("1"),
+        responseId: "director_1",
+        responseRequestId: null,
+      });
     mocks.agent
       .mockResolvedValueOnce({
         output: blocked,
@@ -881,7 +944,7 @@ describe("executable cinematic plan agent", () => {
         ([name]) => name === "command_issue_plan_evaluator_challenges",
       ),
     ).toHaveLength(1);
-    expect(mocks.agent).toHaveBeenCalledTimes(3);
+    expect(mocks.agent).toHaveBeenCalledTimes(4);
   });
 
   it("resumes a published candidate and runs only the missing blind evaluator", async () => {

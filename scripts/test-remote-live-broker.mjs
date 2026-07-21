@@ -2,6 +2,14 @@ import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 
 import { LIVE_BROKER_SEAL, runRemoteLiveCandidate } from "./remote-live-broker.mjs";
+import {
+  candidateMigrationVersion,
+  loadPhase2CandidateMigrationInventory,
+} from "./phase2-candidate-migration-inventory.mjs";
+
+const expectedPhase2MigrationVersions = (
+  await loadPhase2CandidateMigrationInventory()
+).map(candidateMigrationVersion);
 
 const brokerDeploymentCommit = "d".repeat(40);
 const candidate = { commit: brokerDeploymentCommit, tree: "b".repeat(40) };
@@ -140,23 +148,7 @@ const fetchImpl = async (_url, init) => {
                 boundaryScripts: 1,
                 branchRef,
                 lookCount: 117,
-                migrationVersions: [
-                  "20260717121500",
-                  "20260717121501",
-                  "20260717121600",
-                  "20260717121601",
-                  "20260717121602",
-                  "20260717121603",
-                  "20260717121604",
-                  "20260717121605",
-                  "20260717121606",
-                  "20260717121607",
-                  "20260717121608",
-                  "20260717121609",
-                  "20260717121610",
-                  "20260717121611",
-                  "20260717121612",
-                ],
+                migrationVersions: expectedPhase2MigrationVersions,
                 policyBoundLookCount: 117,
                 voiceCount: 2,
               },

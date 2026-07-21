@@ -1,7 +1,7 @@
 # Phase 2 isolated media-scanner corpus evidence
 
-**Run date:** 2026-07-19
-**Candidate:** `d61bc1c5873e7030cfb84acdb601b598024ba390` plus the intentional Phase 2 worktree
+**Latest run date:** 2026-07-21
+**Candidate:** `49dc7ea8c2e7d85857660e775b2bed575616aa5e` plus the intentional Phase 2/MVP worktree
 **Scope:** `P2-07`, `V-P2-008`, `V-P2-011`, and `V-P2-012`
 **Disposition:** focused proof passed; complete frozen-candidate gate remains required
 
@@ -23,11 +23,11 @@ exact RIFF length and chunk envelope; JPEG requires an exact EOI boundary.
 Command:
 
 ```powershell
-& '.\node_modules\.bin\vitest.CMD' run 'src/security/still-image-container.test.ts' 'src/server/sandbox-media-scanner.test.ts' 'src/app/api/cron/provider-output-ingest/route.test.ts' 'tests/integration/sandbox-media-scanner.live.test.ts'
+pnpm exec vitest run --project unit src/security/still-image-container.test.ts src/server/sandbox-media-scanner.test.ts src/app/api/cron/provider-output-ingest/route.test.ts
 ```
 
-Result: 3 files passed, 13 tests passed, and the credential-gated live test was
-correctly skipped. The corpus proves that:
+Result: 3 files and 20 tests passed. The separately credentialed live test is
+recorded below. The deterministic corpus proves that:
 
 - corrupt-CRC and truncated containers are rejected before sandbox creation;
 - ZIP/appended-payload PNG, JPEG, and WebP polyglots are rejected before
@@ -40,19 +40,19 @@ correctly skipped. The corpus proves that:
 
 ## Live isolated sanitization corpus
 
-A short-lived development OIDC token was pulled into an ignored temporary
-file, used only for this test, and deleted immediately after the run. No token
-or provider secret is present in this evidence.
+The live test loaded its Vercel Sandbox credential only from the ignored local
+environment files already used by the repository runners. No token, provider
+secret, or credential value was printed or copied into this evidence.
 
 Command shape:
 
 ```powershell
 $env:RUN_LIVE_MEDIA_SCANNER='1'
-node --env-file=<ignored-temporary-oidc-file> node_modules/vitest/vitest.mjs run 'tests/integration/sandbox-media-scanner.live.test.ts'
+node --env-file-if-exists=.tmp/vercel-sandbox.env --env-file-if-exists=.env.local node_modules/vitest/vitest.mjs run --project integration tests/integration/sandbox-media-scanner.live.test.ts
 ```
 
-Result: 1 file and 1 live integration test passed in 65.36 seconds; the scanner
-operation itself completed in 63.42 seconds. The 400x400 source PNG contained
+Result: 1 file and 1 live integration test passed in 48.34 seconds; the scanner
+operation itself completed in 46.55 seconds. The 400x400 source PNG contained
 a GPS/comment `tEXt` chunk, an XMP-like `iTXt` chunk, and a private ancillary
 attachment chunk. The returned derivative had a new SHA-256, retained the exact
 dimensions and valid PNG envelope, and contained none of `tEXt`, `zTXt`,

@@ -7,6 +7,7 @@ export type CandidateEvidenceExpectations = Readonly<{
     snapshotSeal: string;
     source: Readonly<{ fileCount: number; sha256: string }>;
   }>;
+  candidateMigrations: ReadonlyArray<string>;
   pgTapSuites: ReadonlyArray<
     Readonly<{
       hardenedQuerySha256: string;

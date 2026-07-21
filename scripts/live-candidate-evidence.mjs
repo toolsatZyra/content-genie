@@ -1,3 +1,5 @@
+const TERMINAL_FORWARD_MIGRATION = "20260717121607";
+
 const TOP_LEVEL_KEYS = [
   "apiReadinessAttempts",
   "boundaryEvidence",
@@ -79,6 +81,12 @@ function sha256(value) {
 
 function safeInteger(value, minimum = 0) {
   return Number.isSafeInteger(value) && value >= minimum;
+}
+
+function candidateMigrationVersion(path) {
+  const match = /^supabase\/migrations\/(\d{14})_[a-z0-9_]+\.sql$/u.exec(path);
+  invariant(Boolean(match?.[1]), "candidate migration inventory path");
+  return match[1];
 }
 
 function assertDigest(value, expected, label) {
@@ -227,7 +235,7 @@ function assertPgTapSuites(value, expectedSuites) {
   }
 }
 
-function assertForwardUpgradeEvidence(value, expectedFixture) {
+function assertForwardUpgradeEvidence(value, expectedFixture, candidateMigrations) {
   exactKeys(
     value,
     [
@@ -243,18 +251,11 @@ function assertForwardUpgradeEvidence(value, expectedFixture) {
     ],
     "forward-upgrade evidence",
   );
-  const expectedVersions = [
-    "20260717121500",
-    "20260717121501",
-    "20260717121600",
-    "20260717121601",
-    "20260717121602",
-    "20260717121603",
-    "20260717121604",
-    "20260717121605",
-    "20260717121606",
-    "20260717121607",
-  ];
+  invariant(
+    Array.isArray(candidateMigrations) && candidateMigrations.length > 0,
+    "candidate migration inventory",
+  );
+  const expectedVersions = candidateMigrations.map(candidateMigrationVersion);
   const legacyRows = [
     {
       bytes: 8193,
@@ -287,8 +288,10 @@ function assertForwardUpgradeEvidence(value, expectedFixture) {
         verifiedV1: true,
       },
       predecessorUpgradeExercised: true,
-      preexistingPhase2Versions: expectedVersions.slice(0, -1),
-      terminalForwardMigration: expectedVersions.at(-1),
+      preexistingPhase2Versions: expectedVersions.filter(
+        (version) => version !== TERMINAL_FORWARD_MIGRATION,
+      ),
+      terminalForwardMigration: TERMINAL_FORWARD_MIGRATION,
       upgrade: {
         exactV2WriteAccepted: true,
         legacyRows,
@@ -393,7 +396,7 @@ function assertPersistenceEvidence(value) {
 
 export function assertClosedCandidateArtifact(
   value,
-  { candidateBinding, pgTapSuites, predecessorFixture },
+  { candidateBinding, candidateMigrations, pgTapSuites, predecessorFixture },
 ) {
   exactKeys(value, TOP_LEVEL_KEYS, "candidate evidence");
   invariant(
@@ -420,7 +423,11 @@ export function assertClosedCandidateArtifact(
     "candidate revalidation timestamp",
   );
   exactValue(value.predecessorFixture, predecessorFixture, "predecessor fixture");
-  assertForwardUpgradeEvidence(value.forwardUpgradeEvidence, predecessorFixture);
+  assertForwardUpgradeEvidence(
+    value.forwardUpgradeEvidence,
+    predecessorFixture,
+    candidateMigrations,
+  );
   assertCandidateBinding(value.candidate, candidateBinding);
   assertBrowserCredentialEvidence(value.browserCredentialEvidence);
   assertDatabaseCredentialEvidence(value.databaseCredentialEvidence);

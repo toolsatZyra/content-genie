@@ -13,6 +13,7 @@ import { inspectStillImageContainer } from "@/security/still-image-container";
 
 const scannerTaskVersion = "genie-world-image-sandbox-v1";
 const narrationScannerTaskVersion = "genie-narration-audio-sandbox-v1";
+const videoScannerTaskVersion = "genie-generated-video-sandbox-v1";
 
 export class SandboxMediaScannerError extends Error {
   override readonly name = "SandboxMediaScannerError";
@@ -54,6 +55,19 @@ export type SandboxAudioScanResult = Readonly<{
   sourceDurationMs: number;
   timeScale: number;
   unintendedSilenceDetected: boolean;
+}>;
+
+export type SandboxVideoScanResult = Readonly<{
+  durationMs: number;
+  height: number;
+  magicMime: "video/mp4";
+  outputBytes: Buffer;
+  outputSha256: string;
+  probeSha256: string;
+  scanEngine: "ClamAV.FFmpeg";
+  scanVersion: string;
+  scannerTaskVersion: typeof videoScannerTaskVersion;
+  width: number;
 }>;
 
 type ImageMime = SandboxImageScanResult["magicMime"];
@@ -334,6 +348,266 @@ export async function scanAndReencodeWorldImage(input: {
     throw new SandboxMediaScannerError(
       "The isolated media scanner is unavailable.",
       "scanner.unavailable",
+    );
+  } finally {
+    await sandbox?.stop().catch(() => undefined);
+  }
+}
+
+function parseVideoProbe(value: string): {
+  durationMs: number;
+  height: number;
+  width: number;
+} {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new SandboxMediaScannerError(
+      "The generated video probe was malformed.",
+      "media.video_probe_rejected",
+    );
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new SandboxMediaScannerError(
+      "The generated video probe was malformed.",
+      "media.video_probe_rejected",
+    );
+  }
+  const record = parsed as Record<string, unknown>;
+  if (!Array.isArray(record.streams)) {
+    throw new SandboxMediaScannerError(
+      "The generated video stream set is malformed.",
+      "media.video_stream_rejected",
+    );
+  }
+  const streams = record.streams as Record<string, unknown>[];
+  const videoStreams = streams.filter((stream) => stream.codec_type === "video");
+  if (
+    videoStreams.length !== 1 ||
+    streams.some((stream) => stream.codec_type !== "video")
+  ) {
+    throw new SandboxMediaScannerError(
+      "A generated shot must contain exactly one video stream and no embedded audio or data.",
+      "media.video_stream_rejected",
+    );
+  }
+  const video = videoStreams[0]!;
+  const format = record.format as Record<string, unknown> | undefined;
+  const durationSeconds = Number(video.duration ?? format?.duration);
+  const width = Number(video.width);
+  const height = Number(video.height);
+  if (
+    !Number.isFinite(durationSeconds) ||
+    durationSeconds < 1 ||
+    durationSeconds > 30 ||
+    !Number.isSafeInteger(width) ||
+    !Number.isSafeInteger(height) ||
+    width < 512 ||
+    width > 4_096 ||
+    height < 720 ||
+    height > 4_096 ||
+    height <= width ||
+    width * height > launchMediaLimits.maximumPixels
+  ) {
+    throw new SandboxMediaScannerError(
+      "The generated video dimensions or duration are unsupported.",
+      "media.video_probe_rejected",
+    );
+  }
+  return { durationMs: Math.round(durationSeconds * 1_000), height, width };
+}
+
+export async function scanAndReencodeGeneratedVideo(input: {
+  bytes: Buffer;
+  declaredMime: "video/mp4";
+}): Promise<SandboxVideoScanResult> {
+  if (
+    sniffMediaMagic(input.bytes) !== "video/mp4" ||
+    input.bytes.length < 1_024 ||
+    input.bytes.length > launchMediaLimits.maximumBytes
+  ) {
+    throw new SandboxMediaScannerError(
+      "The generated video did not match its declared MP4 format.",
+      "media.video_magic_mismatch",
+    );
+  }
+
+  let sandbox: (Sandbox & AsyncDisposable) | undefined;
+  try {
+    sandbox = await Sandbox.create({
+      networkPolicy: "allow-all",
+      persistent: false,
+      resources: { vcpus: 2 },
+      runtime: "node24",
+      tags: { purpose: "genie-generated-video-scan" },
+      timeout: 300_000,
+    });
+    await commandOutput(
+      sandbox,
+      "sudo",
+      ["dnf", "install", "-y", "clamav", "clamav-update"],
+      "scanner.video_clam_install_failed",
+      180_000,
+    );
+    await commandOutput(
+      sandbox,
+      "sudo",
+      ["freshclam", "--quiet"],
+      "scanner.signatures_unavailable",
+      150_000,
+    );
+    await commandOutput(
+      sandbox,
+      "npm",
+      [
+        "install",
+        "--no-save",
+        "--no-audit",
+        "--no-fund",
+        "ffmpeg-static@5.3.0",
+        "ffprobe-static@3.1.0",
+      ],
+      "scanner.video_ffmpeg_install_failed",
+      180_000,
+    );
+    const ffmpeg = "/vercel/sandbox/node_modules/ffmpeg-static/ffmpeg";
+    const ffprobe = "/vercel/sandbox/node_modules/ffprobe-static/bin/linux/x64/ffprobe";
+    const [clamVersion, ffmpegVersion] = await Promise.all([
+      dependencyVersionOutput(
+        sandbox,
+        "clamscan",
+        ["--version"],
+        "scanner.video_clam_version_failed",
+      ),
+      dependencyVersionOutput(
+        sandbox,
+        ffmpeg,
+        ["-version"],
+        "scanner.video_ffmpeg_version_failed",
+      ),
+    ]);
+    await sandbox.updateNetworkPolicy("deny-all");
+    const inputPath = "/vercel/sandbox/untrusted-video.mp4";
+    const outputPath = "/vercel/sandbox/sanitized-video.mp4";
+    await sandbox.writeFiles([{ content: input.bytes, path: inputPath }]);
+    await commandOutput(
+      sandbox,
+      "clamscan",
+      ["--infected", "--no-summary", inputPath],
+      "media.malware_or_scan_failure",
+    );
+    const probeArguments = [
+      "-v",
+      "error",
+      "-show_entries",
+      "stream=codec_type,duration,width,height:format=duration",
+      "-of",
+      "json",
+    ];
+    const sourceProbe = parseVideoProbe(
+      await commandOutput(
+        sandbox,
+        ffprobe,
+        [...probeArguments, inputPath],
+        "media.video_parser_rejected",
+      ),
+    );
+    await commandOutput(
+      sandbox,
+      ffmpeg,
+      [
+        "-v",
+        "error",
+        "-xerror",
+        "-i",
+        inputPath,
+        "-map",
+        "0:v:0",
+        "-an",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "18",
+        "-pix_fmt",
+        "yuv420p",
+        "-vf",
+        "setsar=1",
+        "-movflags",
+        "+faststart",
+        "-map_metadata",
+        "-1",
+        outputPath,
+      ],
+      "media.video_reencode_failed",
+      240_000,
+    );
+    const outputProbe = parseVideoProbe(
+      await commandOutput(
+        sandbox,
+        ffprobe,
+        [...probeArguments, outputPath],
+        "media.video_output_probe_failed",
+      ),
+    );
+    if (
+      outputProbe.width !== sourceProbe.width ||
+      outputProbe.height !== sourceProbe.height ||
+      Math.abs(outputProbe.durationMs - sourceProbe.durationMs) > 100
+    ) {
+      throw new SandboxMediaScannerError(
+        "The generated video changed outside the safe sanitization envelope.",
+        "media.video_output_mismatch",
+      );
+    }
+    const outputBytes = await sandbox.readFileToBuffer({ path: outputPath });
+    if (
+      !outputBytes ||
+      outputBytes.length < 1_024 ||
+      outputBytes.length > launchMediaLimits.maximumBytes ||
+      sniffMediaMagic(outputBytes) !== "video/mp4"
+    ) {
+      throw new SandboxMediaScannerError(
+        "The isolated scanner did not produce a safe video derivative.",
+        "media.video_output_invalid",
+      );
+    }
+    const outputSha256 = createHash("sha256").update(outputBytes).digest("hex");
+    const probeSha256 = createHash("sha256")
+      .update(
+        JSON.stringify({
+          durationMs: outputProbe.durationMs,
+          height: outputProbe.height,
+          metadataStripped: true,
+          mime: input.declaredMime,
+          outputSha256,
+          parserSandboxed: true,
+          width: outputProbe.width,
+        }),
+      )
+      .digest("hex");
+    return Object.freeze({
+      durationMs: outputProbe.durationMs,
+      height: outputProbe.height,
+      magicMime: "video/mp4" as const,
+      outputBytes,
+      outputSha256,
+      probeSha256,
+      scanEngine: "ClamAV.FFmpeg" as const,
+      scanVersion: createHash("sha256")
+        .update(`${clamVersion}\n${ffmpegVersion.split(/\r?\n/u)[0] ?? ""}`)
+        .digest("hex")
+        .slice(0, 32),
+      scannerTaskVersion: videoScannerTaskVersion,
+      width: outputProbe.width,
+    });
+  } catch (error) {
+    if (error instanceof SandboxMediaScannerError) throw error;
+    throw new SandboxMediaScannerError(
+      "The isolated generated-video scanner is unavailable.",
+      "scanner.video_unavailable",
     );
   } finally {
     await sandbox?.stop().catch(() => undefined);

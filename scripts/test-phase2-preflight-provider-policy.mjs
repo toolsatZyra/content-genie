@@ -91,7 +91,7 @@ assert.ok(
   ).errors.some((error) => error.includes("rewritten")),
 );
 assert.ok(
-  analyzePreflightProviderPgTap(pgTap.replace("select plan(85);", "select plan(84);"))
+  analyzePreflightProviderPgTap(pgTap.replace("select plan(100);", "select plan(99);"))
     .errors.length > 0,
 );
 

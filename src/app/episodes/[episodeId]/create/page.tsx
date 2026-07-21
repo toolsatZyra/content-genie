@@ -46,6 +46,14 @@ function creationProjectionKey(projection: CreationProjection): string {
         }
       : null,
     episodeVersion: projection.episode.aggregateVersion,
+    production: {
+      jobState: projection.production.job?.state ?? null,
+      jobVersion: projection.production.job?.version ?? null,
+      masterId: projection.production.master?.id ?? null,
+      masterVersion: projection.production.master?.version ?? null,
+      packageState: projection.production.package?.state ?? null,
+      packageVersion: projection.production.package?.version ?? null,
+    },
     workflowState: projection.episode.workflowState,
     scriptId: projection.script?.id ?? "draft",
   });
@@ -181,6 +189,10 @@ export default async function CreationPage({
       "phase2-preflight-blocked",
       "phase2-world-lock",
       "phase2-running",
+      "mvp-review",
+      "mvp-repair",
+      "mvp-clarification",
+      "mvp-approved",
     ].includes(query.fixture ?? "")
   ) {
     const scriptAppearsAfterReconciliation =
@@ -211,6 +223,143 @@ export default async function CreationPage({
       fixtureProjection = deterministicReadyCreationProjection("confirmed");
     } else if (query.fixture === "phase2-running") {
       fixtureProjection = deterministicReadyCreationProjection("running");
+    } else if (
+      query.fixture === "mvp-review" ||
+      query.fixture === "mvp-repair" ||
+      query.fixture === "mvp-clarification" ||
+      query.fixture === "mvp-approved"
+    ) {
+      const approved = query.fixture === "mvp-approved";
+      const clarifying = query.fixture === "mvp-clarification";
+      const repairing = query.fixture === "mvp-repair" || clarifying;
+      const reviewProjection = deterministicReadyCreationProjection("running");
+      fixtureProjection = {
+        ...reviewProjection,
+        episode: {
+          ...reviewProjection.episode,
+          workflowState: approved
+            ? "approved"
+            : repairing
+              ? "producing"
+              : "awaiting_final_review",
+        },
+        production: {
+          job: {
+            attempt_number: repairing ? 2 : 1,
+            completed_clips: repairing ? 19 : 21,
+            completed_sfx: repairing ? 0 : 21,
+            completed_storyboards: repairing ? 20 : 21,
+            last_error_code: null,
+            last_error_summary: null,
+            production_run_id: "53000000-0000-4000-8000-000000000001",
+            state: approved
+              ? "export_ready"
+              : clarifying
+                ? "repair_planning"
+                : repairing
+                  ? "generating"
+                  : "review_ready",
+            total_clips: 21,
+            total_sfx: 21,
+            total_storyboards: 21,
+            version: approved ? 5 : repairing ? 8 : 4,
+          },
+          master: {
+            attempt_number: 1,
+            duration_ms: 91_000,
+            height: 1920,
+            id: "53000000-0000-4000-8000-000000000002",
+            object_name:
+              "10000000-0000-4000-8000-000000000101/mvp-masters/53000000-0000-4000-8000-000000000001/1/master.mp4",
+            state: approved ? "approved" : "pending_review",
+            version: approved ? 2 : 1,
+            width: 1080,
+          },
+          package: approved
+            ? {
+                byte_length: 48_000_000,
+                id: "53000000-0000-4000-8000-000000000003",
+                last_error_code: null,
+                last_error_summary: null,
+                master_id: "53000000-0000-4000-8000-000000000002",
+                object_name:
+                  "10000000-0000-4000-8000-000000000101/mvp-edit-packages/53000000-0000-4000-8000-000000000002/2/approved-assets.zip",
+                state: "ready",
+                version: 2,
+              }
+            : null,
+          repair: repairing
+            ? {
+                affected_shots: clarifying ? 0 : 3,
+                clarification_id: clarifying
+                  ? "53000000-0000-4000-8000-000000000005"
+                  : null,
+                clarification_question: clarifying
+                  ? "At 00:14, do you want Rama's bow image changed, or should the existing image remain while only its motion becomes faster?"
+                  : null,
+                clarification_round: clarifying ? 1 : null,
+                clips_regenerated: clarifying ? 0 : 1,
+                clips_reused: clarifying ? 0 : 18,
+                clips_to_regenerate: clarifying ? 0 : 3,
+                feedback_points: clarifying
+                  ? [
+                      {
+                        actions: [],
+                        evidenceWindows: [],
+                        feedbackPointIndex: 1,
+                        mappedShots: [],
+                        resolution: "clarification" as const,
+                      },
+                    ]
+                  : [
+                      {
+                        actions: [
+                          {
+                            assetStatus: "selected_complete_assets" as const,
+                            selectedAction: "storyboard_and_clip" as const,
+                            shotNumber: 5,
+                          },
+                        ],
+                        evidenceWindows: [
+                          { endMs: 15_000, shotNumber: 5, startMs: 12_000 },
+                        ],
+                        feedbackPointIndex: 1,
+                        mappedShots: [5],
+                        resolution: "model" as const,
+                      },
+                      {
+                        actions: [
+                          {
+                            assetStatus: "selected_complete_assets" as const,
+                            selectedAction: "re_edit" as const,
+                            shotNumber: 9,
+                          },
+                        ],
+                        evidenceWindows: [
+                          { endMs: 27_000, shotNumber: 9, startMs: 24_000 },
+                        ],
+                        feedbackPointIndex: 2,
+                        mappedShots: [9],
+                        resolution: "deterministic" as const,
+                      },
+                    ],
+                id: "53000000-0000-4000-8000-000000000004",
+                last_error_code: null,
+                last_error_summary: null,
+                shots_selected: clarifying ? 0 : 19,
+                state: clarifying ? "awaiting_clarification" : "executing",
+                storyboards_regenerated: clarifying ? 0 : 1,
+                storyboards_reused: clarifying ? 0 : 19,
+                storyboards_to_regenerate: clarifying ? 0 : 2,
+                target_attempt_number: 2,
+                total_shots: clarifying ? 0 : 21,
+                version: clarifying ? 7 : 6,
+              }
+            : null,
+          productionRunId: "53000000-0000-4000-8000-000000000001",
+          signedMasterUrl: "data:video/mp4;base64,AAAA",
+        },
+      };
     } else if (query.fixture === "phase2-canceled") {
       fixtureProjection = {
         ...fixtureProjection,

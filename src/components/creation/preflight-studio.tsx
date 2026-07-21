@@ -50,8 +50,8 @@ function terminalFailureCopy(code: string): Readonly<{
   if (code === "production-quote-ceiling-exceeded") {
     return {
       detail:
-        "The complete quality-first provider, QC, render and repair envelope is above the $50 launch ceiling. No quote was exposed and no spend was authorized. The production route must be simplified without weakening the locked script or quality gates before retrying.",
-      title: "The full quality envelope is above $50",
+        "A legacy spend-policy check rejected the complete quality-first envelope. The owner-operated MVP now records the exact forecast without an arbitrary USD 50 pause; retry after the policy migration is active.",
+      title: "A legacy spend policy stopped Preflight",
     };
   }
   return {
@@ -446,8 +446,9 @@ export function PreflightStudio({ projection, stageHeadingRef }: PreflightStudio
         ) : null}
         {projection.quote?.target40UsdBreached ? (
           <p className="quote-warning" role="alert">
-            The expected quote exceeds the $40 target. Quality remains protected; the
-            $50 hard ceiling still cannot be exceeded.
+            The expected quote exceeds the $40 planning target. Quality remains
+            protected and the exact forecast stays visible; the developer MVP does not
+            pause at an arbitrary USD 50 threshold.
           </p>
         ) : null}
         <footer>
@@ -460,7 +461,7 @@ export function PreflightStudio({ projection, stageHeadingRef }: PreflightStudio
             {quoteConfirmed
               ? "World Lock handoff in progress"
               : automatedReady
-                ? "Sealing the exact ceiling"
+                ? "Sealing the exact cost envelope"
                 : "Agent sequence in progress"}
           </span>
         </footer>

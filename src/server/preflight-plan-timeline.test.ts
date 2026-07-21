@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildCinematicTimeline,
+  buildCinematicTimelineFromShotPlan,
   type PlanAlignmentSegment,
 } from "./preflight-plan-timeline";
 
@@ -77,5 +78,59 @@ describe("deterministic cinematic timeline", () => {
       index === 3 ? { ...segment, exactText: "बदला" } : segment,
     );
     expect(() => buildCinematicTimeline({ ...input, segments })).toThrow("not exact");
+  });
+
+  it("accepts a semantic shot count that differs from the three-second guidance", () => {
+    const input = fixture();
+    const boundaries = Array.from({ length: 12 }, (_, index) => ({
+      endSegmentNumber:
+        index === 11 ? input.segments.length : Math.round(((index + 1) * 239) / 12),
+      sceneNumber: Math.floor(index / 4) + 1,
+      shotNumber: index + 1,
+      startSegmentNumber: index === 0 ? 1 : Math.round((index * 239) / 12) + 1,
+    }));
+    const timeline = buildCinematicTimelineFromShotPlan({ ...input, boundaries });
+
+    expect(timeline.shots).toHaveLength(12);
+    expect(timeline.shots.map(({ exactText }) => exactText).join("")).toBe(
+      input.processingText,
+    );
+    expect(timeline.beats).toHaveLength(3);
+  });
+
+  it("rejects semantic shot plans with gaps, overlaps, or shots longer than 15s", () => {
+    const input = fixture();
+    expect(() =>
+      buildCinematicTimelineFromShotPlan({
+        ...input,
+        boundaries: [
+          {
+            endSegmentNumber: 10,
+            sceneNumber: 1,
+            shotNumber: 1,
+            startSegmentNumber: 2,
+          },
+        ],
+      }),
+    ).toThrow("cover");
+    expect(() =>
+      buildCinematicTimelineFromShotPlan({
+        ...input,
+        boundaries: [
+          {
+            endSegmentNumber: 100,
+            sceneNumber: 1,
+            shotNumber: 1,
+            startSegmentNumber: 1,
+          },
+          {
+            endSegmentNumber: input.segments.length,
+            sceneNumber: 2,
+            shotNumber: 2,
+            startSegmentNumber: 101,
+          },
+        ],
+      }),
+    ).toThrow("duration");
   });
 });

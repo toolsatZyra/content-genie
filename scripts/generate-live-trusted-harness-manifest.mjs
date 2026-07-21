@@ -9,6 +9,10 @@ import {
   hardenPgTapQuery,
 } from "./pgtap-harness-policy.mjs";
 import { assertPhase2CoordinatePredecessorFixture } from "./phase2-coordinate-upgrade-drill.mjs";
+import {
+  loadPhase2CandidateMigrationInventory,
+  PHASE2_CANDIDATE_MIGRATION_INVENTORY_PATH,
+} from "./phase2-candidate-migration-inventory.mjs";
 
 export const TRUSTED_HARNESS_MANIFEST_PATH =
   "scripts/live-trusted-harness-manifest.v1.json";
@@ -38,6 +42,11 @@ const trustedSourceEntries = [
   ["scripts/run-isolated-next-dev.mjs", "isolated-browser-runner"],
   ["scripts/run-phase1-forward-rollback-drill.mjs", "forward-rollback-runner"],
   ["scripts/transient-failure-policy.mjs", "retry-policy"],
+  [
+    "scripts/phase2-candidate-migration-inventory.mjs",
+    "candidate-migration-inventory-validator",
+  ],
+  [PHASE2_CANDIDATE_MIGRATION_INVENTORY_PATH, "candidate-migration-inventory"],
   ["supabase/tests/fixtures/phase2_coordinate_v1_verifiers.sql", "predecessor-fixture"],
   ["package.json", "package-manifest"],
   ["pnpm-lock.yaml", "dependency-lock"],
@@ -68,9 +77,7 @@ export function canonicalTrustedHarnessManifestSha256(manifest) {
 }
 
 export async function buildTrustedHarnessManifest(workspace = resolve(".")) {
-  const phase2Migrations = await namedFiles(workspace, "supabase/migrations", (name) =>
-    /^\d{14}_phase2_[a-z0-9_]+\.sql$/u.test(name),
-  );
+  const phase2Migrations = await loadPhase2CandidateMigrationInventory(workspace);
   const liveSpecs = [
     "playwright.live.config.ts",
     ...(await namedFiles(workspace, "tests/live", (name) => name.endsWith(".spec.ts"))),

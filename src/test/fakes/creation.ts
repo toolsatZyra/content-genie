@@ -1,5 +1,6 @@
 import type { CreationProjection } from "@/domain/creation";
 import { emptyCreationReadinessProjection } from "@/domain/creation-readiness";
+import { emptyCreationProductionProjection } from "@/domain/mvp-production";
 import { DEFAULT_LOOK_ID, LOOKS, findLook } from "@/domain/look/look-registry";
 import { voiceForGender } from "@/domain/voice/voice-registry";
 
@@ -49,6 +50,7 @@ export function deterministicCreationProjection(
       workflowState: withScript ? "world_setup" : "draft",
       workspaceId: "10000000-0000-4000-8000-000000000101",
     },
+    production: emptyCreationProductionProjection,
     script: withScript
       ? {
           estimatedDurationSeconds: 78,
@@ -107,6 +109,17 @@ export function deterministicReadyCreationProjection(
       aggregateVersion: accepted ? 8 : 5,
       workflowState: stage === "running" ? "ready_to_produce" : "world_setup",
     },
+    production:
+      stage === "running"
+        ? {
+            job: null,
+            master: null,
+            package: null,
+            repair: null,
+            productionRunId: "30000000-0000-4000-8000-000000000109",
+            signedMasterUrl: null,
+          }
+        : emptyCreationProductionProjection,
     world: {
       progress:
         stage === "review"

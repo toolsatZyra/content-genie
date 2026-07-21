@@ -12,8 +12,8 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 
-import { creationAccessForEpisode } from "@/domain/creation";
 import {
   canCreateEpisodeInSeries,
   episodeCreationBlocker,
@@ -32,58 +32,21 @@ import { useStudioSearch } from "@/components/studio/use-studio-search";
 
 type StudioView = "atrium" | "series" | "library";
 type ComposerMode = "episode" | "series";
-type EpisodeProgressState = "complete" | "current" | "stopped" | "upcoming";
 const subscribeToHydration = (): (() => void) => () => {};
 
-const episodeProgressLabels = [
-  "Episode organized",
-  "World setup",
-  "Production engine",
-  "Monica & release",
-] as const;
+const terminalEpisodeStates = new Set<EpisodeWorkflowState>([
+  "abandoned",
+  "approved",
+  "canceled",
+  "delivered",
+]);
 
-const episodeProgressIndex = {
-  approved: 3,
-  awaiting_final_review: 3,
-  blocked: 2,
-  delayed: 2,
-  delivered: 4,
-  draft: 0,
-  paused: 2,
-  pending_qualified_review: 3,
-  producing: 2,
-  ready_to_produce: 2,
-  release_blocked: 3,
-  retrying: 2,
-  world_setup: 1,
-} as const satisfies Partial<Record<EpisodeWorkflowState, number>>;
+function isEpisodeInProgress(episode: EpisodeSummary): boolean {
+  return !terminalEpisodeStates.has(episode.workflowState);
+}
 
-function episodeProgressThread(state: EpisodeWorkflowState): readonly {
-  label: (typeof episodeProgressLabels)[number];
-  state: EpisodeProgressState;
-}[] {
-  if (state === "unavailable") {
-    return episodeProgressLabels.map((label) => ({
-      label,
-      state: "stopped",
-    }));
-  }
-  if (state === "abandoned" || state === "canceled") {
-    return episodeProgressLabels.map((label, index) => ({
-      label,
-      state: index === 0 ? "complete" : "stopped",
-    }));
-  }
-  const currentIndex = episodeProgressIndex[state];
-  return episodeProgressLabels.map((label, index) => ({
-    label,
-    state:
-      index < currentIndex
-        ? "complete"
-        : index === currentIndex
-          ? "current"
-          : "upcoming",
-  }));
+function episodeHref(episode: EpisodeSummary): Route {
+  return `/episodes/${encodeURIComponent(episode.id)}/create?seriesId=${encodeURIComponent(episode.seriesId)}&episodeId=${encodeURIComponent(episode.id)}` as Route;
 }
 
 function mergeById<T extends Readonly<{ id: string }>>(
@@ -200,9 +163,7 @@ export function AuthenticatedStudio({
   );
   const [view, setView] = useState<StudioView>(initialSeriesId ? "series" : "atrium");
   const initialEpisode = projection.episodes.find(({ id }) => id === initialEpisodeId);
-  const [selectedEpisodeId, setSelectedEpisodeId] = useState(
-    initialEpisode?.id ?? projection.episodes[0]?.id ?? "",
-  );
+  const selectedEpisodeId = initialEpisode?.id ?? projection.episodes[0]?.id ?? "";
   const [selectedSeriesId, setSelectedSeriesId] = useState(
     projection.series.some(({ id }) => id === initialSeriesId)
       ? (initialSeriesId ?? "")
@@ -226,7 +187,6 @@ export function AuthenticatedStudio({
   const activityRef = useRef<HTMLDialogElement>(null);
   const composerRef = useRef<HTMLDialogElement>(null);
   const accountRef = useRef<HTMLDialogElement>(null);
-  const episodeFocusRef = useRef<HTMLElement>(null);
 
   const anyDialogOpen = useCallback(
     () =>
@@ -265,10 +225,7 @@ export function AuthenticatedStudio({
   const selectedSeries =
     allSeries.find(({ id }) => id === selectedSeriesId) ?? allSeries[0];
   const composerSeries = allSeries.find(({ id }) => id === composerSeriesId);
-  const inProgressEpisodes = allEpisodes.filter(
-    ({ workflowState }) =>
-      !["abandoned", "approved", "canceled", "delivered"].includes(workflowState),
-  );
+  const inProgressEpisodes = allEpisodes.filter(isEpisodeInProgress);
   const search = useStudioSearch(query, projection.workspace.id);
   const searchLiveStatus = !query
     ? "Type at least two characters to search."
@@ -342,28 +299,11 @@ export function AuthenticatedStudio({
     setDiscoveredSeries((current) => mergeById(current, [match.series]));
     if (match.kind === "Episode") {
       setDiscoveredEpisodes((current) => mergeById(current, [match.episode]));
-      setView("atrium");
-      selectEpisode(match.id, true);
+      router.push(episodeHref(match.episode));
     } else {
       setView("series");
       setSelectedSeriesId(match.id);
     }
-  }
-
-  function selectEpisode(id: string, revealOnNarrowScreen = true): void {
-    setSelectedEpisodeId(id);
-    if (
-      !revealOnNarrowScreen ||
-      typeof window === "undefined" ||
-      !window.matchMedia("(max-width: 1050px)").matches
-    ) {
-      return;
-    }
-    window.requestAnimationFrame(() => {
-      const focus = episodeFocusRef.current;
-      focus?.focus({ preventScroll: true });
-      focus?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
   }
 
   async function createItem(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -608,26 +548,15 @@ export function AuthenticatedStudio({
               }}
               series={allSeries}
             />
-            <div className="live-episode-layout">
-              <EpisodeGallery
-                createKind={creatableSeries.length ? "episode" : "series"}
-                episodes={inProgressEpisodes}
-                hasEpisodes={allEpisodes.length > 0}
-                selectedId={selectedEpisode?.id ?? ""}
-                seriesById={seriesById}
-                onCreate={() =>
-                  openComposer(creatableSeries.length ? "episode" : "series")
-                }
-                onSelect={(id) => selectEpisode(id)}
-              />
-              <EpisodeFocus
-                episode={selectedEpisode}
-                focusRef={episodeFocusRef}
-                series={
-                  selectedEpisode ? seriesById.get(selectedEpisode.seriesId) : undefined
-                }
-              />
-            </div>
+            <EpisodeGallery
+              createKind={creatableSeries.length ? "episode" : "series"}
+              episodes={inProgressEpisodes}
+              hasEpisodes={allEpisodes.length > 0}
+              seriesById={seriesById}
+              onCreate={() =>
+                openComposer(creatableSeries.length ? "episode" : "series")
+              }
+            />
           </>
         ) : null}
 
@@ -890,16 +819,12 @@ function EpisodeGallery({
   episodes,
   hasEpisodes,
   onCreate,
-  onSelect,
-  selectedId,
   seriesById,
 }: Readonly<{
   createKind: "episode" | "series";
   episodes: readonly EpisodeSummary[];
   hasEpisodes: boolean;
   onCreate: () => void;
-  onSelect: (id: string) => void;
-  selectedId: string;
   seriesById: ReadonlyMap<string, SeriesSummary>;
 }>) {
   if (episodes.length === 0) {
@@ -936,154 +861,52 @@ function EpisodeGallery({
         </small>
       </div>
       <div className="live-episode-grid">
-        {episodes.map((episode, index) => {
-          const state = episodeStatePresentation(episode.workflowState);
-          return (
-            <button
-              aria-pressed={selectedId === episode.id}
-              className={`live-episode-card accent-${["amber", "rose", "violet", "cyan"][index % 4]} ${selectedId === episode.id ? "is-selected" : ""}`}
-              key={episode.id}
-              onClick={() => onSelect(episode.id)}
-              type="button"
-            >
-              <span className="live-poster" aria-hidden="true">
-                <span />
-                <i />
-              </span>
-              <span className="live-card-copy">
-                <small>{seriesById.get(episode.seriesId)?.title ?? "Series"}</small>
-                <strong>{episode.title}</strong>
-                <em className={`state-chip ${state.tone}`}>
-                  <span />
-                  {state.label}
-                </em>
-                <span>
-                  Episode {String(episode.episodeNumber).padStart(2, "0")} ·{" "}
-                  <RelativeTime value={episode.updatedAt} />
-                </span>
-              </span>
-            </button>
-          );
-        })}
+        {episodes.map((episode, index) => (
+          <CompactEpisodeCard
+            accentIndex={index}
+            episode={episode}
+            key={episode.id}
+            seriesTitle={seriesById.get(episode.seriesId)?.title ?? "Series"}
+          />
+        ))}
       </div>
     </section>
   );
 }
 
-function EpisodeFocus({
+function CompactEpisodeCard({
+  accentIndex,
   episode,
-  focusRef,
-  series,
+  seriesTitle,
 }: Readonly<{
-  episode?: EpisodeSummary | undefined;
-  focusRef: RefObject<HTMLElement | null>;
-  series?: SeriesSummary | undefined;
+  accentIndex: number;
+  episode: EpisodeSummary;
+  seriesTitle: string;
 }>) {
-  if (!episode) return null;
   const state = episodeStatePresentation(episode.workflowState);
-  const creationAccess = creationAccessForEpisode(episode.workflowState);
-  const progress = episodeProgressThread(episode.workflowState);
-  const progressLabel =
-    episode.workflowState === "unavailable"
-      ? "Episode progress unavailable. No workflow stage completion is inferred."
-      : episode.workflowState === "canceled" || episode.workflowState === "abandoned"
-        ? `Episode progress. Workflow ${state.label.toLowerCase()}; later stage completion is not inferred.`
-        : `Episode progress. Current workflow state: ${state.label}.`;
   return (
-    <aside
-      aria-label={`${episode.title} Episode details`}
-      className="live-focus"
-      ref={focusRef}
-      tabIndex={-1}
+    <Link
+      aria-label={`Open ${episode.title}, currently ${state.label}`}
+      className={`live-episode-card accent-${["amber", "rose", "violet", "cyan"][accentIndex % 4]}`}
+      href={episodeHref(episode)}
     >
-      <span aria-live="polite" className="sr-only">
-        Selected {episode.title}. Episode details follow.
+      <span className="live-poster" aria-hidden="true">
+        <span />
+        <i />
       </span>
-      <div
-        aria-label={`${episode.title} Episode production details`}
-        className="episode-focus-scroll"
-        tabIndex={0}
-      >
-        <div className="focus-heading">
-          <span className={`state-chip ${state.tone}`}>
-            <span />
-            {state.label}
-          </span>
-          <button aria-label="Episode actions" disabled type="button">
-            ···
-          </button>
-        </div>
-        <span className="eyebrow">{series?.title ?? "Series"}</span>
-        <h2>{episode.title}</h2>
-        <p>Episode {String(episode.episodeNumber).padStart(2, "0")}</p>
-        <div className="live-stage-window">
-          <div aria-hidden="true">
-            <span />
-            <i />
-            <b />
-          </div>
-          <footer>
-            <span>Now</span>
-            <strong>{humanize(episode.workflowState)}</strong>
-          </footer>
-        </div>
-        <div className="episode-metrics">
-          <div>
-            <small>Progress</small>
-            <strong>{Math.round(episode.progressPercent)}%</strong>
-          </div>
-          <div>
-            <small>Cost signal</small>
-            <strong>
-              {episode.costEstimateMinor === null
-                ? "Not quoted"
-                : `${episode.currency ?? "USD"} ${(episode.costEstimateMinor / 100).toFixed(2)}`}
-            </strong>
-          </div>
-        </div>
-        <ol aria-label={progressLabel} className="live-thread">
-          {progress.map((step, index) => (
-            <li
-              aria-label={`${step.label}, ${
-                step.state === "complete"
-                  ? "completed"
-                  : step.state === "current"
-                    ? "current stage"
-                    : step.state === "stopped"
-                      ? "not inferred after workflow stopped"
-                      : "upcoming"
-              }`}
-              aria-current={step.state === "current" ? "step" : undefined}
-              className={`is-${step.state}`}
-              key={step.label}
-            >
-              <span aria-hidden="true">{index + 1}</span>
-              <strong aria-hidden="true">{step.label}</strong>
-            </li>
-          ))}
-        </ol>
-      </div>
-      {episode.workflowState === "unavailable" ? (
-        <span aria-disabled="true" className="primary-button full-width is-disabled">
-          Episode unavailable
+      <span className="live-card-copy">
+        <small>{seriesTitle}</small>
+        <strong>{episode.title}</strong>
+        <em className={`state-chip ${state.tone}`}>
+          <span />
+          {state.label}
+        </em>
+        <span>
+          Episode {String(episode.episodeNumber).padStart(2, "0")} ·{" "}
+          <RelativeTime value={episode.updatedAt} />
         </span>
-      ) : creationAccess === "closed" ? (
-        <span aria-disabled="true" className="primary-button full-width is-disabled">
-          Episode closed
-        </span>
-      ) : (
-        <Link
-          className="primary-button full-width"
-          href={`/episodes/${episode.id}/create?seriesId=${encodeURIComponent(episode.seriesId)}&episodeId=${encodeURIComponent(episode.id)}`}
-        >
-          {creationAccess === "read-only"
-            ? "View locked setup"
-            : episode.workflowState === "draft"
-              ? "Start world setup"
-              : "Continue world setup"}
-        </Link>
-      )}
-    </aside>
+      </span>
+    </Link>
   );
 }
 
@@ -1115,9 +938,13 @@ function SeriesWorlds({
     );
   }
   const selectedSeries = series.find(({ id }) => id === selectedId) ?? series[0]!;
-  const selectedEpisodes = episodes.filter(
-    ({ seriesId }) => seriesId === selectedSeries.id,
-  );
+  const selectedEpisodes = episodes
+    .filter(({ seriesId }) => seriesId === selectedSeries.id)
+    .sort((left, right) => {
+      const progressOrder =
+        Number(isEpisodeInProgress(right)) - Number(isEpisodeInProgress(left));
+      return progressOrder || Date.parse(right.updatedAt) - Date.parse(left.updatedAt);
+    });
   return (
     <section aria-labelledby="series-worlds-heading" className="series-catalog">
       <h2 className="sr-only" id="series-worlds-heading">
@@ -1160,149 +987,31 @@ function SeriesWorlds({
         })}
       </div>
       <aside
-        aria-labelledby="selected-series-heading"
-        className="selected-series-details"
+        aria-label={`Episodes in ${selectedSeries.title}`}
+        className="selected-series-episodes"
         id="selected-series-details"
       >
         <span aria-live="polite" className="sr-only">
-          Selected {selectedSeries.title}. Series details follow.
+          Selected {selectedSeries.title}. Episodes in progress are listed first.
         </span>
-        <header>
-          <div>
-            <span className="eyebrow">Selected Series</span>
-            <h2 id="selected-series-heading">{selectedSeries.title}</h2>
-          </div>
-          {selectedSeries.state === "unavailable" ? (
-            <span className="state-chip attention">Unavailable</span>
-          ) : null}
-        </header>
-        <p>
-          {selectedSeries.description ||
-            "A new creative world, ready for its first story."}
-        </p>
-        <div className="series-inheritance">
-          <section aria-labelledby="series-assets-heading">
-            {selectedSeries.activeRelease?.kind === "released" ? (
-              <>
-                <h3 id="series-assets-heading">
-                  Series Release {selectedSeries.activeRelease.releaseNumber}
-                </h3>
-                <p>Only the exact release pins below are presented for new Episodes.</p>
-                <ul>
-                  <li>
-                    <strong>Status</strong>
-                    <span className="series-pin-value">
-                      {humanize(selectedSeries.activeRelease.status)}
-                    </span>
-                  </li>
-                  <li>
-                    <strong>Release ID</strong>
-                    <span className="series-pin-value">
-                      <code>{selectedSeries.activeRelease.id}</code>
-                    </span>
-                  </li>
-                  <li>
-                    <strong>Look pin</strong>
-                    <span className="series-pin-value">
-                      {selectedSeries.activeRelease.look ? (
-                        <>
-                          {selectedSeries.activeRelease.look.name} (
-                          {selectedSeries.activeRelease.look.key}), ID{" "}
-                          <code>{selectedSeries.activeRelease.look.id}</code>,{" "}
-                          {humanize(
-                            selectedSeries.activeRelease.look.availabilityStatus,
-                          )}
-                        </>
-                      ) : (
-                        "Not pinned"
-                      )}
-                    </span>
-                  </li>
-                  <li>
-                    <strong>Voice pin</strong>
-                    <span className="series-pin-value">
-                      {humanize(selectedSeries.activeRelease.voice.gender)} narrator (
-                      {selectedSeries.activeRelease.voice.key}), ID{" "}
-                      <code>{selectedSeries.activeRelease.voice.id}</code>,{" "}
-                      {humanize(selectedSeries.activeRelease.voice.availabilityStatus)}
-                    </span>
-                  </li>
-                  <li>
-                    <strong>Continuity pin</strong>
-                    <span className="series-pin-value">
-                      {selectedSeries.activeRelease.continuity ? (
-                        <>
-                          Version{" "}
-                          {selectedSeries.activeRelease.continuity.versionNumber}, ID{" "}
-                          <code>{selectedSeries.activeRelease.continuity.id}</code>
-                        </>
-                      ) : (
-                        "Not pinned"
-                      )}
-                    </span>
-                  </li>
-                </ul>
-              </>
-            ) : selectedSeries.activeRelease?.kind === "unreleased" ? (
-              <>
-                <h3 id="series-assets-heading">No approved Series Release</h3>
-                <p>
-                  This Series has no active release. No look, continuity, characters,
-                  locations, or visual language are claimed as inherited.
-                </p>
-              </>
-            ) : (
-              <>
-                <h3 id="series-assets-heading">Series Release unavailable</h3>
-                <p>
-                  Release metadata is incomplete or unsupported. Inheritance is not
-                  inferred and Episode creation is read-only.
-                </p>
-              </>
-            )}
-          </section>
-          <section aria-labelledby="series-episodes-heading">
-            <h3 id="series-episodes-heading">
-              Episodes <span>{selectedEpisodes.length}</span>
-            </h3>
-            {selectedEpisodes.length > 0 ? (
-              <ul>
-                {selectedEpisodes.map((episode) => (
-                  <li key={episode.id}>
-                    <span>
-                      Episode {String(episode.episodeNumber).padStart(2, "0")}
-                    </span>
-                    <Link
-                      href={`/episodes/${episode.id}/create?seriesId=${encodeURIComponent(selectedSeries.id)}&episodeId=${encodeURIComponent(episode.id)}`}
-                    >
-                      <strong>{episode.title}</strong>
-                      <span>Open Episode →</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p>No Episodes in this Series yet.</p>
-            )}
-          </section>
-        </div>
-        {canCreateEpisodeInSeries(selectedSeries) ? (
-          <button
-            className="primary-button"
-            onClick={() => onCreateEpisode(selectedSeries.id)}
-            type="button"
-          >
-            Create Episode in {selectedSeries.title}
-          </button>
-        ) : selectedSeries.state === "archived" ? (
-          <span aria-disabled="true" className="primary-button is-disabled">
-            Archived Series
-          </span>
-        ) : (
-          <span aria-disabled="true" className="primary-button is-disabled">
-            {episodeCreationBlocker(selectedSeries) ?? "Series unavailable"}
-          </span>
-        )}
+        {selectedEpisodes.map((episode, index) => (
+          <CompactEpisodeCard
+            accentIndex={index}
+            episode={episode}
+            key={episode.id}
+            seriesTitle={selectedSeries.title}
+          />
+        ))}
+        <button
+          className="series-episode-create"
+          disabled={!canCreateEpisodeInSeries(selectedSeries)}
+          onClick={() => onCreateEpisode(selectedSeries.id)}
+          title={episodeCreationBlocker(selectedSeries) ?? undefined}
+          type="button"
+        >
+          <span aria-hidden="true">＋</span>
+          Create Episode
+        </button>
       </aside>
     </section>
   );

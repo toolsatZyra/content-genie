@@ -209,6 +209,7 @@ describe("narrow provider adapters", () => {
         imageUrls: [
           "https://preview.supabase.co/storage/v1/object/sign/workspace-media/workspace/anchor.png?token=signed",
         ],
+        systemPrompt: "Image 1 / @Image1 is the accepted character identity reference.",
       },
       payloadSchemaVersion: "genie.fal-nano-banana-2-edit.v1",
     };
@@ -222,6 +223,7 @@ describe("narrow provider adapters", () => {
     expect((url as URL).pathname).toBe("/fal-ai/nano-banana-2/edit");
     expect(JSON.parse(String(options?.body))).toMatchObject({
       image_urls: edit.payload.imageUrls,
+      system_prompt: edit.payload.systemPrompt,
     });
 
     const attacker = {

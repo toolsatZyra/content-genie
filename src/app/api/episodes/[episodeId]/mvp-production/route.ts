@@ -19,6 +19,14 @@ class MvpProductionContractError extends Error {
 
 type Input =
   | Readonly<{
+      action: "clarify";
+      answer: string;
+      clarificationId: string;
+      expectedVersion: number;
+      repairRequestId: string;
+      workspaceId: string;
+    }>
+  | Readonly<{
       action: "review";
       culturalReviewConfirmed: boolean;
       decision: "approve" | "reject";
@@ -59,6 +67,36 @@ function object(value: unknown): Record<string, unknown> {
 
 function parse(value: unknown): Input {
   const row = object(value);
+  if (row.action === "clarify") {
+    if (
+      Object.keys(row).sort().join("|") !==
+        [
+          "action",
+          "answer",
+          "clarificationId",
+          "expectedVersion",
+          "repairRequestId",
+          "workspaceId",
+        ]
+          .sort()
+          .join("|") ||
+      typeof row.answer !== "string" ||
+      row.answer.trim().length < 1 ||
+      row.answer.length > 4_000 ||
+      row.answer.includes("\0") ||
+      typeof row.clarificationId !== "string" ||
+      !uuid.test(row.clarificationId) ||
+      typeof row.repairRequestId !== "string" ||
+      !uuid.test(row.repairRequestId) ||
+      typeof row.workspaceId !== "string" ||
+      !uuid.test(row.workspaceId) ||
+      !Number.isSafeInteger(row.expectedVersion) ||
+      Number(row.expectedVersion) < 1
+    ) {
+      throw new MvpProductionContractError("Clarification answer is invalid.");
+    }
+    return row as Input;
+  }
   if (row.action === "start") {
     if (
       Object.keys(row).sort().join("|") !==
@@ -115,7 +153,8 @@ function parse(value: unknown): Input {
       typeof row.finalReviewConfirmed !== "boolean" ||
       typeof row.feedback !== "string" ||
       row.feedback.length > 4_000 ||
-      row.feedback.includes("\0")
+      row.feedback.includes("\0") ||
+      (row.decision === "reject" && row.feedback.trim().length < 1)
     ) {
       throw new MvpProductionContractError("Review request is invalid.");
     }
@@ -204,6 +243,60 @@ export async function POST(
         );
       }
       return reply({ ok: true, result: data }, 200, requestId);
+    }
+    if (input.action === "clarify") {
+      const { data, error } = await client.rpc(
+        "command_answer_mvp_repair_clarification",
+        {
+          p_answer: input.answer.trim(),
+          p_clarification_id: input.clarificationId,
+          p_expected_request_version: input.expectedVersion,
+          p_repair_request_id: input.repairRequestId,
+          p_workspace_id: input.workspaceId,
+        },
+      );
+      if (error) {
+        const status = error.code === "42501" ? 403 : 409;
+        return reply(
+          {
+            code:
+              status === 403
+                ? "WORKSPACE_AUTHORITY_REQUIRED"
+                : "REPAIR_CLARIFICATION_REJECTED",
+            ok: false,
+          },
+          status,
+          requestId,
+        );
+      }
+      return reply({ ok: true, result: data }, 200, requestId);
+    }
+    if (input.decision === "approve") {
+      const { error: culturalError } = await client.rpc(
+        "command_record_mvp_master_cultural_decision",
+        {
+          p_decision: "approve",
+          p_expected_master_version: input.expectedVersion,
+          p_master_id: input.masterId,
+          p_rationale:
+            "Qualified reviewer confirms the exact master is culturally releasable.",
+          p_workspace_id: input.workspaceId,
+        },
+      );
+      if (culturalError) {
+        const status = culturalError.code === "42501" ? 403 : 409;
+        return reply(
+          {
+            code:
+              status === 403
+                ? "QUALIFIED_CULTURAL_AUTHORITY_REQUIRED"
+                : "CULTURAL_MASTER_REVIEW_REJECTED",
+            ok: false,
+          },
+          status,
+          requestId,
+        );
+      }
     }
     const { data, error } = await client.rpc("command_review_mvp_master", {
       p_cultural_review_confirmed: input.culturalReviewConfirmed,

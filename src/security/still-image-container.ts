@@ -3,6 +3,8 @@ export type StillImageMime = "image/jpeg" | "image/png" | "image/webp";
 export type StillImageContainerInspection =
   Readonly<{ status: "valid" }> | Readonly<{ status: "malformed" | "trailing_data" }>;
 
+export type StillImageDimensions = Readonly<{ height: number; width: number }>;
+
 const pngSignature = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
 function uint32Be(bytes: Uint8Array, offset: number): number {
@@ -21,6 +23,18 @@ function uint32Le(bytes: Uint8Array, offset: number): number {
     bytes[offset + 2]! * 0x10000 +
     bytes[offset + 3]! * 0x1000000
   );
+}
+
+function uint16Be(bytes: Uint8Array, offset: number): number {
+  return bytes[offset]! * 0x100 + bytes[offset + 1]!;
+}
+
+function uint16Le(bytes: Uint8Array, offset: number): number {
+  return bytes[offset]! + bytes[offset + 1]! * 0x100;
+}
+
+function uint24Le(bytes: Uint8Array, offset: number): number {
+  return bytes[offset]! + bytes[offset + 1]! * 0x100 + bytes[offset + 2]! * 0x10000;
 }
 
 function ascii(bytes: Uint8Array, offset: number, length: number): string {
@@ -138,4 +152,92 @@ export function inspectStillImageContainer(
   if (mime === "image/png") return inspectPng(bytes);
   if (mime === "image/jpeg") return inspectJpeg(bytes);
   return inspectWebp(bytes);
+}
+
+function validDimensions(width: number, height: number): StillImageDimensions | null {
+  return Number.isSafeInteger(width) &&
+    Number.isSafeInteger(height) &&
+    width > 0 &&
+    height > 0
+    ? Object.freeze({ height, width })
+    : null;
+}
+
+function pngDimensions(bytes: Uint8Array): StillImageDimensions | null {
+  if (bytes.length < 24 || ascii(bytes, 12, 4) !== "IHDR") return null;
+  return validDimensions(uint32Be(bytes, 16), uint32Be(bytes, 20));
+}
+
+function jpegDimensions(bytes: Uint8Array): StillImageDimensions | null {
+  const startOfFrame = new Set([
+    0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf,
+  ]);
+  let offset = 2;
+  while (offset + 4 <= bytes.length - 2) {
+    while (offset < bytes.length && bytes[offset] === 0xff) offset += 1;
+    if (offset >= bytes.length) return null;
+    const marker = bytes[offset]!;
+    offset += 1;
+    if (marker === 0xd9 || marker === 0xda) return null;
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd8)) continue;
+    if (offset + 2 > bytes.length) return null;
+    const segmentLength = uint16Be(bytes, offset);
+    if (segmentLength < 2 || offset + segmentLength > bytes.length) return null;
+    if (startOfFrame.has(marker)) {
+      if (segmentLength < 7) return null;
+      return validDimensions(uint16Be(bytes, offset + 5), uint16Be(bytes, offset + 3));
+    }
+    offset += segmentLength;
+  }
+  return null;
+}
+
+function webpDimensions(bytes: Uint8Array): StillImageDimensions | null {
+  let offset = 12;
+  while (offset + 8 <= bytes.length) {
+    const type = ascii(bytes, offset, 4);
+    const length = uint32Le(bytes, offset + 4);
+    const data = offset + 8;
+    const end = data + length;
+    if (end > bytes.length) return null;
+    if (type === "VP8X" && length >= 10) {
+      return validDimensions(
+        uint24Le(bytes, data + 4) + 1,
+        uint24Le(bytes, data + 7) + 1,
+      );
+    }
+    if (type === "VP8L" && length >= 5 && bytes[data] === 0x2f) {
+      const width = 1 + (bytes[data + 1]! | ((bytes[data + 2]! & 0x3f) << 8));
+      const height =
+        1 +
+        ((bytes[data + 2]! >> 6) |
+          (bytes[data + 3]! << 2) |
+          ((bytes[data + 4]! & 0x0f) << 10));
+      return validDimensions(width, height);
+    }
+    if (
+      type === "VP8 " &&
+      length >= 10 &&
+      bytes[data + 3] === 0x9d &&
+      bytes[data + 4] === 0x01 &&
+      bytes[data + 5] === 0x2a
+    ) {
+      return validDimensions(
+        uint16Le(bytes, data + 6) & 0x3fff,
+        uint16Le(bytes, data + 8) & 0x3fff,
+      );
+    }
+    offset = end + (length % 2);
+  }
+  return null;
+}
+
+export function inspectStillImageDimensions(
+  bytes: Uint8Array,
+  mime: StillImageMime,
+): StillImageDimensions | null {
+  if (inspectStillImageContainer(bytes, mime).status !== "valid") return null;
+  if (mime === "image/png") return pngDimensions(bytes);
+  if (mime === "image/jpeg") return jpegDimensions(bytes);
+  return webpDimensions(bytes);
 }

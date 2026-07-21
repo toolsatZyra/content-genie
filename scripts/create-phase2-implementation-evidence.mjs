@@ -4,13 +4,14 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 import {
-  PHASE2_REVIEW_SCOPES,
+  PHASE2_REVIEW_COVERAGE,
+  PHASE2_REVIEW_TYPE,
   assertPhase2PromotionInputs,
 } from "./phase2-implementation-evidence-policy.mjs";
 
 const root = process.cwd();
 const artifactRelativePath =
-  "docs/evidence/phase2/p2-01-through-p2-03.implementation.json";
+  "docs/evidence/phase2/p2-01-through-p2-14.implementation.json";
 const artifactPath = path.join(root, ...artifactRelativePath.split("/"));
 const gateSourcePath = path.join(
   root,
@@ -23,23 +24,22 @@ const gateArtifactPath = path.join(root, ...gateArtifactRelativePath.split("/"))
 const remoteSourcePath = path.join(root, ".tmp", "artifacts", "phase1-live-suite.json");
 const remoteArtifactRelativePath = "docs/evidence/phase2/remote-live-suite.v3.json";
 const remoteArtifactPath = path.join(root, ...remoteArtifactRelativePath.split("/"));
-const reviewSources = PHASE2_REVIEW_SCOPES.map((scope) => ({
+const reviewSource = {
   artifactPath: path.join(
     root,
     "docs",
     "evidence",
     "phase2",
-    `cold-review.${scope}.v1.json`,
+    "cold-review.comprehensive.v2.json",
   ),
-  artifactRelativePath: `docs/evidence/phase2/cold-review.${scope}.v1.json`,
+  artifactRelativePath: "docs/evidence/phase2/cold-review.comprehensive.v2.json",
   sourcePath: path.join(
     root,
     ".tmp",
     "artifacts",
-    `phase2-cold-review.${scope}.v1.json`,
+    "phase2-cold-review.comprehensive.v2.json",
   ),
-  scope,
-}));
+};
 const evidencePath = path.join(
   root,
   "reference",
@@ -52,16 +52,33 @@ const planPath = path.join(
   "acceptance",
   "traceability-plan.v1.json",
 );
-const obligationIds = [
-  "AC-QC-007@phase2",
-  "AC-QC-010@phase2",
-  "GEN-PROD-002@phase2",
-  "GEN-PROD-004@phase2",
-  "GEN-PROD-006@phase2",
-  "GQC-SCRIPT-001@phase2",
-  "GQC-SCRIPT-002@phase2",
-  "GQC-SCRIPT-005@phase2",
-];
+const plan = readJson(
+  planPath,
+  "Generate the traceability plan before Phase 2 implementation evidence.",
+  "The traceability plan is unreadable.",
+);
+const phase2Obligations = plan.requirements.flatMap((requirement) =>
+  (requirement.obligations ?? []).filter(
+    (obligation) => obligation.checkpoint === "phase2",
+  ),
+);
+const obligationIds = phase2Obligations.map(({ obligationId }) => obligationId).sort();
+const workPackages = [
+  ...new Set(phase2Obligations.flatMap((obligation) => obligation.workPackages)),
+].sort();
+const expectedWorkPackages = Array.from(
+  { length: 14 },
+  (_, index) => `P2-${String(index + 1).padStart(2, "0")}`,
+);
+if (
+  obligationIds.length !== 96 ||
+  new Set(obligationIds).size !== obligationIds.length ||
+  JSON.stringify(workPackages) !== JSON.stringify(expectedWorkPackages)
+) {
+  throw new Error(
+    "Phase 2 implementation evidence requires the exact 96-obligation P2-01 through P2-14 traceability contract.",
+  );
+}
 
 function git(args, encoding = "utf8") {
   const result = spawnSync("git", args, {
@@ -149,12 +166,10 @@ const remoteLiveSuite = readJson(
   "Run the remote live suite for the same committed candidate before generating Phase 2 implementation evidence.",
   "The remote live-suite artifact is unreadable.",
 );
-const reviews = reviewSources.map(({ scope, sourcePath }) =>
-  readJson(
-    sourcePath,
-    `A fresh ${scope} cold-review manifest is required before Phase 2 implementation promotion.`,
-    `The ${scope} cold-review manifest is unreadable.`,
-  ),
+const review = readJson(
+  reviewSource.sourcePath,
+  "A fresh independent context-minimized comprehensive review manifest is required before Phase 2 implementation promotion.",
+  "The comprehensive Phase 2 review manifest is unreadable.",
 );
 assertPhase2PromotionInputs({
   candidateCommit,
@@ -162,7 +177,7 @@ assertPhase2PromotionInputs({
   candidateTree,
   localGate: gateReport,
   remoteLiveSuite,
-  reviews,
+  review,
 });
 
 fs.mkdirSync(path.dirname(gateArtifactPath), { recursive: true });
@@ -170,18 +185,17 @@ fs.copyFileSync(gateSourcePath, gateArtifactPath);
 const gateArtifactSha256 = sha256(fs.readFileSync(gateArtifactPath));
 fs.copyFileSync(remoteSourcePath, remoteArtifactPath);
 const remoteArtifactSha256 = sha256(fs.readFileSync(remoteArtifactPath));
-const reviewArtifacts = reviewSources.map((source, index) => {
-  fs.copyFileSync(source.sourcePath, source.artifactPath);
-  return {
-    artifact: {
-      path: source.artifactRelativePath,
-      sha256: sha256(fs.readFileSync(source.artifactPath)),
-    },
-    reviewedAt: reviews[index].reviewedAt,
-    reviewerId: reviews[index].reviewerId,
-    scope: source.scope,
-  };
-});
+fs.copyFileSync(reviewSource.sourcePath, reviewSource.artifactPath);
+const reviewArtifact = {
+  artifact: {
+    path: reviewSource.artifactRelativePath,
+    sha256: sha256(fs.readFileSync(reviewSource.artifactPath)),
+  },
+  coverage: PHASE2_REVIEW_COVERAGE,
+  reviewedAt: review.reviewedAt,
+  reviewerId: review.reviewerId,
+  reviewType: PHASE2_REVIEW_TYPE,
+};
 
 const allCandidatePaths = git(["ls-tree", "-r", "--name-only", candidateCommit])
   .split(/\r?\n/u)
@@ -206,19 +220,19 @@ const exactPaths = new Set([
 ]);
 const prefixes = [
   "public/looks/",
-  "src/domain/look/",
-  "src/domain/profile/",
-  "src/domain/script/",
-  "src/domain/voice/",
+  "scripts/",
+  "src/",
+  "supabase/migrations/",
+  "supabase/tests/",
+  "tests/",
+  "trigger/",
 ];
-const phase2MigrationPattern =
-  /^supabase\/migrations\/20260717(?:1215|1216)[0-9]{2}_phase2_[a-z0-9_]+\.sql$/u;
 const boundPaths = allCandidatePaths
   .filter(
     (candidatePath) =>
       exactPaths.has(candidatePath) ||
       prefixes.some((prefix) => candidatePath.startsWith(prefix)) ||
-      phase2MigrationPattern.test(candidatePath),
+      candidatePath === "trigger.config.ts",
   )
   .sort();
 for (const requiredPath of exactPaths) {
@@ -260,15 +274,14 @@ const artifact = {
     },
     completedAt: remoteLiveSuite.finishedAt,
   },
-  reviews: reviewArtifacts,
-  schemaVersion: "genie-implementation-evidence.v2",
-  workPackages: ["P2-01", "P2-02", "P2-03"],
+  review: reviewArtifact,
+  schemaVersion: "genie-implementation-evidence.v3",
+  workPackages,
 };
 fs.mkdirSync(path.dirname(artifactPath), { recursive: true });
 fs.writeFileSync(artifactPath, `${JSON.stringify(artifact, null, 2)}\n`, "utf8");
 const artifactSha256 = sha256(fs.readFileSync(artifactPath));
 
-const plan = JSON.parse(fs.readFileSync(planPath, "utf8"));
 const obligationById = new Map();
 for (const requirement of plan.requirements) {
   for (const obligation of requirement.obligations ?? []) {

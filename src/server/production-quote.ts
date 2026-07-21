@@ -5,7 +5,10 @@ import { createHash } from "node:crypto";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { ensureProductionVideoCapabilities } from "@/server/production-video-capabilities";
 
-const MAXIMUM_EPISODE_CEILING_MICROUSD = 50_000_000;
+// This is a parser/JavaScript-integer safety bound, not a product spend cap.
+// The developer MVP records and authorizes the exact high quote without pausing
+// at USD 50; a data-derived policy can be introduced after real usage.
+const MAXIMUM_LEDGER_MICROUSD = Number.MAX_SAFE_INTEGER;
 const allowanceRateKeys = [
   "narration_master_reuse",
   "qc_judges",
@@ -194,7 +197,7 @@ function parseRate(value: unknown, label: string): Rate {
       row.maximumLineMicrousd,
       `${label} maximum`,
       0,
-      MAXIMUM_EPISODE_CEILING_MICROUSD,
+      MAXIMUM_LEDGER_MICROUSD,
     ),
     minimumQuantity: number(row.minimumQuantity, `${label} minimum`, 0, 10_000),
     rateCardId: uuid(row.rateCardId, `${label} ID`),
@@ -205,7 +208,7 @@ function parseRate(value: unknown, label: string): Rate {
       row.unitPriceMicrousd,
       `${label} price`,
       0,
-      MAXIMUM_EPISODE_CEILING_MICROUSD,
+      MAXIMUM_LEDGER_MICROUSD,
     ),
   });
 }
@@ -299,7 +302,7 @@ function parseQuoteInput(value: unknown): QuoteInput {
         slot.unitPriceMicrousd,
         "Slot unit price",
         0,
-        MAXIMUM_EPISODE_CEILING_MICROUSD,
+        MAXIMUM_LEDGER_MICROUSD,
       ),
     });
   });
@@ -323,7 +326,7 @@ function parseQuoteInput(value: unknown): QuoteInput {
         existing.hardCeilingMicrousd,
         "Existing quote ceiling",
         0,
-        MAXIMUM_EPISODE_CEILING_MICROUSD,
+        MAXIMUM_LEDGER_MICROUSD,
       ),
       quoteHash: hash(existing.quoteHash, "Existing quote hash"),
       quoteId: uuid(existing.quoteId, "Existing quote"),
@@ -443,7 +446,7 @@ export function compileProductionQuoteLines(input: QuoteInput): readonly QuoteLi
       lineKey: `provider.${slot.slotKey}`,
       lineKind: "provider_clip",
       lowQuantity: low,
-      maximumLineMicrousd: MAXIMUM_EPISODE_CEILING_MICROUSD,
+      maximumLineMicrousd: MAXIMUM_LEDGER_MICROUSD,
       rateCardId: slot.rateCardId,
       rateHash: slot.rateHash,
       slotId: slot.slotId,
@@ -551,13 +554,6 @@ export async function ensureProductionQuote(
   const lines = compileProductionQuoteLines(quoteInput);
   const expectedTotalMicrousd = total(lines, "expectedAmountMicrousd");
   const highTotalMicrousd = total(lines, "highAmountMicrousd");
-  if (highTotalMicrousd > MAXIMUM_EPISODE_CEILING_MICROUSD) {
-    throw new ProductionQuoteError(
-      `The full quality envelope is $${(highTotalMicrousd / 1_000_000).toFixed(2)}, above the $50 launch ceiling.`,
-      false,
-      "PRODUCTION_QUOTE_CEILING_EXCEEDED",
-    );
-  }
   if (expectedTotalMicrousd > highTotalMicrousd) {
     throw new ProductionQuoteError("Production quote totals are inconsistent.");
   }

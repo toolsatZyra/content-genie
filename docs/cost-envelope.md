@@ -8,9 +8,12 @@ reconciliation pass
 
 ## 1. What this document proves
 
-The target of less than USD 40 where possible and no more than USD 50 without
-explicit approval is feasible only with capability-aware routing, early
-keyframe rejection, bounded candidate multipliers, and 720p-to-1080p conform.
+The target of less than USD 40 where possible remains useful for observability.
+For the owner-operated developer MVP, the complete exact forecast is recorded
+and authorized without pausing at USD 50. A data-derived cap will be chosen
+after several days of real usage. Capability-aware routing, early keyframe
+rejection, bounded candidate multipliers, and 720p-to-1080p conform still
+control waste without lowering quality.
 It is not feasible to send every retained second through the most expensive
 lane or to generate unbounded alternatives.
 
@@ -172,22 +175,20 @@ USD 17.81.
 | Voice, alignment, sound, LLM/VLM, render, storage allowance | 3.50 | 6.50 | 9.50 |
 | **Episode total** | **31.45** | **44.96** | **62.83** |
 
-The 120-second high case exceeds the no-intervention ceiling. Genie must reduce
-the route/candidate plan without lowering quality, shorten only if the user
-supplies a shorter script revision, or request explicit top-up authorization.
-It must never silently lower QC thresholds.
+The 120-second high case is intentionally allowed in the owner-operated MVP.
+Genie records forecast and settlement, prevents duplicate spend, and keeps
+automatic retries bounded. It must never silently lower QC thresholds.
 
 ## 5. Authorization sequence
 
-1. At Episode creation, the user selects or accepts a workspace budget policy.
-   The default hard ceiling is USD 50.
+1. At Episode creation, Genie records the exact cost policy version. The
+   owner-operated MVP has no arbitrary USD 50 pause.
 2. Every world-asset generation reserves its own bounded micro-budget against
    that ceiling and shows its estimated incremental cost.
 3. Before `Begin autonomy`, Genie presents route assumptions and the
    low/expected/high quote.
-4. The user authorizes an exact hard execution ceiling. An already-authorized
-   workspace ceiling may make this a one-click confirmation, but the amount,
-   assumptions, and version remain visible.
+4. Genie seals the exact high execution envelope under standing developer-MVP
+   authority. The amount, assumptions, and version remain visible.
 5. No paid video request may enter the outbox until the full itemized high
    envelope is reserved and it is at or below the authorized hard ceiling.
 6. Repair Plans receive separate delta low/expected/high values and their own

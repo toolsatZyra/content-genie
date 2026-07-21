@@ -108,7 +108,7 @@ test("opens the truthful Living Cinema preview and switches Episodes", async ({
   ).toBeVisible();
   await page.getByRole("button", { name: "Close activity" }).click();
 
-  await page.getByRole("button", { name: "Series" }).click();
+  await page.getByRole("button", { name: "Series", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Series becomes interactive");
   await expect(page.getByRole("button", { name: "Atrium" })).toHaveAttribute(
     "aria-current",
@@ -330,7 +330,6 @@ test("@visual preserves cinematic geometry, targets and mobile continuity", asyn
 test("Phase 1 fixture organizes concurrent Episodes, Series and review work", async ({
   page,
 }) => {
-  await mockPhase1Search(page);
   await page.goto("/?fixture=phase1", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#main-content")).toHaveAttribute("data-hydrated", "true");
   await expect(
@@ -344,22 +343,19 @@ test("Phase 1 fixture organizes concurrent Episodes, Series and review work", as
   await expect(
     page.getByRole("heading", { level: 2, name: "Episodes in progress" }),
   ).toBeVisible();
+  await expect(page.locator(".live-episode-card")).toHaveCount(2);
+  await expect(page.locator(".live-focus")).toHaveCount(0);
+  for (const episode of deterministicStudioProjection().episodes) {
+    await expect(
+      page.getByRole("link", { name: new RegExp(`Open ${episode.title}`) }),
+    ).toHaveAttribute("href", new RegExp(`/episodes/${episode.id}/create`));
+  }
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     ),
   ).toBeLessThanOrEqual(1);
 
-  await page.getByRole("button", { name: "Open global search" }).click();
-  const search = page.getByRole("searchbox");
-  await expect(search).toBeFocused();
-  await search.fill("Fire Beyond");
-  await page.getByRole("button", { name: /Episode The Fire Beyond Sight/ }).click();
-  await expect(
-    page.getByRole("complementary").getByRole("heading", {
-      name: "The Fire Beyond Sight",
-    }),
-  ).toBeVisible();
   await page.screenshot({
     animations: "disabled",
     fullPage: false,
@@ -383,7 +379,7 @@ test("Phase 1 fixture organizes concurrent Episodes, Series and review work", as
   await expect(page.getByText(/intentionally disabled/i)).toBeVisible();
 });
 
-test("Phase 1 Series selection exposes exact release pins and preselects Episode creation", async ({
+test("Phase 1 Series selection shows only compact Episodes and preselects Episode creation", async ({
   page,
 }) => {
   const projection = deterministicStudioProjection();
@@ -401,33 +397,19 @@ test("Phase 1 Series selection exposes exact release pins and preselects Episode
     "aria-controls",
     "selected-series-details",
   );
-  const details = page.getByRole("complementary", { name: selectedSeries.title });
-  await expect(
-    details.getByRole("heading", { name: selectedSeries.title }),
-  ).toBeVisible();
-  await expect(
-    details.getByRole("heading", { name: "Series Release 2" }),
-  ).toBeVisible();
-  await expect(details.locator("li").filter({ hasText: "Status" })).toContainText(
-    "Active",
-  );
-  await expect(
-    details.getByText("10000000-0000-4000-8000-00000000000b", { exact: true }),
-  ).toBeVisible();
-  await expect(details.getByText(/Divine Realism.*divine-realism/)).toBeVisible();
-  await expect(
-    details.getByText(/Male narrator.*elevenlabs-male-hindi-devotional-v1/),
-  ).toBeVisible();
-  await expect(details.getByText(/Version 3/)).toBeVisible();
-  await expect(page.getByText("Record / CAS version", { exact: false })).toHaveCount(0);
-  await expect(details.getByRole("heading", { name: /Episodes 2/ })).toBeVisible();
+  const details = page.getByRole("complementary", {
+    name: `Episodes in ${selectedSeries.title}`,
+  });
+  await expect(details.locator(".live-episode-card")).toHaveCount(2);
+  await expect(details.getByRole("heading")).toHaveCount(0);
+  await expect(details.locator(".series-inheritance")).toHaveCount(0);
   for (const episode of projection.episodes) {
-    await expect(details.getByText(episode.title, { exact: true })).toBeVisible();
+    await expect(
+      details.getByRole("link", { name: new RegExp(`Open ${episode.title}`) }),
+    ).toHaveAttribute("href", new RegExp(`/episodes/${episode.id}/create`));
   }
 
-  await details
-    .getByRole("button", { name: `Create Episode in ${selectedSeries.title}` })
-    .click();
+  await details.getByRole("button", { name: "Create Episode" }).click();
   const composer = page.getByRole("dialog", { name: "Create in Genie" });
   await expect(composer).toBeVisible();
   await expect(composer.getByLabel("Series")).toHaveValue(selectedSeries.id);
@@ -441,20 +423,15 @@ test("Phase 1 Series selection exposes exact release pins and preselects Episode
     .getByRole("button", { name: new RegExp(unreleasedSeries.title) })
     .click();
   const unreleasedDetails = page.getByRole("complementary", {
-    name: unreleasedSeries.title,
+    name: `Episodes in ${unreleasedSeries.title}`,
   });
+  await expect(unreleasedDetails.locator(".live-episode-card")).toHaveCount(0);
   await expect(
-    unreleasedDetails.getByRole("heading", { name: "No approved Series Release" }),
-  ).toBeVisible();
-  await expect(
-    unreleasedDetails.getByText(/No look, continuity, characters/),
-  ).toBeVisible();
-  await expect(
-    unreleasedDetails.getByRole("heading", { name: "Inherited assets" }),
-  ).toHaveCount(0);
+    unreleasedDetails.getByRole("button", { name: "Create Episode" }),
+  ).toBeEnabled();
 });
 
-test("Phase 1 keeps focus, Episode actions, and Series pins inside responsive panels", async ({
+test("Phase 1 keeps compact cards consistent and uncluttered across responsive layouts", async ({
   page,
 }) => {
   await page.setViewportSize({ height: 650, width: 1280 });
@@ -472,41 +449,19 @@ test("Phase 1 keeps focus, Episode actions, and Series pins inside responsive pa
   await expect(page.getByRole("dialog", { name: "Create in Genie" })).toBeHidden();
   await expect(page.locator("dialog[open]")).toHaveCount(1);
   await activityDialog.getByRole("button", { name: "Close activity" }).click();
-  const desktopGeometry = await page.evaluate(() => {
-    const panel = document.querySelector<HTMLElement>(".live-focus")!;
-    const action = panel.querySelector<HTMLElement>(":scope > .full-width")!;
-    const panelBox = panel.getBoundingClientRect();
-    const actionBox = action.getBoundingClientRect();
-    return {
-      actionBottom: actionBox.bottom,
-      actionLeft: actionBox.left,
-      actionPosition: getComputedStyle(action).position,
-      actionRight: actionBox.right,
-      panelBottom: panelBox.bottom,
-      panelLeft: panelBox.left,
-      panelRight: panelBox.right,
-    };
-  });
-  expect(desktopGeometry.actionPosition).not.toBe("fixed");
-  expect(desktopGeometry.actionLeft).toBeGreaterThanOrEqual(desktopGeometry.panelLeft);
-  expect(desktopGeometry.actionRight).toBeLessThanOrEqual(
-    desktopGeometry.panelRight + 1,
+  await expect(page.locator(".live-focus")).toHaveCount(0);
+  const atriumCards = await page.locator(".live-episode-card").evaluateAll((cards) =>
+    cards.map((card) => ({
+      height: Math.round(card.getBoundingClientRect().height),
+      width: Math.round(card.getBoundingClientRect().width),
+    })),
   );
-  expect(desktopGeometry.actionBottom).toBeLessThanOrEqual(
-    desktopGeometry.panelBottom + 1,
-  );
+  expect(new Set(atriumCards.map(({ height }) => height)).size).toBe(1);
+  expect(new Set(atriumCards.map(({ width }) => width)).size).toBe(1);
 
   await page.setViewportSize({ height: 844, width: 390 });
-  await page.locator(".live-episode-card").nth(1).click();
-  const focusPanel = page.locator(".live-focus");
-  await expect(focusPanel).toBeFocused();
-  await expect(focusPanel).not.toHaveCSS("outline-style", "none");
-  const focusScroller = page.locator(".episode-focus-scroll");
-  await focusScroller.focus();
-  await expect(focusScroller).not.toHaveCSS("outline-style", "none");
-
-  await page.getByRole("button", { name: "Series" }).click();
-  const details = page.locator(".selected-series-details");
+  await page.getByRole("button", { name: "Series", exact: true }).click();
+  const details = page.locator(".selected-series-episodes");
   await expect(details).toBeVisible();
   expect(
     await details.evaluate((element) => element.scrollWidth - element.clientWidth),
@@ -574,20 +529,14 @@ test("Phase 1 future and malformed lifecycle projections remain read-only", asyn
     waitUntil: "domcontentloaded",
   });
   await expect(page.locator("#main-content")).toHaveAttribute("data-hydrated", "true");
-  const episodeDetails = page.getByRole("complementary", {
-    name: `${projection.episodes[0]!.title} Episode details`,
+  const episodeCard = page.getByRole("link", {
+    name: new RegExp(`Open ${projection.episodes[0]!.title}`),
   });
-  await expect(episodeDetails.locator(".state-chip")).toHaveText("Unavailable");
-  await expect(
-    episodeDetails.getByText("Episode unavailable", { exact: true }),
-  ).toHaveAttribute("aria-disabled", "true");
-  await expect(episodeDetails.getByRole("link", { name: /world setup/i })).toHaveCount(
-    0,
+  await expect(episodeCard.locator(".state-chip")).toHaveText("Unavailable");
+  await expect(episodeCard).toHaveAttribute(
+    "href",
+    new RegExp(`/episodes/${projection.episodes[0]!.id}/create`),
   );
-  const progress = episodeDetails.getByRole("list", {
-    name: /Episode progress unavailable/,
-  });
-  await expect(progress.locator(".is-stopped")).toHaveCount(4);
 
   await page.getByRole("button", { name: "Series", exact: true }).click();
   const unavailableSeries = projection.series[0]!;
@@ -596,11 +545,14 @@ test("Phase 1 future and malformed lifecycle projections remain read-only", asyn
     .filter({ hasText: unavailableSeries.title });
   await expect(unavailableCard.getByRole("button", { name: "Archive" })).toHaveCount(0);
   const seriesDetails = page.getByRole("complementary", {
-    name: unavailableSeries.title,
+    name: `Episodes in ${unavailableSeries.title}`,
   });
-  await expect(seriesDetails.locator('span[aria-disabled="true"]')).toHaveText(
-    episodeCreationBlocker(unavailableSeries)!,
-  );
+  await expect(
+    seriesDetails.getByRole("button", { name: "Create Episode" }),
+  ).toBeDisabled();
+  await expect(
+    seriesDetails.getByRole("button", { name: "Create Episode" }),
+  ).toHaveAttribute("title", episodeCreationBlocker(unavailableSeries)!);
 
   const malformedSeries = projection.series[1]!;
   await page
@@ -608,71 +560,44 @@ test("Phase 1 future and malformed lifecycle projections remain read-only", asyn
     .getByRole("button", { name: new RegExp(malformedSeries.title) })
     .click();
   const malformedDetails = page.getByRole("complementary", {
-    name: malformedSeries.title,
+    name: `Episodes in ${malformedSeries.title}`,
   });
   const malformedCard = page
     .locator(".series-world")
     .filter({ hasText: malformedSeries.title });
   await expect(malformedCard.getByRole("button", { name: "Archive" })).toHaveCount(0);
   await expect(
-    malformedDetails.getByRole("heading", { name: "Series Release unavailable" }),
-  ).toBeVisible();
-  await expect(malformedDetails.locator('span[aria-disabled="true"]')).toHaveText(
-    episodeCreationBlocker(malformedSeries)!,
-  );
+    malformedDetails.getByRole("button", { name: "Create Episode" }),
+  ).toBeDisabled();
+  await expect(
+    malformedDetails.getByRole("button", { name: "Create Episode" }),
+  ).toHaveAttribute("title", episodeCreationBlocker(malformedSeries)!);
   expect(commandRequests).toEqual([]);
 });
 
-test("Phase 1 derives an accessible progress thread for every workflow state", async ({
+test("Phase 1 exposes every in-progress workflow state as a direct Episode link", async ({
   page,
 }) => {
   const projection = deterministicStateMatrixProjection();
-  const currentStageByState = {
-    approved: "Monica & release",
-    awaiting_final_review: "Monica & release",
-    blocked: "Production engine",
-    delayed: "Production engine",
-    draft: "Episode organized",
-    paused: "Production engine",
-    pending_qualified_review: "Monica & release",
-    producing: "Production engine",
-    ready_to_produce: "Production engine",
-    release_blocked: "Monica & release",
-    retrying: "Production engine",
-    world_setup: "World setup",
-  } as const;
+  const terminalStates = new Set(["abandoned", "approved", "canceled", "delivered"]);
+  const inProgress = projection.episodes.filter(
+    ({ workflowState }) => !terminalStates.has(workflowState),
+  );
   await page.goto("/?fixture=phase1-states", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#main-content")).toHaveAttribute("data-hydrated", "true");
 
-  for (const episode of projection.episodes) {
-    await page.locator(".live-episode-card").filter({ hasText: episode.title }).click();
-    const details = page.getByRole("complementary", {
-      name: `${episode.title} Episode details`,
+  await expect(page.locator(".live-episode-card")).toHaveCount(inProgress.length);
+  for (const episode of inProgress) {
+    const card = page.getByRole("link", {
+      name: new RegExp(`Open ${episode.title}`),
     });
-    const thread = details.getByRole("list", { name: /Episode progress/ });
-    await expect(thread.locator("li")).toHaveCount(4);
-    if (episode.workflowState === "delivered") {
-      await expect(thread.locator('[aria-current="step"]')).toHaveCount(0);
-      await expect(thread.locator(".is-complete")).toHaveCount(4);
-    } else if (
-      episode.workflowState === "canceled" ||
-      episode.workflowState === "abandoned"
-    ) {
-      await expect(thread).toHaveAttribute("aria-label", /not inferred/);
-      await expect(thread.locator(".is-complete")).toHaveCount(1);
-      await expect(thread.locator(".is-stopped")).toHaveCount(3);
-      await expect(thread.locator('[aria-current="step"]')).toHaveCount(0);
-    } else if (episode.workflowState === "unavailable") {
-      await expect(thread.locator(".is-stopped")).toHaveCount(4);
-      await expect(thread.locator('[aria-current="step"]')).toHaveCount(0);
-    } else {
-      const current = thread.locator('[aria-current="step"]');
-      await expect(current).toHaveCount(1);
-      await expect(current).toHaveAttribute(
-        "aria-label",
-        new RegExp(`^${currentStageByState[episode.workflowState]}, current stage$`),
-      );
-    }
+    await expect(card.locator(".state-chip")).toHaveText(
+      episodeStatePresentation(episode.workflowState).label,
+    );
+    await expect(card).toHaveAttribute(
+      "href",
+      new RegExp(`/episodes/${episode.id}/create`),
+    );
   }
 });
 
@@ -695,35 +620,19 @@ test("Phase 1 search announces results and provides a 44px close target", async 
   expect(closeBox?.height ?? 0).toBeGreaterThanOrEqual(44);
 });
 
-test("Phase 1 keeps the sticky Episode CTA reachable without a fixed overlay at 1280x720", async ({
+test("Phase 1 removes the duplicate Episode detail column at 1280x720", async ({
   page,
 }) => {
   await page.setViewportSize({ height: 720, width: 1280 });
   await page.goto("/?fixture=phase1", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#main-content")).toHaveAttribute("data-hydrated", "true");
-  const details = page.getByRole("complementary", {
-    name: /When Ganga Met the Mountain Episode details/,
-  });
-  const action = details.getByRole("link", { name: "Continue world setup" });
-  await expect(action).toBeVisible();
-  await details.evaluate((element) => element.scrollIntoView({ block: "start" }));
-  const geometry = await details.evaluate((element) => {
-    const actionElement = element.querySelector<HTMLElement>(".full-width")!;
-    const actionBox = actionElement.getBoundingClientRect();
-    const detailBox = element.getBoundingClientRect();
-    return {
-      actionBottom: actionBox.bottom,
-      actionTop: actionBox.top,
-      actionPosition: getComputedStyle(actionElement).position,
-      detailTop: detailBox.top,
-      detailPosition: getComputedStyle(element).position,
-      viewportHeight: window.innerHeight,
-    };
-  });
-  expect(geometry.detailPosition).toBe("sticky");
-  expect(geometry.actionPosition).toBe("sticky");
-  expect(geometry.actionTop).toBeGreaterThanOrEqual(geometry.detailTop);
-  expect(geometry.actionBottom).toBeLessThanOrEqual(geometry.viewportHeight);
+  await expect(page.locator(".live-focus")).toHaveCount(0);
+  await expect(page.locator(".live-episode-layout")).toHaveCount(0);
+  await expect(page.locator(".live-episode-card")).toHaveCount(2);
+  const galleryWidth = await page
+    .locator(".live-gallery")
+    .evaluate((element) => Math.round(element.getBoundingClientRect().width));
+  expect(galleryWidth).toBeGreaterThan(1000);
 });
 
 test("Phase 1 fixture remains accessible and continuous at 390px", async ({ page }) => {
@@ -758,7 +667,7 @@ test("Phase 1 fixture remains accessible and continuous at 390px", async ({ page
 
   await page.getByRole("button", { name: "Create Episode" }).click();
   await expect(page.getByRole("dialog", { name: "Create in Genie" })).toBeVisible();
-  await expect(page.getByText(/script remains untouched/i)).toBeVisible();
+  await expect(page.getByText(/add the exact narration script/i)).toBeVisible();
   const composerGeometry = await page.evaluate(() => {
     const dialog = document.querySelector<HTMLDialogElement>(".composer-dialog")!;
     const close = dialog.querySelector<HTMLElement>("[aria-label='Close composer']")!;
@@ -787,12 +696,10 @@ test("Phase 1 fixture remains accessible and continuous at 390px", async ({ page
 
   const secondEpisode = page.locator(".live-episode-card").nth(1);
   await secondEpisode.focus();
-  await secondEpisode.press("Enter");
-  const details = page.getByRole("complementary");
-  await expect(details).toBeFocused();
-  await expect(details).toBeInViewport();
-  await expect(details.getByText(/Selected .* Episode details follow\./)).toHaveCount(
-    1,
+  await expect(secondEpisode).toBeFocused();
+  await expect(secondEpisode).toHaveAttribute(
+    "href",
+    /\/episodes\/.+\/create\?seriesId=.+&episodeId=.+/,
   );
 });
 
@@ -804,7 +711,11 @@ test("Phase 1 empty and complete state fixtures remain accessible at every targe
     { height: 1024, name: "tablet", width: 820 },
     { height: 844, name: "mobile", width: 390 },
   ] as const;
-  const expectedLabels = episodeWorkflowStates.map(
+  const terminalStates = new Set(["abandoned", "approved", "canceled", "delivered"]);
+  const visibleStates = episodeWorkflowStates.filter(
+    (state) => !terminalStates.has(state),
+  );
+  const expectedLabels = visibleStates.map(
     (state) => episodeStatePresentation(state).label,
   );
 
@@ -837,17 +748,13 @@ test("Phase 1 empty and complete state fixtures remain accessible at every targe
         "true",
       );
       const cards = page.locator(".live-episode-card");
-      await expect(cards).toHaveCount(episodeWorkflowStates.length);
+      await expect(cards).toHaveCount(visibleStates.length);
       await expect(cards.locator(".state-chip")).toHaveText(expectedLabels);
-      await expect(page.getByRole("link", { name: "Start world setup" })).toBeVisible();
-      await cards.filter({ hasText: "State: delivered" }).click();
-      await expect(page.getByRole("link", { name: "View locked setup" })).toBeVisible();
-      await cards.filter({ hasText: "State: canceled" }).click();
-      await expect(page.getByText("Episode closed", { exact: true })).toHaveAttribute(
-        "aria-disabled",
-        "true",
-      );
       await expect(page.getByText("Resumed production", { exact: true })).toBeVisible();
+      await expect(page.getByText("Happy path approved", { exact: true })).toHaveCount(
+        0,
+      );
+      await page.getByRole("button", { name: "Series", exact: true }).click();
       await expect(
         page.getByText("Happy path approved", { exact: true }),
       ).toBeVisible();
@@ -878,10 +785,19 @@ test("Phase 1 restores the selected Series and Episode from creation context", a
     `/?fixture=phase1-states&seriesId=${encodeURIComponent(delivered.seriesId)}&episodeId=${encodeURIComponent(delivered.id)}`,
     { waitUntil: "domcontentloaded" },
   );
+  const selectedSeries = projection.series.find(({ id }) => id === delivered.seriesId)!;
   await expect(
-    page.getByRole("complementary").getByRole("heading", { name: delivered.title }),
+    page.getByRole("group", { name: "Choose a Series" }).getByRole("button", {
+      name: new RegExp(selectedSeries.title),
+    }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page
+      .getByRole("complementary", {
+        name: `Episodes in ${selectedSeries.title}`,
+      })
+      .getByRole("link", { name: new RegExp(`Open ${delivered.title}`) }),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: "View locked setup" })).toBeVisible();
 });
 
 test("Phase 1 global search opens an authorized Episode beyond the initial projection", async ({
@@ -907,16 +823,20 @@ test("Phase 1 global search opens an authorized Episode beyond the initial proje
   await expect(page.locator('main[data-hydrated="true"]')).toBeVisible();
   await page.getByRole("button", { name: "Open global search" }).click();
   await page.getByRole("searchbox").fill("Beyond the Index");
+  const destinationRequest = page.waitForRequest((request) => {
+    const destination = new URL(request.url());
+    return (
+      request.method() === "GET" &&
+      destination.pathname === `/episodes/${episode.id}/create` &&
+      destination.searchParams.get("seriesId") === series.id &&
+      destination.searchParams.get("episodeId") === episode.id
+    );
+  });
   await page
     .getByRole("button", { name: /Episode The River Beyond the Index/ })
     .click();
-  await expect(
-    page.getByRole("complementary").getByRole("heading", {
-      name: "The River Beyond the Index",
-    }),
-  ).toBeVisible();
-  await expect(page.getByText("3 Episodes shown")).toBeVisible();
-  await expect(page.getByText("1 creating", { exact: true })).toBeVisible();
+  await destinationRequest;
+  await expect(page.getByRole("dialog", { name: "Global search" })).not.toBeVisible();
 });
 
 test("Phase 1 global search ignores stale pagination after the query changes", async ({

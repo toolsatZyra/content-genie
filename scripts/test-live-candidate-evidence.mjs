@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 
 import { assertClosedCandidateArtifact } from "./live-candidate-evidence.mjs";
 import { PHASE2_COORDINATE_PREDECESSOR_FIXTURE } from "./phase2-coordinate-upgrade-drill.mjs";
+import {
+  candidateMigrationVersion,
+  loadPhase2CandidateMigrationInventory,
+} from "./phase2-candidate-migration-inventory.mjs";
 
 const digest = (seed) => ({ fileCount: 1, sha256: seed.repeat(64) });
 const binding = {
@@ -15,18 +19,9 @@ const binding = {
 const revisionId = "10000000-0000-4000-8000-000000000001";
 const episodeId = "10000000-0000-4000-8000-000000000002";
 const timestamp = "2026-07-18T00:00:00.000Z";
-const versions = [
-  "20260717121500",
-  "20260717121501",
-  "20260717121600",
-  "20260717121601",
-  "20260717121602",
-  "20260717121603",
-  "20260717121604",
-  "20260717121605",
-  "20260717121606",
-  "20260717121607",
-];
+const candidateMigrations = await loadPhase2CandidateMigrationInventory();
+const versions = candidateMigrations.map(candidateMigrationVersion);
+const terminalForwardMigration = "20260717121607";
 const legacyRows = [
   {
     bytes: 8193,
@@ -123,8 +118,10 @@ const evidence = {
       verifiedV1: true,
     },
     predecessorUpgradeExercised: true,
-    preexistingPhase2Versions: versions.slice(0, -1),
-    terminalForwardMigration: versions.at(-1),
+    preexistingPhase2Versions: versions.filter(
+      (version) => version !== terminalForwardMigration,
+    ),
+    terminalForwardMigration,
     upgrade: {
       exactV2WriteAccepted: true,
       legacyRows,
@@ -161,6 +158,7 @@ const evidence = {
 
 const expectations = {
   candidateBinding: binding,
+  candidateMigrations,
   pgTapSuites: expectedPgTapSuites,
   predecessorFixture: PHASE2_COORDINATE_PREDECESSOR_FIXTURE,
 };

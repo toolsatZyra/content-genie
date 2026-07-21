@@ -27,6 +27,7 @@ import {
   hardenPgTapQuery,
 } from "./pgtap-harness-policy.mjs";
 import { assertPhase2CoordinatePredecessorFixture } from "./phase2-coordinate-upgrade-drill.mjs";
+import { loadPhase2CandidateMigrationInventory } from "./phase2-candidate-migration-inventory.mjs";
 import { LIVE_BROKER_SEAL, runRemoteLiveCandidate } from "./remote-live-broker.mjs";
 import { reconcileTrustedBranchCleanupLeases } from "./live-branch-reaper.mjs";
 import {
@@ -113,11 +114,17 @@ const trustedHarnessManifest = JSON.parse(
 );
 const trustedHarnessManifestSha256 = sha256(JSON.stringify(trustedHarnessManifest));
 
-function assertTrustedManifestExpectations({ pgTapSuites, predecessorFixture }) {
+function assertTrustedManifestExpectations({
+  candidateMigrations,
+  pgTapSuites,
+  predecessorFixture,
+}) {
   if (
     trustedHarnessManifest.schemaVersion !== "genie-live-trusted-harness-manifest.v1" ||
     trustedHarnessManifest.packageManager?.declaration !== "pnpm@11.9.0" ||
     trustedHarnessManifest.packageManager?.version !== "11.9.0" ||
+    JSON.stringify(candidateMigrations) !==
+      JSON.stringify(trustedHarnessManifest.phase2Migrations) ||
     JSON.stringify(pgTapSuites) !==
       JSON.stringify(trustedHarnessManifest.pgTapSuites) ||
     JSON.stringify(predecessorFixture) !==
@@ -355,15 +362,14 @@ async function expectedPgTapSuites(snapshotDirectory) {
   const testFiles = (await readdir(testDirectory))
     .filter((file) => file.endsWith(".test.sql"))
     .sort();
-  const expectedFiles = [
-    "phase1_foundation.test.sql",
-    "phase2_zero_spend_foundation.test.sql",
-  ];
+  const expectedFiles = trustedHarnessManifest.pgTapSuites.map(
+    ({ testFile }) => testFile,
+  );
   if (
     testFiles.length !== expectedFiles.length ||
     testFiles.some((file, index) => file !== expectedFiles[index])
   ) {
-    throw new Error("The exact two-suite pgTAP collection has drifted.");
+    throw new Error("The sealed pgTAP collection has drifted.");
   }
   return Promise.all(
     testFiles.map(async (testFile) => {
@@ -426,6 +432,7 @@ try {
   );
   candidateEvidenceExpectations = Object.freeze({
     candidateBinding,
+    candidateMigrations: await loadPhase2CandidateMigrationInventory(snapshotDirectory),
     pgTapSuites: await expectedPgTapSuites(snapshotDirectory),
     predecessorFixture: assertPhase2CoordinatePredecessorFixture(),
   });

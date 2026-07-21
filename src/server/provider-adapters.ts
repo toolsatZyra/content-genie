@@ -220,12 +220,19 @@ function falPayload(
     manifest.modelKey === "fal-ai/nano-banana-2" &&
     manifest.payloadSchemaVersion === "genie.fal-nano-banana-2.v1" &&
     exactObject(manifest.payload, sharedKeys);
-  const edit =
+  const editWithoutSystemPrompt =
     manifest.provider === "fal" &&
     manifest.operation === "edit_image" &&
     manifest.modelKey === "fal-ai/nano-banana-2/edit" &&
     manifest.payloadSchemaVersion === "genie.fal-nano-banana-2-edit.v1" &&
     exactObject(manifest.payload, [...sharedKeys, "imageUrls"]);
+  const editWithSystemPrompt =
+    manifest.provider === "fal" &&
+    manifest.operation === "edit_image" &&
+    manifest.modelKey === "fal-ai/nano-banana-2/edit" &&
+    manifest.payloadSchemaVersion === "genie.fal-nano-banana-2-edit.v1" &&
+    exactObject(manifest.payload, [...sharedKeys, "imageUrls", "systemPrompt"]);
+  const edit = editWithoutSystemPrompt || editWithSystemPrompt;
   if (!generation && !edit) {
     throw new ProviderAdapterError("FAL image payload is invalid.");
   }
@@ -256,7 +263,7 @@ function falPayload(
   };
   if (edit) {
     const imageUrls = payload.imageUrls;
-    if (!Array.isArray(imageUrls) || imageUrls.length < 1 || imageUrls.length > 4) {
+    if (!Array.isArray(imageUrls) || imageUrls.length < 1 || imageUrls.length > 14) {
       throw new ProviderAdapterError("FAL image references are invalid.");
     }
     body.image_urls = imageUrls.map((value) => {
@@ -281,6 +288,9 @@ function falPayload(
       }
       return url.toString();
     });
+    if (editWithSystemPrompt) {
+      body.system_prompt = boundedText(payload.systemPrompt, "systemPrompt", 16_000);
+    }
   }
   return body;
 }

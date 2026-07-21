@@ -6,6 +6,7 @@ import {
   canonicalTrustedHarnessManifestSha256,
   TRUSTED_HARNESS_MANIFEST_PATH,
 } from "./generate-live-trusted-harness-manifest.mjs";
+import { loadPhase2CandidateMigrationInventory } from "./phase2-candidate-migration-inventory.mjs";
 
 const manifest = JSON.parse(await readFile(TRUSTED_HARNESS_MANIFEST_PATH, "utf8"));
 const validated = await assertTrustedHarnessManifest(manifest);
@@ -17,15 +18,22 @@ assert.ok(manifest.entries.some(({ role }) => role === "trusted-branch-controlle
 assert.ok(manifest.entries.some(({ role }) => role === "durable-branch-reaper"));
 assert.ok(manifest.entries.some(({ role }) => role === "scheduled-reaper-entrypoint"));
 assert.ok(manifest.entries.some(({ role }) => role === "scheduled-reaper-workflow"));
-assert.equal(manifest.phase2Migrations.length, 88);
+assert.deepEqual(
+  manifest.phase2Migrations,
+  await loadPhase2CandidateMigrationInventory(),
+);
 assert.deepEqual(
   manifest.pgTapSuites.map(({ testFile }) => testFile),
   [
+    "mvp_cinematic_pipeline.test.sql",
+    "mvp_repair_feedback_grounding.test.sql",
     "phase1_foundation.test.sql",
     "phase2_executable_plan.test.sql",
+    "phase2_p2_09_cultural_claim_contract.test.sql",
     "phase2_preflight_provider_ingest.test.sql",
     "phase2_world_cultural.test.sql",
     "phase2_zero_spend_foundation.test.sql",
+    "workspace_authority_profile.test.sql",
   ],
 );
 assert.deepEqual(manifest.packageManager, {

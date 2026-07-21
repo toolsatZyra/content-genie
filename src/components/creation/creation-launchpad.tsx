@@ -1,79 +1,44 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import type { RefObject } from "react";
 
+import { MvpProductionStudio } from "@/components/production/mvp-production-studio";
 import type { CreationPreflightProjection } from "@/domain/creation-readiness";
+import type { CreationProductionProjection } from "@/domain/mvp-production";
 
 interface CreationLaunchpadProps {
   readonly episodeId: string;
+  readonly episodeTitle: string;
   readonly preflight: CreationPreflightProjection;
+  readonly production: CreationProductionProjection;
   readonly stageHeadingRef: RefObject<HTMLHeadingElement | null>;
-}
-
-function usd(microusd: number): string {
-  return `$${(microusd / 1_000_000).toFixed(2)}`;
+  readonly workspaceId: string;
 }
 
 export function CreationLaunchpad({
   episodeId,
+  episodeTitle,
   preflight,
+  production,
   stageHeadingRef,
+  workspaceId,
 }: CreationLaunchpadProps) {
-  const router = useRouter();
   const run = preflight.productionRun;
-
-  useEffect(() => {
-    if (!run) return;
-    router.replace(`/episodes/${episodeId}/production`);
-  }, [episodeId, router, run]);
 
   if (run) {
     return (
-      <section className="launchpad-chamber is-running">
-        <div className="launchpad-sigil" aria-hidden="true">
-          <i />
-          <i />
-          <span>✦</span>
-        </div>
-        <small>
-          World Lock sealed · run {run.runNumber.toString().padStart(2, "0")}
-        </small>
-        <h1 ref={stageHeadingRef} tabIndex={-1}>
-          Monica has the baton.
-        </h1>
-        <p>
-          Every creative and financial input is pinned to manifest{" "}
-          <code>{run.manifestHash.slice(0, 12)}</code>. Production can advance
-          asynchronously without changing the world you approved.
-        </p>
-        <div className="launchpad-run-status">
-          <div>
-            <small>Run state</small>
-            <strong>{run.state.replaceAll("_", " ")}</strong>
-          </div>
-          <div>
-            <small>Authorized high</small>
-            <strong>{usd(run.authorizedHighMicrousd)}</strong>
-          </div>
-          <div>
-            <small>Immutable ceiling</small>
-            <strong>{usd(run.hardCeilingMicrousd)}</strong>
-          </div>
-        </div>
-        <p className="launchpad-note">
-          Opening the live production room automatically. The Atrium will continue to
-          surface progress and notify you when final review is needed.
-        </p>
-        <Link
-          className="creation-primary launchpad-production-link"
-          href={`/episodes/${episodeId}/production`}
-        >
-          Production
-        </Link>
-      </section>
+      <MvpProductionStudio
+        episodeId={episodeId}
+        episodeTitle={episodeTitle}
+        job={production.job}
+        master={production.master}
+        editPackage={production.package}
+        productionRunId={production.productionRunId ?? run.id}
+        repair={production.repair}
+        signedMasterUrl={production.signedMasterUrl}
+        stageHeadingRef={stageHeadingRef}
+        workspaceId={workspaceId}
+      />
     );
   }
 
@@ -90,8 +55,9 @@ export function CreationLaunchpad({
       </h1>
       <p>
         The agentic AI crew is freezing the accepted cast, locations, character sheets,
-        narration identity, master clock, shot graph, QC consensus and exact spending
-        ceiling. If any byte changed, Monica rejects the lock instead of guessing.
+        narration identity, master clock, shot graph and QC consensus. The complete cost
+        forecast remains visible and recorded, but the owner-operated MVP does not pause
+        at an arbitrary spend threshold.
       </p>
       <div className="world-lock-manifest">
         <div>
@@ -107,17 +73,17 @@ export function CreationLaunchpad({
         <div>
           <span>03</span>
           <strong>Production proof</strong>
-          <small>Clock · graph · QC · quote</small>
+          <small>Clock · graph · QC · cost ledger</small>
         </div>
       </div>
       <div className="launch-world-lock" aria-live="polite" role="status">
         <span aria-hidden="true">✦</span>
         <strong>Locking every verified dependency…</strong>
-        <small>Atomic · bounded · production-authorizing</small>
+        <small>Atomic · durable · production-authorizing</small>
       </div>
       <p className="launchpad-note">
-        No click is required. When the immutable run is present, this screen opens the
-        live production room. Final exact-master approval remains yours.
+        No click is required. Production, editing, playback and final review remain in
+        this Edit stage.
       </p>
     </section>
   );

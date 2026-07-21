@@ -35,6 +35,13 @@ export type CinematicTimeline = Readonly<{
   shots: readonly PlanShotWindow[];
 }>;
 
+export type SemanticShotBoundary = Readonly<{
+  endSegmentNumber: number;
+  sceneNumber: number;
+  shotNumber: number;
+  startSegmentNumber: number;
+}>;
+
 export class PreflightPlanTimelineError extends Error {
   override readonly name = "PreflightPlanTimelineError";
 }
@@ -47,7 +54,7 @@ function exactSlice(text: string, startScalar: number, endScalar: number): strin
   return Array.from(text).slice(startScalar, endScalar).join("");
 }
 
-function validateAlignment(input: {
+export function validatePlanAlignment(input: {
   durationMs: number;
   processingText: string;
   segments: readonly PlanAlignmentSegment[];
@@ -165,7 +172,7 @@ export function buildCinematicTimeline(input: {
   processingText: string;
   segments: readonly PlanAlignmentSegment[];
 }): CinematicTimeline {
-  validateAlignment(input);
+  validatePlanAlignment(input);
   const ranges = rawShotRanges(input.durationMs, input.segments);
   const ungroupedShots = ranges.map((range, index) => {
     const first = input.segments[range.startIndex]!;
@@ -219,6 +226,94 @@ export function buildCinematicTimeline(input: {
       "The narration cannot form a bounded cinematic timeline.",
     );
   }
+  return Object.freeze({
+    beats: Object.freeze(beats),
+    shots: Object.freeze(shots),
+  });
+}
+
+export function buildCinematicTimelineFromShotPlan(input: {
+  boundaries: readonly SemanticShotBoundary[];
+  durationMs: number;
+  processingText: string;
+  segments: readonly PlanAlignmentSegment[];
+}): CinematicTimeline {
+  validatePlanAlignment(input);
+  if (input.boundaries.length < 1 || input.boundaries.length > 80) {
+    throw new PreflightPlanTimelineError(
+      "The semantic shot plan is outside its operational safety envelope.",
+    );
+  }
+  let expectedStartSegment = 1;
+  let priorSceneNumber = 0;
+  const shots: PlanShotWindow[] = [];
+  for (const [index, boundary] of input.boundaries.entries()) {
+    const first = input.segments[boundary.startSegmentNumber - 1];
+    const last = input.segments[boundary.endSegmentNumber - 1];
+    if (
+      boundary.shotNumber !== index + 1 ||
+      boundary.startSegmentNumber !== expectedStartSegment ||
+      boundary.endSegmentNumber < boundary.startSegmentNumber ||
+      boundary.endSegmentNumber > input.segments.length ||
+      !first ||
+      !last ||
+      boundary.sceneNumber < 1 ||
+      boundary.sceneNumber > priorSceneNumber + 1 ||
+      (priorSceneNumber > 0 && boundary.sceneNumber < priorSceneNumber)
+    ) {
+      throw new PreflightPlanTimelineError(
+        "The semantic shot plan does not cover the narration in order.",
+      );
+    }
+    const duration = last.endMs - first.startMs;
+    if (duration < 1_000 || duration > 15_000) {
+      throw new PreflightPlanTimelineError(
+        `Semantic shot ${boundary.shotNumber} is outside the qualified provider duration envelope.`,
+      );
+    }
+    shots.push(
+      Object.freeze({
+        beatNumber: boundary.sceneNumber,
+        endMs: last.endMs,
+        endScalar: last.endScalar,
+        exactText: exactSlice(input.processingText, first.startScalar, last.endScalar),
+        shotNumber: boundary.shotNumber,
+        startMs: first.startMs,
+        startScalar: first.startScalar,
+      }),
+    );
+    expectedStartSegment = boundary.endSegmentNumber + 1;
+    priorSceneNumber = boundary.sceneNumber;
+  }
+  if (
+    expectedStartSegment !== input.segments.length + 1 ||
+    shots[0]?.startScalar !== 0 ||
+    shots.at(-1)?.endScalar !== Array.from(input.processingText).length ||
+    shots.at(-1)?.endMs !== input.durationMs
+  ) {
+    throw new PreflightPlanTimelineError(
+      "The semantic shot plan does not cover the locked narration exactly.",
+    );
+  }
+  const grouped = new Map<number, PlanShotWindow[]>();
+  for (const shot of shots) {
+    const group = grouped.get(shot.beatNumber) ?? [];
+    group.push(shot);
+    grouped.set(shot.beatNumber, group);
+  }
+  const beats = [...grouped.entries()].map(([beatNumber, group]) => {
+    const first = group[0]!;
+    const last = group.at(-1)!;
+    return Object.freeze({
+      beatNumber,
+      endMs: last.endMs,
+      endScalar: last.endScalar,
+      exactText: exactSlice(input.processingText, first.startScalar, last.endScalar),
+      shotNumbers: Object.freeze(group.map(({ shotNumber }) => shotNumber)),
+      startMs: first.startMs,
+      startScalar: first.startScalar,
+    });
+  });
   return Object.freeze({
     beats: Object.freeze(beats),
     shots: Object.freeze(shots),

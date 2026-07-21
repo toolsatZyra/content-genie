@@ -1,6 +1,10 @@
 import { createHash, createPublicKey, randomUUID, verify } from "node:crypto";
 
 import { signLiveBrokerBody } from "./live-broker-signing.mjs";
+import {
+  candidateMigrationVersion,
+  loadPhase2CandidateMigrationInventory,
+} from "./phase2-candidate-migration-inventory.mjs";
 
 export const LIVE_BROKER_ENDPOINT =
   "https://content-genie-three.vercel.app/api/internal/live-broker";
@@ -11,23 +15,9 @@ export const LIVE_BROKER_EVIDENCE_PUBLIC_KEY_SPKI_BASE64 =
 const schemaVersion = "genie-live-broker-request.v1";
 const MAX_BROKER_RESPONSE_BYTES = 3 * 1024 * 1024;
 const exactEndpoint = new URL(LIVE_BROKER_ENDPOINT);
-const expectedPhase2MigrationVersions = [
-  "20260717121500",
-  "20260717121501",
-  "20260717121600",
-  "20260717121601",
-  "20260717121602",
-  "20260717121603",
-  "20260717121604",
-  "20260717121605",
-  "20260717121606",
-  "20260717121607",
-  "20260717121608",
-  "20260717121609",
-  "20260717121610",
-  "20260717121611",
-  "20260717121612",
-];
+const expectedPhase2MigrationVersions = (
+  await loadPhase2CandidateMigrationInventory()
+).map(candidateMigrationVersion);
 
 function exactKeys(value, keys) {
   return (

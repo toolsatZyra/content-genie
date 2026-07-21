@@ -138,6 +138,22 @@ function successfulResults(
       data: [],
       error: null,
     },
+    mvp_production_jobs: {
+      data: null,
+      error: null,
+    },
+    production_runs: {
+      data: null,
+      error: null,
+    },
+    mvp_episode_masters: {
+      data: null,
+      error: null,
+    },
+    mvp_edit_packages: {
+      data: null,
+      error: null,
+    },
   };
 }
 
@@ -196,6 +212,14 @@ describe("the creation projection query", () => {
         qc: null,
         quote: null,
         sourceReview: null,
+      },
+      production: {
+        job: null,
+        master: null,
+        package: null,
+        repair: null,
+        productionRunId: null,
+        signedMasterUrl: null,
       },
       world: { characters: [], locations: [], progress: [], referencePack: null },
     });
@@ -369,6 +393,8 @@ describe("the creation projection query", () => {
     "voice_version_availability",
     "look_version_availability",
     "creation_readiness_projections",
+    "mvp_production_jobs",
+    "production_runs",
   ])("propagates a %s query failure", async (table) => {
     const expected = new Error(`${table} unavailable`);
     const results = successfulResults();

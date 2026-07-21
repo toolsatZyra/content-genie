@@ -15,6 +15,12 @@ import {
   type WorldBuildProgressState,
 } from "@/domain/creation-readiness";
 import { LOOKS } from "@/domain/look/look-registry";
+import type {
+  MvpEditPackageView,
+  MvpMasterView,
+  MvpProductionJobView,
+  MvpRepairProgressView,
+} from "@/domain/mvp-production";
 import { parseEpisodeWorkflowState, type EpisodeWorkflowState } from "@/domain/studio";
 
 interface EpisodeRow {
@@ -74,6 +80,10 @@ interface PreflightRunRow {
   state: string;
 }
 
+interface ProductionRunRow {
+  id: string;
+}
+
 function projectWorldProgress(
   rows: readonly WorldProgressRow[],
 ): readonly CreationWorldProgressItem[] {
@@ -119,30 +129,98 @@ export async function loadCreationProjection(
   if (!episodeData) return null;
   const episode = episodeData as unknown as EpisodeRow;
 
-  const [scriptResult, configurationResult] = await Promise.all([
-    client
-      .from("script_revisions")
-      .select("id,revision_number,raw_text,raw_utf8_sha256,estimated_duration_seconds")
-      .eq("workspace_id", episode.workspace_id)
-      .eq("episode_id", episode.id)
-      .order("revision_number", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    client
-      .from("episode_configuration_candidates")
-      .select(
-        "id,aggregate_version,narrator_gender,voice_version_id,look_version_id,performance_profile_id,voice_confirmed_at,voice_confirmed_by,look_confirmed_at,look_confirmed_by",
-      )
-      .eq("workspace_id", episode.workspace_id)
-      .eq("episode_id", episode.id)
-      .in("state", ["world_design", "preflight", "ready_to_lock", "locked"])
-      .maybeSingle(),
-  ]);
+  const [scriptResult, configurationResult, productionJobResult, productionRunResult] =
+    await Promise.all([
+      client
+        .from("script_revisions")
+        .select(
+          "id,revision_number,raw_text,raw_utf8_sha256,estimated_duration_seconds",
+        )
+        .eq("workspace_id", episode.workspace_id)
+        .eq("episode_id", episode.id)
+        .order("revision_number", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      client
+        .from("episode_configuration_candidates")
+        .select(
+          "id,aggregate_version,narrator_gender,voice_version_id,look_version_id,performance_profile_id,voice_confirmed_at,voice_confirmed_by,look_confirmed_at,look_confirmed_by",
+        )
+        .eq("workspace_id", episode.workspace_id)
+        .eq("episode_id", episode.id)
+        .in("state", ["world_design", "preflight", "ready_to_lock", "locked"])
+        .maybeSingle(),
+      client
+        .from("mvp_production_jobs")
+        .select(
+          "production_run_id,state,version,attempt_number,total_storyboards,completed_storyboards,total_clips,completed_clips,total_sfx,completed_sfx,last_error_code,last_error_summary",
+        )
+        .eq("workspace_id", episode.workspace_id)
+        .eq("episode_id", episode.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      client
+        .from("production_runs")
+        .select("id")
+        .eq("workspace_id", episode.workspace_id)
+        .eq("episode_id", episode.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
   if (scriptResult.error) throw scriptResult.error;
   if (configurationResult.error) throw configurationResult.error;
+  if (productionJobResult.error) throw productionJobResult.error;
+  if (productionRunResult.error) throw productionRunResult.error;
 
   const script = scriptResult.data as ScriptRow | null;
   const configuration = configurationResult.data as ConfigurationRow | null;
+  const productionJob = productionJobResult.data as MvpProductionJobView | null;
+  const productionRun = productionRunResult.data as ProductionRunRow | null;
+  const productionMasterResult = productionJob
+    ? await client
+        .from("mvp_episode_masters")
+        .select("id,state,version,duration_ms,width,height,attempt_number,object_name")
+        .eq("workspace_id", episode.workspace_id)
+        .eq("production_run_id", productionJob.production_run_id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null, error: null };
+  if (productionMasterResult.error) throw productionMasterResult.error;
+  const productionMaster = productionMasterResult.data as MvpMasterView | null;
+  const productionPackageResult = productionMaster
+    ? await client
+        .from("mvp_edit_packages")
+        .select(
+          "id,master_id,state,version,object_name,byte_length,last_error_code,last_error_summary",
+        )
+        .eq("workspace_id", episode.workspace_id)
+        .eq("master_id", productionMaster.id)
+        .maybeSingle()
+    : { data: null, error: null };
+  if (productionPackageResult.error) throw productionPackageResult.error;
+  const productionPackage = productionPackageResult.data as MvpEditPackageView | null;
+  const productionRepairResult =
+    productionJob && productionJob.attempt_number > 1
+      ? await client
+          .from("mvp_repair_progress")
+          .select(
+            "repair_request_id,state,version,target_attempt_number,total_shots,affected_shots,storyboards_reused,storyboards_to_regenerate,storyboards_regenerated,clips_reused,clips_to_regenerate,clips_regenerated,shots_selected,last_error_code,last_error_summary,clarification_id,clarification_question,clarification_round,feedback_points",
+          )
+          .eq("workspace_id", episode.workspace_id)
+          .eq("production_run_id", productionJob.production_run_id)
+          .eq("target_attempt_number", productionJob.attempt_number)
+          .maybeSingle()
+      : { data: null, error: null };
+  if (productionRepairResult.error) throw productionRepairResult.error;
+  const productionRepair = productionRepairResult.data
+    ? ({
+        ...productionRepairResult.data,
+        id: productionRepairResult.data.repair_request_id,
+      } as MvpRepairProgressView)
+    : null;
   const [voiceAvailabilityResult, lookAvailabilityResult] = configuration
     ? await Promise.all([
         client.from("voice_version_availability").select("voice_version_id,status"),
@@ -313,6 +391,14 @@ export async function loadCreationProjection(
     preflight: staleFailure
       ? { ...readiness.preflight, failure: null }
       : readiness.preflight,
+    production: {
+      job: productionJob,
+      master: productionMaster,
+      package: productionPackage,
+      repair: productionRepair,
+      productionRunId: productionJob?.production_run_id ?? productionRun?.id ?? null,
+      signedMasterUrl: null,
+    },
     world: readiness.world,
   };
 }

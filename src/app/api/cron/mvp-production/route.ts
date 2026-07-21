@@ -9,6 +9,10 @@ import {
   advanceNextMvpProductionJob,
   MvpProductionError,
 } from "@/server/mvp-production";
+import {
+  advanceNextMvpEditPackage,
+  MvpEditPackageError,
+} from "@/server/mvp-edit-package";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -30,13 +34,16 @@ export async function GET(request: Request) {
     if (!hasValidCronAuthorization(request.headers, cron.cronSecret)) {
       return response({ code: "CRON_AUTHORIZATION_REJECTED", ok: false }, 401);
     }
-    const result = await advanceNextMvpProductionJob();
-    return response({ ok: true, ...result }, 200);
+    const production = await advanceNextMvpProductionJob();
+    const editPackage = production.advanced
+      ? { advanced: false }
+      : await advanceNextMvpEditPackage();
+    return response({ editPackage, ok: true, production }, 200);
   } catch (error) {
     console.error("MVP production advance failed safely", {
       errorName: error instanceof Error ? error.name : "UnknownError",
       safeCode:
-        error instanceof MvpProductionError
+        error instanceof MvpProductionError || error instanceof MvpEditPackageError
           ? error.safeCode
           : error instanceof SecureIngestCronEnvironmentError
             ? "CRON_CONFIGURATION_UNAVAILABLE"
@@ -45,7 +52,7 @@ export async function GET(request: Request) {
     return response(
       {
         code:
-          error instanceof MvpProductionError
+          error instanceof MvpProductionError || error instanceof MvpEditPackageError
             ? error.safeCode
             : error instanceof SecureIngestCronEnvironmentError
               ? "CRON_CONFIGURATION_UNAVAILABLE"

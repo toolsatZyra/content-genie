@@ -2,12 +2,89 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions,auth,storage,private,audit,pg_catalog;
-select plan(57);
+select plan(100);
 
 create temp table world_fixture(key text primary key,value text not null) on commit drop;
 grant select,insert,update,delete on world_fixture to authenticated,service_role;
 grant usage on schema private to service_role;
 grant select on all tables in schema private to service_role;
+
+insert into world_fixture(key,value) values
+('shiva_identity_manifest',$manifest$
+{
+  "schemaVersion":"genie-character-identity-manifest.v2",
+  "isDeity":true,
+  "identity":{
+    "characterKey":"shiva",
+    "canonicalName":"Shiva",
+    "formKey":"mahadeva",
+    "formName":"Mahadeva",
+    "essentialAttributes":["third-eye","matted-hair"]
+  },
+  "form":{
+    "topology":{"headCount":1,"armCount":2,"handCount":2,"legCount":2},
+    "rules":{
+      "required":["human-form","third-eye-visible"],
+      "prohibited":["extra-heads","extra-limbs"]
+    }
+  },
+  "wardrobe":{
+    "required":["tiger-skin-wrap"],
+    "prohibited":["modern-clothing"]
+  },
+  "skin":{
+    "toneRules":["ash-blue-tone"],
+    "formRules":["sacred-ash-markings"]
+  },
+  "ornaments":[{"key":"rudraksha","placement":"neck","required":true}],
+  "dignity":{
+    "required":["reverent-bearing"],
+    "prohibited":["comic-caricature"]
+  },
+  "allowedTransitions":[],
+  "deity":{
+    "arms":[
+      {"armId":"left-1","side":"left","ordinal":1,"handId":"left-hand-1"},
+      {"armId":"right-1","side":"right","ordinal":1,"handId":"right-hand-1"}
+    ],
+    "handObjectAssignments":[
+      {"handId":"left-hand-1","assignmentKind":"attribute","objectKey":"damaru"},
+      {"handId":"right-hand-1","assignmentKind":"weapon","objectKey":"trishula"}
+    ],
+    "vahana":{"status":"specified","key":"nandi"},
+    "weapons":[{"key":"trishula","required":true}]
+  }
+}
+$manifest$),
+('non_deity_identity_manifest',$manifest$
+{
+  "schemaVersion":"genie-character-identity-manifest.v2",
+  "isDeity":false,
+  "identity":{
+    "characterKey":"contract-fixture",
+    "canonicalName":"Contract Fixture",
+    "formKey":"standard",
+    "formName":"Standard Form",
+    "essentialAttributes":["adult","calm-bearing"]
+  },
+  "form":{
+    "topology":{"headCount":1,"armCount":2,"handCount":2,"legCount":2},
+    "rules":{"required":["human-form"],"prohibited":["extra-limbs"]}
+  },
+  "wardrobe":{
+    "required":["period-appropriate-clothing"],
+    "prohibited":["modern-clothing"]
+  },
+  "skin":{
+    "toneRules":["match-accepted-reference"],
+    "formRules":["no-unplanned-age-change"]
+  },
+  "ornaments":[],
+  "dignity":{"required":["respectful-bearing"],"prohibited":[]},
+  "allowedTransitions":[],
+  "deity":null
+}
+$manifest$);
 
 insert into public.organizations(id,name,slug) values
 ('b1000000-0000-4000-8000-000000000001','Genie World Test','genie-world-test');
@@ -79,6 +156,31 @@ from (values
 ) as media(version_id,asset_id,quarantine_id,kind,hash_char,prov_char);
 set local session_replication_role=origin;
 
+create function pg_temp.record_contract_character_manifest(
+  p_version_id uuid,
+  p_manifest jsonb,
+  p_manifest_hash text default null
+)
+returns jsonb
+language sql
+set search_path=public,extensions,auth,storage,private,pg_catalog
+as $$
+  select public.command_record_character_candidate(
+    'b1100000-0000-4000-8000-000000000001',
+    'b1600000-0000-4000-8000-000000000001',
+    'b1800000-0000-4000-8000-000000000099',
+    'b1810000-0000-4000-8000-000000000099',
+    'contract-fixture','Contract Fixture','standard','Standard Form',
+    p_version_id,'generated','Contract portrait',
+    encode(extensions.digest(convert_to('Contract portrait','UTF8'),'sha256'),'hex'),
+    'preserve identity','b1720000-0000-4000-8000-000000000004',
+    p_manifest,coalesce(p_manifest_hash,encode(extensions.digest(
+      convert_to(p_manifest::text,'UTF8'),'sha256'),'hex')),null
+  )
+$$;
+grant execute on function pg_temp.record_contract_character_manifest(uuid,jsonb,text)
+to service_role;
+
 select set_config('request.jwt.claims','{"role":"service_role"}',true);
 select set_config('request.jwt.claim.role','service_role',true);
 set local role service_role;
@@ -94,8 +196,189 @@ select lives_ok(format(
  'b1800000-0000-4000-8000-000000000001','b1810000-0000-4000-8000-000000000001',
  'shiva','Shiva','mahadeva','Mahadeva','b1820000-0000-4000-8000-000000000001',
  'generated','Shiva portrait',encode(extensions.digest(convert_to('Shiva portrait','UTF8'),'sha256'),'hex'),
- 'no drift','b1720000-0000-4000-8000-000000000001','{"isDeity":true,"arms":2}',repeat('a',64)
+ 'no drift','b1720000-0000-4000-8000-000000000001',
+ (select value from world_fixture where key='shiva_identity_manifest'),
+ encode(extensions.digest(convert_to((select value::jsonb from world_fixture
+   where key='shiva_identity_manifest')::text,'UTF8'),'sha256'),'hex')
  ),'a generated character is an immutable review candidate');
+
+select ok(
+  exists(
+    select 1 from public.character_versions version
+    where version.id='b1820000-0000-4000-8000-000000000001'
+      and version.identity_manifest->>'schemaVersion'=
+        'genie-character-identity-manifest.v2'
+      and (version.identity_manifest->>'isDeity')::boolean
+      and version.identity_manifest#>>'{identity,characterKey}'='shiva'
+      and (version.identity_manifest#>>'{form,topology,armCount}')::integer=2
+      and jsonb_array_length(version.identity_manifest#>'{deity,arms}')=2
+      and jsonb_array_length(
+        version.identity_manifest#>'{deity,handObjectAssignments}')=2
+      and version.identity_manifest#>>'{deity,vahana,key}'='nandi'
+      and jsonb_array_length(version.identity_manifest#>'{deity,weapons}')=1
+      and jsonb_array_length(version.identity_manifest->'ornaments')=1
+      and jsonb_typeof(version.identity_manifest->'wardrobe')='object'
+      and jsonb_typeof(version.identity_manifest->'skin')='object'
+      and jsonb_typeof(version.identity_manifest#>'{form,rules}')='object'
+      and jsonb_typeof(version.identity_manifest->'dignity')='object'
+      and jsonb_typeof(version.identity_manifest->'allowedTransitions')='array'
+      and version.identity_manifest_hash=encode(extensions.digest(convert_to(
+        version.identity_manifest::text,'UTF8'),'sha256'),'hex')
+  ),
+  'GQC-WORLD-002/003: the deity candidate stores the exact measurable manifest and canonical content hash'
+);
+select throws_ok(format(
+  'select pg_temp.record_contract_character_manifest(%L,%L::jsonb,%L)',
+  'b1820000-0000-4000-8000-000000000099',
+  (select value from world_fixture where key='shiva_identity_manifest'),repeat('f',64)
+ ),'22023','character identity manifest hash does not match canonical content',
+ 'GQC-WORLD-002: a manifest hash must match its canonical JSON content');
+select throws_ok(format(
+  'select pg_temp.record_contract_character_manifest(%L,%L::jsonb)',
+  'b1820000-0000-4000-8000-000000000099',
+  (select jsonb_set(value::jsonb,'{form}',(value::jsonb->'form')-'topology')::text
+    from world_fixture where key='shiva_identity_manifest')
+ ),'22023','character identity manifest is invalid: form keys must be exact',
+ 'GQC-WORLD-003: deity topology is explicit');
+select throws_ok(format(
+  'select pg_temp.record_contract_character_manifest(%L,%L::jsonb)',
+  'b1820000-0000-4000-8000-000000000099',
+  (select jsonb_set(value::jsonb,'{deity}',(value::jsonb->'deity')-'arms')::text
+    from world_fixture where key='shiva_identity_manifest')
+ ),'22023','character identity manifest is invalid: deity keys must be exact',
+ 'GQC-WORLD-003: deity arms are explicit');
+select throws_ok(format(
+  'select pg_temp.record_contract_character_manifest(%L,%L::jsonb)',
+  'b1820000-0000-4000-8000-000000000099',
+  (select jsonb_set(value::jsonb,'{deity}',
+      (value::jsonb->'deity')-'handObjectAssignments')::text
+    from world_fixture where key='shiva_identity_manifest')
+ ),'22023','character identity manifest is invalid: deity keys must be exact',
+ 'GQC-WORLD-003: deity hand-object assignments are explicit');
+select throws_ok(format(
+  'select pg_temp.record_contract_character_manifest(%L,%L::jsonb)',
+  'b1820000-0000-4000-8000-000000000099',
+  (select jsonb_set(value::jsonb,'{deity}',(value::jsonb->'deity')-'vahana')::text
+    from world_fixture where key='shiva_identity_manifest')
+ ),'22023','character identity manifest is invalid: deity keys must be exact',
+ 'GQC-WORLD-003: a deity vahana or explicit none value is required');
+select throws_ok(format(
+  'select pg_temp.record_contract_character_manifest(%L,%L::jsonb)',
+  'b1820000-0000-4000-8000-000000000099',
+  (select jsonb_set(value::jsonb,'{deity}',(value::jsonb->'deity')-'weapons')::text
+    from world_fixture where key='shiva_identity_manifest')
+ ),'22023','character identity manifest is invalid: deity keys must be exact',
+ 'GQC-WORLD-003: deity weapons are explicit');
+select throws_ok(format(
+  'select pg_temp.record_contract_character_manifest(%L,%L::jsonb)',
+  'b1820000-0000-4000-8000-000000000099',
+  (select (value::jsonb-'ornaments')::text from world_fixture
+    where key='shiva_identity_manifest')
+ ),'22023','character identity manifest is invalid: top-level keys must be exact for schema v2',
+ 'GQC-WORLD-002/003: ornament rules are explicit');
+select throws_ok(format(
+  'select pg_temp.record_contract_character_manifest(%L,%L::jsonb)',
+  'b1820000-0000-4000-8000-000000000099',
+  (select (value::jsonb-'wardrobe')::text from world_fixture
+    where key='shiva_identity_manifest')
+ ),'22023','character identity manifest is invalid: top-level keys must be exact for schema v2',
+ 'GQC-WORLD-002: wardrobe rules are explicit');
+select throws_ok(format(
+  'select pg_temp.record_contract_character_manifest(%L,%L::jsonb)',
+  'b1820000-0000-4000-8000-000000000099',
+  (select (value::jsonb-'skin')::text from world_fixture
+    where key='shiva_identity_manifest')
+ ),'22023','character identity manifest is invalid: top-level keys must be exact for schema v2',
+ 'GQC-WORLD-002/003: skin tone and form rules are explicit');
+select throws_ok(format(
+  'select pg_temp.record_contract_character_manifest(%L,%L::jsonb)',
+  'b1820000-0000-4000-8000-000000000099',
+  (select jsonb_set(value::jsonb,'{form}',(value::jsonb->'form')-'rules')::text
+    from world_fixture where key='shiva_identity_manifest')
+ ),'22023','character identity manifest is invalid: form keys must be exact',
+ 'GQC-WORLD-002: form rules are explicit');
+select throws_ok(format(
+  'select pg_temp.record_contract_character_manifest(%L,%L::jsonb)',
+  'b1820000-0000-4000-8000-000000000099',
+  (select (value::jsonb-'dignity')::text from world_fixture
+    where key='shiva_identity_manifest')
+ ),'22023','character identity manifest is invalid: top-level keys must be exact for schema v2',
+ 'GQC-WORLD-003: dignity rules are explicit');
+select throws_ok(format(
+  'select pg_temp.record_contract_character_manifest(%L,%L::jsonb)',
+  'b1820000-0000-4000-8000-000000000099',
+  (select (value::jsonb-'allowedTransitions')::text from world_fixture
+    where key='shiva_identity_manifest')
+ ),'22023','character identity manifest is invalid: top-level keys must be exact for schema v2',
+ 'GQC-WORLD-003: allowed form transitions are explicit even when none are allowed');
+select throws_ok(format(
+  'select pg_temp.record_contract_character_manifest(%L,%L::jsonb)',
+  'b1820000-0000-4000-8000-000000000099',
+  (select jsonb_set(jsonb_set(value::jsonb,'{form,topology,armCount}','3'::jsonb),
+      '{form,topology,handCount}','3'::jsonb)::text
+    from world_fixture where key='shiva_identity_manifest')
+ ),'22023','character identity manifest is invalid: deity arms must enumerate the topology arm count',
+ 'GQC-WORLD-003: declared arms exactly match topology counts');
+select throws_ok(format(
+  'select pg_temp.record_contract_character_manifest(%L,%L::jsonb)',
+  'b1820000-0000-4000-8000-000000000099',
+  (select jsonb_set(value::jsonb,'{deity,weapons}','[]'::jsonb)::text
+    from world_fixture where key='shiva_identity_manifest')
+ ),'22023','character identity manifest is invalid: held deity weapons must appear in weapons',
+ 'GQC-WORLD-003: hand-object weapon assignments resolve to the explicit weapon list');
+select throws_ok(format(
+  'select pg_temp.record_contract_character_manifest(%L,%L::jsonb)',
+  'b1820000-0000-4000-8000-000000000099',
+  (select value from world_fixture where key='shiva_identity_manifest')
+ ),'22023','character identity manifest does not match its character form',
+ 'GQC-WORLD-002: manifest identity keys and names bind to the exact character form row');
+select throws_ok(format(
+  'select pg_temp.record_contract_character_manifest(%L,%L::jsonb)',
+  'b1820000-0000-4000-8000-000000000099',
+  (select jsonb_set(value::jsonb,'{deity}',
+      (select value::jsonb->'deity' from world_fixture
+        where key='shiva_identity_manifest'))::text
+    from world_fixture where key='non_deity_identity_manifest')
+ ),'22023','character identity manifest is invalid: non-deity manifests must set deity to null',
+ 'GQC-WORLD-002: non-deity manifests cannot claim deity-only anatomy or attributes');
+select lives_ok(format(
+  'select pg_temp.record_contract_character_manifest(%L,%L::jsonb)',
+  'b1820000-0000-4000-8000-000000000099',
+  (select value from world_fixture where key='non_deity_identity_manifest')
+ ),'GQC-WORLD-002: a measurable non-deity manifest records deity as not applicable');
+select ok(
+  exists(select 1 from public.character_versions version
+    where version.id='b1820000-0000-4000-8000-000000000099'
+      and not (version.identity_manifest->>'isDeity')::boolean
+      and jsonb_typeof(version.identity_manifest->'deity')='null'
+      and jsonb_typeof(version.identity_manifest->'ornaments')='array'
+      and version.identity_manifest_hash=encode(extensions.digest(convert_to(
+        version.identity_manifest::text,'UTF8'),'sha256'),'hex')),
+  'GQC-WORLD-002: the stored non-deity manifest remains explicit and content-bound'
+);
+
+reset role;
+select throws_ok(
+  $$update public.character_versions
+    set identity_manifest_hash=repeat('0',64)
+    where id='b1820000-0000-4000-8000-000000000001'$$,
+  '55000','immutable record cannot be updated or deleted',
+  'P2-08: accepted media-version identity manifests are immutable'
+);
+
+set local session_replication_role=replica;
+delete from public.character_selections
+where character_form_id='b1810000-0000-4000-8000-000000000099';
+delete from public.character_versions
+where id='b1820000-0000-4000-8000-000000000099';
+delete from public.character_forms
+where id='b1810000-0000-4000-8000-000000000099';
+delete from public.characters
+where id='b1800000-0000-4000-8000-000000000099';
+set local session_replication_role=origin;
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
+select set_config('request.jwt.claim.role','service_role',true);
+set local role service_role;
 select is((select state from public.character_selections),'review_required','the initial character waits for human review');
 
 reset role;
@@ -111,13 +394,15 @@ select lives_ok(format(
  ),'the user accepts the exact character candidate');
 select is((select state from public.character_selections),'accepted','acceptance changes only the selection envelope');
 select is((select selected_version_id from public.character_selections),'b1820000-0000-4000-8000-000000000001'::uuid,'the selected identity is exact');
+select lives_ok($sql$
 insert into world_fixture(key,value)
 select 'regeneration',public.command_decide_world_candidate(
  'b1100000-0000-4000-8000-000000000001','b1600000-0000-4000-8000-000000000001','character',
  'b1810000-0000-4000-8000-000000000001','b1820000-0000-4000-8000-000000000001',2,'regenerate',
  'Shiva portrait with calmer eyes',encode(extensions.digest(convert_to('Shiva portrait with calmer eyes','UTF8'),'sha256'),'hex'),
  'b1900000-0000-4000-8000-000000000002','world-regenerate-001',repeat('2',64),'b1910000-0000-4000-8000-000000000002'
-)::text;
+)::text
+$sql$,'the accepted identity queues one exact replacement request');
 select is((select state from public.character_selections),'generating','an accepted identity can be reopened for a replacement');
 select is((select selected_version_id from public.character_selections),'b1820000-0000-4000-8000-000000000001'::uuid,'the accepted version remains the active fallback while generating');
 reset role;
@@ -134,7 +419,10 @@ select throws_ok(format(
  'b1800000-0000-4000-8000-000000000001','b1810000-0000-4000-8000-000000000001',
  'shiva','Shiva','mahadeva','Mahadeva','b1820000-0000-4000-8000-000000000002',
  'generated','Shiva portrait with calmer eyes',encode(extensions.digest(convert_to('Shiva portrait with calmer eyes','UTF8'),'sha256'),'hex'),
- 'no drift','b1720000-0000-4000-8000-000000000002','{"isDeity":true,"arms":2}',repeat('b',64),
+ 'no drift','b1720000-0000-4000-8000-000000000002',
+ (select value from world_fixture where key='shiva_identity_manifest'),
+ encode(extensions.digest(convert_to((select value::jsonb from world_fixture
+   where key='shiva_identity_manifest')::text,'UTF8'),'sha256'),'hex'),
  'b1930000-0000-4000-8000-000000000099'
  ),'40001','character generation response is stale','an unrelated request cannot replace the accepted candidate');
 select lives_ok(format(
@@ -143,7 +431,10 @@ select lives_ok(format(
  'b1800000-0000-4000-8000-000000000001','b1810000-0000-4000-8000-000000000001',
  'shiva','Shiva','mahadeva','Mahadeva','b1820000-0000-4000-8000-000000000002',
  'generated','Shiva portrait with calmer eyes',encode(extensions.digest(convert_to('Shiva portrait with calmer eyes','UTF8'),'sha256'),'hex'),
- 'no drift','b1720000-0000-4000-8000-000000000002','{"isDeity":true,"arms":2}',repeat('b',64),
+ 'no drift','b1720000-0000-4000-8000-000000000002',
+ (select value from world_fixture where key='shiva_identity_manifest'),
+ encode(extensions.digest(convert_to((select value::jsonb from world_fixture
+   where key='shiva_identity_manifest')::text,'UTF8'),'sha256'),'hex'),
  ((select value::jsonb from world_fixture where key='regeneration')->>'regenerationRequestId')
  ),'the bound generation response creates a new immutable version');
 select is((select selected_version_id from public.character_selections),'b1820000-0000-4000-8000-000000000001'::uuid,'reviewing a replacement preserves the prior selection');
@@ -161,6 +452,111 @@ select lives_ok(format(
  ),'the replacement can become the selected version');
 select is((select count(*)::integer from public.character_versions),2,'replacement preserves both immutable character versions');
 
+-- V-P2-007: execute the authenticated replacement-upload boundary and the
+-- service completion boundary, then select the exact immutable upload version.
+select lives_ok(format(
+ 'select public.command_prepare_world_upload(%L,%L,%L,%L,%L,5,%L,%L,%L,%L,%L,1000,%L,%L,%L,%L,%L,%L)',
+ 'b1100000-0000-4000-8000-000000000001','b1600000-0000-4000-8000-000000000001',
+ 'character','b1810000-0000-4000-8000-000000000001','b1820000-0000-4000-8000-000000000002',
+ 'b1940000-0000-4000-8000-000000000001','b1930000-0000-4000-8000-000000000005',
+ 'b1700000-0000-4000-8000-000000000005','b1730000-0000-4000-8000-000000000005',
+ 'image/png',repeat('5',64),'shiva-upload.png','b1900000-0000-4000-8000-000000000005',
+ 'world-upload-0001',repeat('6',64),'b1910000-0000-4000-8000-000000000005'
+ ),'V-P2-007: an accepted character can enter the exact replacement-upload workflow');
+
+reset role;
+set local session_replication_role=replica;
+insert into public.assets(id,workspace_id,asset_kind) values(
+ 'b1700000-0000-4000-8000-000000000005','b1100000-0000-4000-8000-000000000001','character_anchor'
+);
+insert into public.asset_versions(
+ id,workspace_id,asset_id,version_number,source_quarantine_version_id,bucket_id,
+ object_name,storage_version,content_sha256,media_mime,byte_length,policy_version_id,
+ provenance_hash
+) values(
+ 'b1720000-0000-4000-8000-000000000005','b1100000-0000-4000-8000-000000000001',
+ 'b1700000-0000-4000-8000-000000000005',1,'b1730000-0000-4000-8000-000000000005',
+ 'workspace-media',
+ 'b1100000-0000-4000-8000-000000000001/character_anchor/b1700000-0000-4000-8000-000000000005/b1720000-0000-4000-8000-000000000005/source',
+ 'v1',repeat('7',64),'image/png',900,'b1710000-0000-4000-8000-000000000001',repeat('8',64)
+);
+set local session_replication_role=origin;
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
+select set_config('request.jwt.claim.role','service_role',true);
+set local role service_role;
+select lives_ok(format(
+ 'select public.command_mark_world_upload_scanning(%L,%L)',
+ 'b1100000-0000-4000-8000-000000000001','b1940000-0000-4000-8000-000000000001'
+ ),'V-P2-007: the registered replacement upload enters the scanning state');
+select lives_ok(format(
+ 'select public.command_complete_world_upload(%L,%L,%L,%L)',
+ 'b1100000-0000-4000-8000-000000000001','b1940000-0000-4000-8000-000000000001',
+ 'b1720000-0000-4000-8000-000000000005','b1820000-0000-4000-8000-000000000005'
+ ),'V-P2-007: the promoted replacement creates a new immutable uploaded character version');
+select ok(
+  (select source_kind='uploaded'
+      and anchor_asset_version_id='b1720000-0000-4000-8000-000000000005'
+      and version_number=3
+    from public.character_versions
+    where id='b1820000-0000-4000-8000-000000000005')
+  and (select count(*)=3 from public.character_versions
+    where character_form_id='b1810000-0000-4000-8000-000000000001'),
+  'V-P2-007: upload completion adds exactly one version with exact promoted-asset provenance'
+);
+select ok(
+  exists(select 1 from public.character_versions
+    where id='b1820000-0000-4000-8000-000000000002'
+      and identity_manifest_hash=encode(extensions.digest(convert_to(
+        (select value::jsonb from world_fixture
+          where key='shiva_identity_manifest')::text,'UTF8'),'sha256'),'hex')
+      and prompt_sha256=encode(extensions.digest(
+        convert_to('Shiva portrait with calmer eyes','UTF8'),'sha256'),'hex')),
+  'V-P2-007: the original accepted version and both immutable hashes remain exact'
+);
+
+reset role;
+select set_config('request.jwt.claims','{"sub":"b1200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2","session_id":"b1210000-0000-4000-8000-000000000001"}',true);
+select set_config('request.jwt.claim.sub','b1200000-0000-4000-8000-000000000001',true);
+select set_config('request.jwt.claim.role','authenticated',true);
+set local role authenticated;
+select lives_ok(format(
+ 'select public.command_decide_world_candidate(%L,%L,%L,%L,%L,7,%L,%L,%L,%L,%L,%L,%L)',
+ 'b1100000-0000-4000-8000-000000000001','b1600000-0000-4000-8000-000000000001','character',
+ 'b1810000-0000-4000-8000-000000000001','b1820000-0000-4000-8000-000000000005','accept','',repeat('0',64),
+ 'b1900000-0000-4000-8000-000000000006','world-upload-accept',repeat('9',64),'b1910000-0000-4000-8000-000000000006'
+ ),'V-P2-007: the reviewer accepts the exact uploaded replacement candidate');
+select is(
+  (select selected_version_id from public.character_selections
+    where configuration_candidate_id='b1600000-0000-4000-8000-000000000001'
+      and character_form_id='b1810000-0000-4000-8000-000000000001'),
+  'b1820000-0000-4000-8000-000000000005'::uuid,
+  'V-P2-007: selection resolves to the exact new immutable upload version'
+);
+
+-- Restore the original accepted World fixture before building its reference
+-- pack; the enclosing transaction still rolls back the entire suite.
+reset role;
+set local session_replication_role=replica;
+update public.character_selections
+set candidate_version_id='b1820000-0000-4000-8000-000000000002',
+  selected_version_id='b1820000-0000-4000-8000-000000000002',
+  state='accepted',aggregate_version=5
+where configuration_candidate_id='b1600000-0000-4000-8000-000000000001'
+  and character_form_id='b1810000-0000-4000-8000-000000000001';
+delete from private.world_asset_decisions
+where version_id='b1820000-0000-4000-8000-000000000005';
+delete from public.character_versions
+where id='b1820000-0000-4000-8000-000000000005';
+delete from private.world_upload_intakes
+where id='b1940000-0000-4000-8000-000000000001';
+delete from private.world_regeneration_requests
+where id='b1930000-0000-4000-8000-000000000005';
+delete from public.asset_versions
+where id='b1720000-0000-4000-8000-000000000005';
+delete from public.assets
+where id='b1700000-0000-4000-8000-000000000005';
+set local session_replication_role=origin;
+
 reset role;
 select set_config('request.jwt.claims','{"role":"service_role"}',true);
 select set_config('request.jwt.claim.role','service_role',true);
@@ -172,7 +568,25 @@ select throws_ok(format(
  'b1850000-0000-4000-8000-000000000001','generated','Empty Kedarnath courtyard',
  encode(extensions.digest(convert_to('Empty Kedarnath courtyard','UTF8'),'sha256'),'hex'),'no people',
  'b1720000-0000-4000-8000-000000000003','{"namedTemple":true}',repeat('c',64)
- ),'22023','location candidate envelope is invalid','a named temple cannot omit its evidence-set hash');
+ ),'22023','location candidate envelope is invalid','V-P2-009: a named temple cannot omit its required provenance evidence-set hash');
+select ok(
+  not exists(select 1 from public.series_releases
+    where series_id='b1300000-0000-4000-8000-000000000001')
+  and not exists(select 1 from public.production_runs
+    where episode_id='b1400000-0000-4000-8000-000000000001')
+  and not exists(select 1 from private.production_budget_authorizations
+    where episode_id='b1400000-0000-4000-8000-000000000001')
+  and not exists(
+    select 1 from private.production_budget_reservations reservation
+    join private.production_budget_authorizations authz
+      on authz.id=reservation.authorization_id
+    where authz.episode_id='b1400000-0000-4000-8000-000000000001'
+  )
+  and not exists(select 1 from private.outbox_events
+    where event_type='production.run.authorized.v1'
+      and payload_json->>'episodeId'='b1400000-0000-4000-8000-000000000001'),
+  'V-P2-009: missing named-temple provenance creates no release, run, authority, reservation, or production outbox event'
+);
 select lives_ok(format(
  'select public.command_record_location_candidate(%L,%L,%L,%L,%L,true,%L,%L,%L,%L,%L,%L,%L,%L::jsonb,%L,%L,null)',
  'b1100000-0000-4000-8000-000000000001','b1600000-0000-4000-8000-000000000001',
@@ -273,7 +687,7 @@ select throws_ok(format(
  'b1100000-0000-4000-8000-000000000001','b1200000-0000-4000-8000-000000000001',
  '{all}','{all}','{all}','{all}','Zyra owner appointment',repeat('d',64),
  'b2200000-0000-4000-8000-000000000099','competency-aal1',repeat('e',64),'b2210000-0000-4000-8000-000000000099'
- ),'42501','aal2 required','competency activation fails closed without AAL2');
+ ),'42501','AAL2 authenticated authority required','competency activation remains strict AAL2 team administration');
 
 select set_config('request.jwt.claims','{"sub":"b1200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2","session_id":"b1210000-0000-4000-8000-000000000001"}',true);
 insert into world_fixture(key,value)
@@ -284,6 +698,14 @@ select 'competency_one',public.command_appoint_cultural_reviewer(
  'b2200000-0000-4000-8000-000000000001','competency-one',repeat('1',64),'b2210000-0000-4000-8000-000000000001'
 )::text;
 select is(((select value::jsonb from world_fixture where key='competency_one')->>'status'),'active','an AAL2 admin explicitly activates broad launch competency');
+
+insert into world_fixture(key,value)
+select 'competency_expired',public.command_appoint_cultural_reviewer(
+ 'b1100000-0000-4000-8000-000000000001','b1200000-0000-4000-8000-000000000002',
+ array['all'],array['all'],array['all'],array['all'],'Expired appointment fixture',repeat('f',64),
+ statement_timestamp()-interval '2 years',statement_timestamp()-interval '1 year',
+ 'b2200000-0000-4000-8000-000000000003','competency-expired',repeat('a',64),'b2210000-0000-4000-8000-000000000003'
+)::text;
 
 select set_config('request.jwt.claims','{"sub":"b1200000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal2","session_id":"b1210000-0000-4000-8000-000000000002"}',true);
 select set_config('request.jwt.claim.sub','b1200000-0000-4000-8000-000000000002',true);
@@ -303,6 +725,118 @@ select 'scope_two',encode(extensions.digest(convert_to(
 from public.reviewer_competency_versions competency
 where competency.id=((select value::jsonb from world_fixture where key='competency_two')->>'competencyVersionId')::uuid;
 
+insert into world_fixture(key,value)
+select 'scope_expired',encode(extensions.digest(convert_to(
+ array_to_string(competency.traditions,',')||':'||array_to_string(competency.regions,',')||':'||
+ array_to_string(competency.languages,',')||':'||array_to_string(competency.content_classes,',')||':'||
+ competency.appointment_evidence_hash,'UTF8'),'sha256'),'hex')
+from public.reviewer_competency_versions competency
+where competency.id=((select value::jsonb from world_fixture where key='competency_expired')->>'competencyVersionId')::uuid;
+
+select throws_ok(format(
+ 'select public.command_submit_source_review(%L,%L,%L,1,%L,%L,%L,%L,%L,%L,%L)',
+ 'b1100000-0000-4000-8000-000000000001','b2100000-0000-4000-8000-000000000001',
+ 'b2200000-0000-4000-8000-000000000099','approve','missing competency must not publish',repeat('0',64),
+ 'b2300000-0000-4000-8000-000000000010','review-missing-competency',repeat('b',64),'b2310000-0000-4000-8000-000000000010'
+ ),'42501','qualified source review authority is unavailable',
+ 'V-P2-018: publication rejects a reviewer with no exact competency');
+reset role;
+select ok(
+  not exists(select 1 from public.series_releases
+    where series_id='b1300000-0000-4000-8000-000000000001')
+  and not exists(select 1 from public.production_runs
+    where episode_id='b1400000-0000-4000-8000-000000000001')
+  and not exists(select 1 from private.production_budget_authorizations
+    where episode_id='b1400000-0000-4000-8000-000000000001')
+  and not exists(
+    select 1 from private.production_budget_reservations reservation
+    join private.production_budget_authorizations authz
+      on authz.id=reservation.authorization_id
+    where authz.episode_id='b1400000-0000-4000-8000-000000000001'
+  )
+  and not exists(select 1 from private.outbox_events
+    where event_type='production.run.authorized.v1'
+      and payload_json->>'episodeId'='b1400000-0000-4000-8000-000000000001'),
+  'V-P2-018: missing competency creates no release, run, authority, reservation, or production outbox event'
+);
+
+select set_config('request.jwt.claims','{"sub":"b1200000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal2","session_id":"b1210000-0000-4000-8000-000000000002"}',true);
+select set_config('request.jwt.claim.sub','b1200000-0000-4000-8000-000000000002',true);
+select set_config('request.jwt.claim.role','authenticated',true);
+set local role authenticated;
+select throws_ok(format(
+ 'select public.command_submit_source_review(%L,%L,%L,1,%L,%L,%L,%L,%L,%L,%L)',
+ 'b1100000-0000-4000-8000-000000000001','b2100000-0000-4000-8000-000000000001',
+ ((select value::jsonb from world_fixture where key='competency_expired')->>'competencyVersionId'),
+ 'approve','expired competency must not publish',(select value from world_fixture where key='scope_expired'),
+ 'b2300000-0000-4000-8000-000000000011','review-expired-competency',repeat('c',64),'b2310000-0000-4000-8000-000000000011'
+ ),'42501','qualified source review authority is unavailable',
+ 'V-P2-018: publication rejects an expired exact reviewer competency');
+reset role;
+select ok(
+  not exists(select 1 from public.series_releases
+    where series_id='b1300000-0000-4000-8000-000000000001')
+  and not exists(select 1 from public.production_runs
+    where episode_id='b1400000-0000-4000-8000-000000000001')
+  and not exists(select 1 from private.production_budget_authorizations
+    where episode_id='b1400000-0000-4000-8000-000000000001')
+  and not exists(
+    select 1 from private.production_budget_reservations reservation
+    join private.production_budget_authorizations authz
+      on authz.id=reservation.authorization_id
+    where authz.episode_id='b1400000-0000-4000-8000-000000000001'
+  )
+  and not exists(select 1 from private.outbox_events
+    where event_type='production.run.authorized.v1'
+      and payload_json->>'episodeId'='b1400000-0000-4000-8000-000000000001'),
+  'V-P2-018: expired competency creates no release, run, authority, reservation, or production outbox event'
+);
+
+set local session_replication_role=replica;
+update public.memberships
+set status='deactivated',deactivated_at=statement_timestamp()
+where workspace_id='b1100000-0000-4000-8000-000000000001'
+  and user_id='b1200000-0000-4000-8000-000000000002';
+set local session_replication_role=origin;
+select set_config('request.jwt.claims','{"sub":"b1200000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal2","session_id":"b1210000-0000-4000-8000-000000000002"}',true);
+select set_config('request.jwt.claim.sub','b1200000-0000-4000-8000-000000000002',true);
+select set_config('request.jwt.claim.role','authenticated',true);
+set local role authenticated;
+select throws_ok(format(
+ 'select public.command_submit_source_review(%L,%L,%L,1,%L,%L,%L,%L,%L,%L,%L)',
+ 'b1100000-0000-4000-8000-000000000001','b2100000-0000-4000-8000-000000000001',
+ ((select value::jsonb from world_fixture where key='competency_two')->>'competencyVersionId'),
+ 'approve','deactivated reviewer must not publish',(select value from world_fixture where key='scope_two'),
+ 'b2300000-0000-4000-8000-000000000012','review-deactivated-member',repeat('d',64),'b2310000-0000-4000-8000-000000000012'
+ ),'42501','active workspace session required',
+ 'V-P2-018: publication rejects a deactivated otherwise-qualified reviewer');
+reset role;
+select ok(
+  not exists(select 1 from public.series_releases
+    where series_id='b1300000-0000-4000-8000-000000000001')
+  and not exists(select 1 from public.production_runs
+    where episode_id='b1400000-0000-4000-8000-000000000001')
+  and not exists(select 1 from private.production_budget_authorizations
+    where episode_id='b1400000-0000-4000-8000-000000000001')
+  and not exists(
+    select 1 from private.production_budget_reservations reservation
+    join private.production_budget_authorizations authz
+      on authz.id=reservation.authorization_id
+    where authz.episode_id='b1400000-0000-4000-8000-000000000001'
+  )
+  and not exists(select 1 from private.outbox_events
+    where event_type='production.run.authorized.v1'
+      and payload_json->>'episodeId'='b1400000-0000-4000-8000-000000000001'),
+  'V-P2-018: deactivated reviewer creates no release, run, authority, reservation, or production outbox event'
+);
+
+set local session_replication_role=replica;
+update public.memberships
+set status='active',deactivated_at=null
+where workspace_id='b1100000-0000-4000-8000-000000000001'
+  and user_id='b1200000-0000-4000-8000-000000000002';
+set local session_replication_role=origin;
+
 reset role;
 select set_config('request.jwt.claims','{"role":"service_role"}',true);
 select set_config('request.jwt.claim.role','service_role',true);
@@ -320,7 +854,27 @@ select throws_ok(format(
  'b1100000-0000-4000-8000-000000000001','b2100000-0000-4000-8000-000000000001',
  ((select value::jsonb from world_fixture where key='competency_two')->>'competencyVersionId'),
  'approve','recused approval',(select value from world_fixture where key='scope_two'),'b2300000-0000-4000-8000-000000000002','review-two',repeat('3',64),'b2310000-0000-4000-8000-000000000002'
- ),'42501','reviewer recusal applies to this subject','a matching recusal invalidates otherwise broad competency');
+ ),'42501','reviewer recusal applies to this subject',
+ 'V-P2-018: publication rejects a recused otherwise-qualified reviewer');
+reset role;
+select ok(
+  not exists(select 1 from public.series_releases
+    where series_id='b1300000-0000-4000-8000-000000000001')
+  and not exists(select 1 from public.production_runs
+    where episode_id='b1400000-0000-4000-8000-000000000001')
+  and not exists(select 1 from private.production_budget_authorizations
+    where episode_id='b1400000-0000-4000-8000-000000000001')
+  and not exists(
+    select 1 from private.production_budget_reservations reservation
+    join private.production_budget_authorizations authz
+      on authz.id=reservation.authorization_id
+    where authz.episode_id='b1400000-0000-4000-8000-000000000001'
+  )
+  and not exists(select 1 from private.outbox_events
+    where event_type='production.run.authorized.v1'
+      and payload_json->>'episodeId'='b1400000-0000-4000-8000-000000000001'),
+  'V-P2-018: recusal creates no release, run, authority, reservation, or production outbox event'
+);
 
 reset role;
 select set_config('request.jwt.claims','{"sub":"b1200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2","session_id":"b1210000-0000-4000-8000-000000000001"}',true);
@@ -334,14 +888,6 @@ select 'scope_one',encode(extensions.digest(convert_to(
  competency.appointment_evidence_hash,'UTF8'),'sha256'),'hex')
 from public.reviewer_competency_versions competency
 where competency.id=((select value::jsonb from world_fixture where key='competency_one')->>'competencyVersionId')::uuid;
-select lives_ok(format(
- 'select public.command_submit_source_review(%L,%L,%L,1,%L,%L,%L,%L,%L,%L,%L)',
- 'b1100000-0000-4000-8000-000000000001','b2100000-0000-4000-8000-000000000001',
- ((select value::jsonb from world_fixture where key='competency_one')->>'competencyVersionId'),
- 'approve','evidence complete',(select value from world_fixture where key='scope_one'),
- 'b2300000-0000-4000-8000-000000000001','review-one',repeat('4',64),'b2310000-0000-4000-8000-000000000001'
- ),'the qualified reviewer approves the exact complete source packet');
-select is((select status from public.source_review_statuses where source_review_packet_id='b2100000-0000-4000-8000-000000000001'),'approved','qualified approval is a separate selected decision');
 
 -- Complete one exact executable plan and prove that the late World Lock
 -- transaction is all-or-nothing before sealing the authoritative run.
@@ -367,6 +913,28 @@ select is(
     'b1100000-0000-4000-8000-000000000001')),
   7,'the integration quote carries every mandatory production allowance'
 );
+select public.command_record_authenticated_voice_canary(
+  configuration.voice_version_id,
+  configuration.external_voice_id,
+  'eleven_multilingual_v2',
+  'mp3_44100_128',
+  repeat('1',64),
+  repeat('2',64),
+  repeat('3',64),
+  repeat('4',64),
+  4096,
+  statement_timestamp(),
+  statement_timestamp() + interval '30 days',
+  'b2360000-0000-4000-8000-000000000001',
+  'world-voice-canary-001',
+  repeat('5',64)
+)
+from private.voice_provider_configurations configuration
+where configuration.voice_version_id = (
+  select candidate.voice_version_id
+  from public.episode_configuration_candidates candidate
+  where candidate.id = 'b1600000-0000-4000-8000-000000000001'
+);
 
 reset role;
 set local session_replication_role=replica;
@@ -381,8 +949,6 @@ update private.aggregate_versions set current_version=(select aggregate_version 
 where aggregate_type='episode' and aggregate_id='b1400000-0000-4000-8000-000000000001';
 update public.episode_configuration_candidates set state='ready_to_lock'
 where id='b1600000-0000-4000-8000-000000000001';
-update public.voice_version_availability set status='verified'
-where voice_version_id=(select voice_version_id from public.episode_configuration_candidates where id='b1600000-0000-4000-8000-000000000001');
 insert into public.script_lock_events(
   id,workspace_id,episode_id,script_revision_id,raw_utf8_sha256,actor_user_id,
   actor_authority_epoch,duration_acknowledged,command_id,correlation_id
@@ -497,6 +1063,75 @@ join public.world_reference_pack_versions pack
   on pack.configuration_candidate_id=packet.configuration_candidate_id and pack.state='verified'
 join public.cultural_policy_versions policy on policy.id=packet.policy_version_id
 where packet.id='b2100000-0000-4000-8000-000000000001';
+set local session_replication_role=origin;
+with claims as (
+  select jsonb_agg(jsonb_build_object(
+    'category',required.category,
+    'applicability','not_present',
+    'claims','[]'::jsonb,
+    'evidenceHash',repeat(substr(md5(required.category),1,1),64),
+    'qualifiedReviewTriggered',false
+  ) order by required.ordinal) as payload
+  from unnest(array[
+    'deity_attributes','traditions','named_temples','rituals','shlokas',
+    'contested_retellings','violence_romance','caste_social_context',
+    'rights_triggers'
+  ]::text[]) with ordinality as required(category,ordinal)
+), assessments as (
+  select jsonb_agg(jsonb_build_object(
+    'ruleCode',contract.rule_code,
+    'verdict','eligible',
+    'claimCategories','[]'::jsonb,
+    'evidenceHash',repeat(substr(md5(contract.rule_code),1,1),64),
+    'rationale','Exact all-clear World integration assessment.'
+  ) order by contract.ordinal) as payload
+  from public.p2_09_cultural_rule_contracts contract
+), contract as (
+  select encode(extensions.digest(convert_to(jsonb_agg(jsonb_build_object(
+    'ruleCode',rule.rule_code,
+    'ordinal',rule.ordinal,
+    'effect',rule.effect,
+    'nonOverridable',rule.non_overridable,
+    'claimCategories',to_jsonb(rule.claim_categories),
+    'allowedMachineStates',to_jsonb(rule.allowed_machine_states),
+    'requirement',rule.requirement
+  ) order by rule.ordinal)::text,'UTF8'),'sha256'),'hex') as hash
+  from public.p2_09_cultural_rule_contracts rule
+), recorded as (
+  select public.command_record_p2_09_cultural_claim_bundle(
+    'b1100000-0000-4000-8000-000000000001',
+    'b2100000-0000-4000-8000-000000000001',
+    'genie.p2-09-cultural-claims.v1',
+    claims.payload,
+    assessments.payload,
+    encode(extensions.digest(convert_to(claims.payload::text,'UTF8'),'sha256'),'hex'),
+    encode(extensions.digest(convert_to(assessments.payload::text,'UTF8'),'sha256'),'hex'),
+    contract.hash
+  ) as result
+  from claims,assessments,contract
+)
+select is(recorded.result->>'machineState','eligible',
+  'the complete World fixture records its exact P2-09 cultural bundle before qualified approval')
+from recorded;
+reset role;
+select set_config('request.jwt.claims','{"sub":"b1200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2","session_id":"b1210000-0000-4000-8000-000000000001"}',true);
+select set_config('request.jwt.claim.sub','b1200000-0000-4000-8000-000000000001',true);
+select set_config('request.jwt.claim.role','authenticated',true);
+set local role authenticated;
+select lives_ok(format(
+ 'select public.command_submit_source_review(%L,%L,%L,1,%L,%L,%L,%L,%L,%L,%L)',
+ 'b1100000-0000-4000-8000-000000000001','b2100000-0000-4000-8000-000000000001',
+ ((select value::jsonb from world_fixture where key='competency_one')->>'competencyVersionId'),
+ 'approve','evidence complete',(select value from world_fixture where key='scope_one'),
+ 'b2300000-0000-4000-8000-000000000001','review-one',repeat('4',64),'b2310000-0000-4000-8000-000000000001'
+ ),'the qualified reviewer approves the exact complete source packet');
+select is(
+  (select status from public.source_review_statuses where source_review_packet_id='b2100000-0000-4000-8000-000000000001'),
+  'approved',
+  'qualified approval is a separate selected decision bound to the final World evidence hashes'
+);
+reset role;
+set local session_replication_role=replica;
 insert into public.pronunciation_lexicons(id,workspace_id,series_id,lexicon_key) values
   ('b2500000-0000-4000-8000-000000000001','b1100000-0000-4000-8000-000000000001','b1300000-0000-4000-8000-000000000001','world-lock-lexicon');
 insert into public.pronunciation_lexicon_versions(
@@ -738,6 +1373,151 @@ select ok(
   and ((select value::jsonb from world_fixture where key='world_prepare_fail')->>'requestHash')~'^[a-f0-9]{64}$',
   'World Lock preparation derives exact server-side manifest and request hashes'
 );
+
+-- V-P2-019: every required audio identity is independently release-blocking.
+-- The fixture is restored after each case so the following case and the existing
+-- successful World Lock continue to exercise the original exact identities.
+reset role;
+set local session_replication_role=replica;
+update public.pronunciation_lexicon_versions
+set state='stale'
+where id='b2510000-0000-4000-8000-000000000001';
+set local session_replication_role=origin;
+set local role authenticated;
+select throws_ok(format(
+  'select public.command_lock_first_episode_world(%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%s,%s,%s,%L,%L,%L,%L,%L)',
+  'b1100000-0000-4000-8000-000000000001','b1600000-0000-4000-8000-000000000001',
+  'b2800000-0000-4000-8000-000000000001',(select value from world_fixture where key='quote_confirmation'),
+  'b2900000-0000-4000-8000-000000000011','b2910000-0000-4000-8000-000000000011',
+  'b2920000-0000-4000-8000-000000000011','b2930000-0000-4000-8000-000000000011',
+  'b2940000-0000-4000-8000-000000000011','b2950000-0000-4000-8000-000000000011',
+  'b2990000-0000-4000-8000-000000000011',
+  (select aggregate_version from public.series where id='b1300000-0000-4000-8000-000000000001'),
+  (select aggregate_version from public.episodes where id='b1400000-0000-4000-8000-000000000001'),
+  (select aggregate_version from public.episode_configuration_candidates where id='b1600000-0000-4000-8000-000000000001'),
+  ((select value::jsonb from world_fixture where key='world_prepare_fail')->>'manifestHash'),
+  'b2960000-0000-4000-8000-000000000011','world-lock-missing-pronunciation',
+  ((select value::jsonb from world_fixture where key='world_prepare_fail')->>'requestHash'),
+  'b2970000-0000-4000-8000-000000000011'
+),'40001','World Lock prerequisite pins are incomplete or stale',
+  'V-P2-019: a stale pronunciation identity blocks World Lock');
+reset role;
+select ok(
+  not exists(select 1 from public.series_releases
+    where series_id='b1300000-0000-4000-8000-000000000001')
+  and not exists(select 1 from public.production_runs
+    where episode_id='b1400000-0000-4000-8000-000000000001')
+  and not exists(select 1 from private.production_budget_authorizations
+    where episode_id='b1400000-0000-4000-8000-000000000001')
+  and not exists(
+    select 1 from private.production_budget_reservations reservation
+    join private.production_budget_authorizations authz
+      on authz.id=reservation.authorization_id
+    where authz.episode_id='b1400000-0000-4000-8000-000000000001'
+  )
+  and not exists(select 1 from private.outbox_events
+    where event_type='production.run.authorized.v1'
+      and payload_json->>'episodeId'='b1400000-0000-4000-8000-000000000001'),
+  'V-P2-019: missing pronunciation creates no release, run, authority, reservation, or production outbox event'
+);
+
+set local session_replication_role=replica;
+update public.pronunciation_lexicon_versions
+set state='verified'
+where id='b2510000-0000-4000-8000-000000000001';
+update public.score_identity_versions
+set state='stale'
+where id='b2520000-0000-4000-8000-000000000001';
+set local session_replication_role=origin;
+set local role authenticated;
+select throws_ok(format(
+  'select public.command_lock_first_episode_world(%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%s,%s,%s,%L,%L,%L,%L,%L)',
+  'b1100000-0000-4000-8000-000000000001','b1600000-0000-4000-8000-000000000001',
+  'b2800000-0000-4000-8000-000000000001',(select value from world_fixture where key='quote_confirmation'),
+  'b2900000-0000-4000-8000-000000000012','b2910000-0000-4000-8000-000000000012',
+  'b2920000-0000-4000-8000-000000000012','b2930000-0000-4000-8000-000000000012',
+  'b2940000-0000-4000-8000-000000000012','b2950000-0000-4000-8000-000000000012',
+  'b2990000-0000-4000-8000-000000000012',
+  (select aggregate_version from public.series where id='b1300000-0000-4000-8000-000000000001'),
+  (select aggregate_version from public.episodes where id='b1400000-0000-4000-8000-000000000001'),
+  (select aggregate_version from public.episode_configuration_candidates where id='b1600000-0000-4000-8000-000000000001'),
+  ((select value::jsonb from world_fixture where key='world_prepare_fail')->>'manifestHash'),
+  'b2960000-0000-4000-8000-000000000012','world-lock-missing-score',
+  ((select value::jsonb from world_fixture where key='world_prepare_fail')->>'requestHash'),
+  'b2970000-0000-4000-8000-000000000012'
+),'40001','World Lock prerequisite pins are incomplete or stale',
+  'V-P2-019: a stale score identity blocks World Lock');
+reset role;
+select ok(
+  not exists(select 1 from public.series_releases
+    where series_id='b1300000-0000-4000-8000-000000000001')
+  and not exists(select 1 from public.production_runs
+    where episode_id='b1400000-0000-4000-8000-000000000001')
+  and not exists(select 1 from private.production_budget_authorizations
+    where episode_id='b1400000-0000-4000-8000-000000000001')
+  and not exists(
+    select 1 from private.production_budget_reservations reservation
+    join private.production_budget_authorizations authz
+      on authz.id=reservation.authorization_id
+    where authz.episode_id='b1400000-0000-4000-8000-000000000001'
+  )
+  and not exists(select 1 from private.outbox_events
+    where event_type='production.run.authorized.v1'
+      and payload_json->>'episodeId'='b1400000-0000-4000-8000-000000000001'),
+  'V-P2-019: missing score creates no release, run, authority, reservation, or production outbox event'
+);
+
+set local session_replication_role=replica;
+update public.score_identity_versions
+set state='verified'
+where id='b2520000-0000-4000-8000-000000000001';
+update public.sound_identity_versions
+set state='stale'
+where id='b2530000-0000-4000-8000-000000000001';
+set local session_replication_role=origin;
+set local role authenticated;
+select throws_ok(format(
+  'select public.command_lock_first_episode_world(%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%s,%s,%s,%L,%L,%L,%L,%L)',
+  'b1100000-0000-4000-8000-000000000001','b1600000-0000-4000-8000-000000000001',
+  'b2800000-0000-4000-8000-000000000001',(select value from world_fixture where key='quote_confirmation'),
+  'b2900000-0000-4000-8000-000000000013','b2910000-0000-4000-8000-000000000013',
+  'b2920000-0000-4000-8000-000000000013','b2930000-0000-4000-8000-000000000013',
+  'b2940000-0000-4000-8000-000000000013','b2950000-0000-4000-8000-000000000013',
+  'b2990000-0000-4000-8000-000000000013',
+  (select aggregate_version from public.series where id='b1300000-0000-4000-8000-000000000001'),
+  (select aggregate_version from public.episodes where id='b1400000-0000-4000-8000-000000000001'),
+  (select aggregate_version from public.episode_configuration_candidates where id='b1600000-0000-4000-8000-000000000001'),
+  ((select value::jsonb from world_fixture where key='world_prepare_fail')->>'manifestHash'),
+  'b2960000-0000-4000-8000-000000000013','world-lock-missing-sound',
+  ((select value::jsonb from world_fixture where key='world_prepare_fail')->>'requestHash'),
+  'b2970000-0000-4000-8000-000000000013'
+),'40001','World Lock prerequisite pins are incomplete or stale',
+  'V-P2-019: a stale sound identity blocks World Lock');
+reset role;
+select ok(
+  not exists(select 1 from public.series_releases
+    where series_id='b1300000-0000-4000-8000-000000000001')
+  and not exists(select 1 from public.production_runs
+    where episode_id='b1400000-0000-4000-8000-000000000001')
+  and not exists(select 1 from private.production_budget_authorizations
+    where episode_id='b1400000-0000-4000-8000-000000000001')
+  and not exists(
+    select 1 from private.production_budget_reservations reservation
+    join private.production_budget_authorizations authz
+      on authz.id=reservation.authorization_id
+    where authz.episode_id='b1400000-0000-4000-8000-000000000001'
+  )
+  and not exists(select 1 from private.outbox_events
+    where event_type='production.run.authorized.v1'
+      and payload_json->>'episodeId'='b1400000-0000-4000-8000-000000000001'),
+  'V-P2-019: missing sound creates no release, run, authority, reservation, or production outbox event'
+);
+
+set local session_replication_role=replica;
+update public.sound_identity_versions
+set state='verified'
+where id='b2530000-0000-4000-8000-000000000001';
+set local session_replication_role=origin;
 reset role;
 set local role service_role;
 insert into public.work_items(

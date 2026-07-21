@@ -4,6 +4,11 @@ import { createHash } from "node:crypto";
 
 import type { ParsedFalWebhook } from "@/domain/provider/fal-webhook";
 import { canonicalJson } from "@/security/command-envelope";
+import { launchMediaLimits, sniffMediaMagic } from "@/security/media-ingest";
+import {
+  inspectStillImageDimensions,
+  type StillImageMime,
+} from "@/security/still-image-container";
 import {
   getNextFalAuthenticatedPollCandidate,
   getProviderDispatchManifest,
@@ -31,6 +36,77 @@ async function boundedBody(response: Response): Promise<string> {
     throw new FalResultRecoveryError("FAL recovery result size is invalid.");
   }
   return bytes.toString("utf8");
+}
+
+async function exactImageMetadata(
+  media: Record<string, unknown>,
+  fetchImplementation: typeof fetch,
+): Promise<{ height: number; url: string; width: number }> {
+  if (
+    typeof media.url !== "string" ||
+    !["image/png", "image/jpeg", "image/webp"].includes(String(media.content_type))
+  ) {
+    throw new FalResultRecoveryError("FAL recovery media metadata is invalid.");
+  }
+  let url: URL;
+  try {
+    url = new URL(media.url);
+  } catch {
+    throw new FalResultRecoveryError("FAL recovery media URL is invalid.");
+  }
+  if (
+    url.protocol !== "https:" ||
+    url.username ||
+    url.password ||
+    url.hash ||
+    !url.hostname.endsWith(".fal.media")
+  ) {
+    throw new FalResultRecoveryError("FAL recovery media URL is invalid.");
+  }
+  const declaredWidth = media.width == null ? null : Number(media.width);
+  const declaredHeight = media.height == null ? null : Number(media.height);
+  if (
+    declaredWidth !== null &&
+    declaredHeight !== null &&
+    Number.isSafeInteger(declaredWidth) &&
+    Number.isSafeInteger(declaredHeight) &&
+    declaredWidth >= 320 &&
+    declaredHeight >= 320 &&
+    declaredWidth * declaredHeight <= launchMediaLimits.maximumPixels
+  ) {
+    return { height: declaredHeight, url: url.toString(), width: declaredWidth };
+  }
+
+  const response = await fetchImplementation(url, {
+    method: "GET",
+    redirect: "error",
+    signal: AbortSignal.timeout(120_000),
+  });
+  const declaredBytes = Number(response.headers.get("content-length") ?? "0");
+  if (
+    !response.ok ||
+    !Number.isSafeInteger(declaredBytes) ||
+    (declaredBytes > 0 && declaredBytes > launchMediaLimits.maximumImageBytes)
+  ) {
+    throw new FalResultRecoveryError("FAL recovery media is unavailable.");
+  }
+  const bytes = Buffer.from(await response.arrayBuffer());
+  const mime = media.content_type as StillImageMime;
+  const dimensions = inspectStillImageDimensions(bytes, mime);
+  if (
+    bytes.length < 1_024 ||
+    bytes.length > launchMediaLimits.maximumImageBytes ||
+    sniffMediaMagic(bytes) !== mime ||
+    !dimensions ||
+    dimensions.width < 320 ||
+    dimensions.height < 320 ||
+    dimensions.width * dimensions.height > launchMediaLimits.maximumPixels ||
+    (declaredWidth !== null && declaredWidth !== dimensions.width) ||
+    (declaredHeight !== null && declaredHeight !== dimensions.height)
+  ) {
+    throw new FalResultRecoveryError("FAL recovery media failed validation.");
+  }
+  return { ...dimensions, url: url.toString() };
 }
 
 export type FalResultRecoveryResult = Readonly<{
@@ -63,7 +139,8 @@ export async function recoverNextCompletedFalResult(
   ) {
     throw new FalResultRecoveryError("FAL recovery manifest is invalid.");
   }
-  const response = await (input.fetchImplementation ?? fetch)(
+  const fetchImplementation = input.fetchImplementation ?? fetch;
+  const response = await fetchImplementation(
     `https://queue.fal.run/${manifest.modelKey}/requests/${candidate.externalJobId}`,
     {
       headers: { Authorization: `Key ${falKey}` },
@@ -104,24 +181,18 @@ export async function recoverNextCompletedFalResult(
   }
   const media = image as Record<string, unknown>;
   const targetAssetId = manifest.payload.targetAssetId;
-  if (
-    typeof targetAssetId !== "string" ||
-    typeof media.url !== "string" ||
-    !media.url.startsWith("https://") ||
-    !["image/png", "image/jpeg", "image/webp"].includes(String(media.content_type)) ||
-    !Number.isSafeInteger(media.width) ||
-    !Number.isSafeInteger(media.height)
-  ) {
+  if (typeof targetAssetId !== "string") {
     throw new FalResultRecoveryError("FAL recovery media metadata is invalid.");
   }
+  const metadata = await exactImageMetadata(media, fetchImplementation);
   const output = Object.freeze({
     contentType: media.content_type as "image/jpeg" | "image/png" | "image/webp",
-    height: media.height as number,
+    height: metadata.height,
     ordinal: 1 as const,
     targetAssetId,
-    url: media.url,
-    urlSha256: sha256(media.url),
-    width: media.width as number,
+    url: metadata.url,
+    urlSha256: sha256(metadata.url),
+    width: metadata.width,
   });
   const canonicalPayloadHash = sha256(
     canonicalJson({

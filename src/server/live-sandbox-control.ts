@@ -4,6 +4,7 @@ import { Sandbox, type NetworkPolicy } from "@vercel/sandbox";
 import postgres from "postgres";
 
 import { assertClosedCandidateArtifact } from "../../scripts/live-candidate-evidence.mjs";
+import candidateMigrationInventoryJson from "../../scripts/phase2-candidate-migrations.v1.json";
 import trustedHarnessManifestJson from "../../scripts/live-trusted-harness-manifest.v1.json";
 
 import {
@@ -28,96 +29,29 @@ const COMMAND_TIMEOUT_MS = 12 * 60_000;
 const ARTIFACT_MAX_BYTES = 2 * 1024 * 1024;
 const COMMAND_OUTPUT_MAX_BYTES = 8 * 1024 * 1024;
 const candidateWritablePaths = [".next", ".tmp", "supabase/.temp"] as const;
-const expectedPhase2MigrationVersions = [
-  "20260717121500",
-  "20260717121501",
-  "20260717121600",
-  "20260717121601",
-  "20260717121602",
-  "20260717121603",
-  "20260717121604",
-  "20260717121605",
-  "20260717121606",
-  "20260717121607",
-  "20260717121608",
-  "20260717121609",
-  "20260717121610",
-  "20260717121611",
-  "20260717121612",
-  "20260717121613",
-  "20260717121614",
-  "20260717121615",
-  "20260717121616",
-  "20260719030500",
-  "20260719032252",
-  "20260719032603",
-  "20260719033129",
-  "20260719040025",
-  "20260719040929",
-  "20260719041024",
-  "20260719041555",
-  "20260719041830",
-  "20260719042436",
-  "20260719043240",
-  "20260719044020",
-  "20260719044544",
-  "20260719045118",
-  "20260719045745",
-  "20260719045855",
-  "20260719051000",
-  "20260719052500",
-  "20260719053000",
-  "20260719053500",
-  "20260719054000",
-  "20260719054500",
-  "20260719055000",
-  "20260719061422",
-  "20260719062218",
-  "20260719063218",
-  "20260719064500",
-  "20260719070000",
-  "20260719071000",
-  "20260719072000",
-  "20260719073000",
-  "20260719073100",
-  "20260719073200",
-  "20260719073300",
-  "20260719073400",
-  "20260719073500",
-  "20260719073600",
-  "20260719073700",
-  "20260719073800",
-  "20260719073900",
-  "20260719074000",
-  "20260719074100",
-  "20260719074200",
-  "20260719074300",
-  "20260719074400",
-  "20260719074500",
-  "20260719074600",
-  "20260719074700",
-  "20260719074800",
-  "20260719074900",
-  "20260719075000",
-  "20260719075100",
-  "20260719075200",
-  "20260719075300",
-  "20260719075400",
-  "20260719075500",
-  "20260719075600",
-  "20260719075700",
-  "20260719075800",
-  "20260719075900",
-  "20260719080000",
-  "20260719080100",
-  "20260719080200",
-  "20260719080300",
-  "20260719080400",
-  "20260719165003",
-  "20260719195650",
-  "20260719215715",
-  "20260719223000",
-] as const;
+
+function candidateMigrationVersion(path: string): string {
+  const match = /^supabase\/migrations\/(\d{14})_[a-z0-9_]+\.sql$/u.exec(path);
+  if (!match?.[1]) throw new Error("Candidate migration inventory path is invalid.");
+  return match[1];
+}
+
+const expectedPhase2MigrationPaths = candidateMigrationInventoryJson.migrations;
+if (
+  candidateMigrationInventoryJson.schemaVersion !==
+    "genie-phase2-candidate-migrations.v1" ||
+  expectedPhase2MigrationPaths.length === 0 ||
+  new Set(expectedPhase2MigrationPaths).size !== expectedPhase2MigrationPaths.length ||
+  JSON.stringify(expectedPhase2MigrationPaths) !==
+    JSON.stringify([...expectedPhase2MigrationPaths].sort()) ||
+  JSON.stringify(expectedPhase2MigrationPaths) !==
+    JSON.stringify(trustedHarnessManifestJson.phase2Migrations)
+) {
+  throw new Error("Candidate migration inventory does not match the trusted manifest.");
+}
+const expectedPhase2MigrationVersions = expectedPhase2MigrationPaths.map(
+  candidateMigrationVersion,
+);
 const trustedHarnessSha256 = createHash("sha256")
   .update(JSON.stringify(trustedHarnessManifestJson))
   .digest("hex");
@@ -160,9 +94,10 @@ type TrustedHarnessEvidence = Readonly<{
 
 function trustedHarnessVerificationProgram(candidateTree: string): string {
   const manifest = JSON.stringify(trustedHarnessManifestJson);
+  const migrationInventory = JSON.stringify(candidateMigrationInventoryJson);
   return String.raw`
 const crypto=require('node:crypto');const fs=require('node:fs');const fsp=require('node:fs/promises');const path=require('node:path');const url=require('node:url');
-const root=process.cwd();const manifest=${manifest};const candidateTree=${JSON.stringify(candidateTree)};const snapshotSeal=${JSON.stringify(LIVE_BROKER_SEAL)};
+const root=process.cwd();const manifest=${manifest};const migrationInventory=${migrationInventory};const candidateTree=${JSON.stringify(candidateTree)};const snapshotSeal=${JSON.stringify(LIVE_BROKER_SEAL)};
 function fail(label){throw new Error('trusted harness verification failed: '+label)}
 function exactKeys(value,keys,label){if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).sort().join(',')!==[...keys].sort().join(','))fail(label)}
 function digest(value){return crypto.createHash('sha256').update(value).digest('hex')}
@@ -172,11 +107,13 @@ async function files(directory,predicate){const rows=[];async function visit(rel
 function candidateDigest(entries){entries.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);if(new Set(entries.map((entry)=>entry.path)).size!==entries.length)fail('duplicate binding path');const hash=crypto.createHash('sha256');for(const entry of entries){hash.update(entry.path);hash.update('\0');hash.update(String(entry.contents.byteLength));hash.update('\0');hash.update(entry.contents);hash.update('\0')}return{fileCount:entries.length,sha256:hash.digest('hex')}}
 async function bindingGroup({directories=[],files:individual=[]}){const relative=[...individual];for(const directory of directories)relative.push(...await files(directory,()=>true));return candidateDigest(await Promise.all(relative.map(async(entry)=>({contents:await fsp.readFile(path.resolve(root,entry)),path:entry.replaceAll('\\','/')}))))}
 (async()=>{
-exactKeys(manifest,['entries','liveSpecs','manifestPath','packageManager','pgTapSuites','phase2Migrations','predecessorFixture','predecessorFixtureSource','schemaVersion'],'manifest schema');
-if(manifest.schemaVersion!=='genie-live-trusted-harness-manifest.v1')fail('manifest version');
-const manifestFile=JSON.parse(await fsp.readFile(path.resolve(root,manifest.manifestPath),'utf8'));if(!same(manifestFile,manifest))fail('committed manifest');
-const seen=new Set();for(const entry of manifest.entries){exactKeys(entry,['path','role','sha256'],'entry schema');if(seen.has(entry.path)||!/^[a-f0-9]{64}$/.test(entry.sha256))fail('entry identity');seen.add(entry.path);if(await fileDigest(entry.path)!==entry.sha256)fail('entry digest '+entry.path)}
-const migrations=(await files('supabase/migrations',(name)=>/^\d{14}_phase2_[a-z0-9_]+\.sql$/u.test(name)));if(!same(migrations,manifest.phase2Migrations))fail('phase2 migrations');
+ exactKeys(manifest,['entries','liveSpecs','manifestPath','packageManager','pgTapSuites','phase2Migrations','predecessorFixture','predecessorFixtureSource','schemaVersion'],'manifest schema');
+ if(manifest.schemaVersion!=='genie-live-trusted-harness-manifest.v1')fail('manifest version');
+ exactKeys(migrationInventory,['migrations','schemaVersion'],'migration inventory schema');if(migrationInventory.schemaVersion!=='genie-phase2-candidate-migrations.v1'||!Array.isArray(migrationInventory.migrations)||migrationInventory.migrations.length===0||new Set(migrationInventory.migrations).size!==migrationInventory.migrations.length||!same(migrationInventory.migrations,[...migrationInventory.migrations].sort())||!same(migrationInventory.migrations,manifest.phase2Migrations))fail('migration inventory');
+ const manifestFile=JSON.parse(await fsp.readFile(path.resolve(root,manifest.manifestPath),'utf8'));if(!same(manifestFile,manifest))fail('committed manifest');
+ const inventoryFile=JSON.parse(await fsp.readFile(path.resolve(root,'scripts/phase2-candidate-migrations.v1.json'),'utf8'));if(!same(inventoryFile,migrationInventory))fail('committed migration inventory');
+ const seen=new Set();for(const entry of manifest.entries){exactKeys(entry,['path','role','sha256'],'entry schema');if(seen.has(entry.path)||!/^[a-f0-9]{64}$/.test(entry.sha256))fail('entry identity');seen.add(entry.path);if(await fileDigest(entry.path)!==entry.sha256)fail('entry digest '+entry.path)}
+ const phase2Migrations=(await files('supabase/migrations',(name)=>/^\d{14}_phase2_[a-z0-9_]+\.sql$/u.test(name)));if(!same(phase2Migrations,manifest.phase2Migrations.filter((migration)=>/^supabase\/migrations\/\d{14}_phase2_[a-z0-9_]+\.sql$/u.test(migration))))fail('phase2 migrations');
 const liveSpecs=['playwright.live.config.ts',...await files('tests/live',(name)=>name.endsWith('.spec.ts'))];if(!same(liveSpecs,manifest.liveSpecs))fail('live specs');
 const pgTapPaths=await files('supabase/tests',(name)=>name.endsWith('.test.sql'));if(!same(pgTapPaths.map((entry)=>entry.split('/').at(-1)),manifest.pgTapSuites.map((entry)=>entry.testFile)))fail('pgtap collection');
 const pkg=JSON.parse(await fsp.readFile(path.resolve(root,'package.json'),'utf8'));if(!same(manifest.packageManager,{declaration:pkg.packageManager,name:'pnpm',version:'11.9.0'}))fail('package manager');
@@ -792,7 +729,9 @@ async function trustedDatabaseEvidence(
       boundaryScripts: row.boundary_scripts,
       branchRef: branch.branchRef,
       lookCount: row.looks,
-      migrationVersions: versions.map(({ version }) => version),
+      migrationVersions: versions
+        .map(({ version }) => version)
+        .filter((version) => expectedPhase2MigrationVersions.includes(version)),
       policyBoundLookCount: row.policy_bound_looks,
       voiceCount: row.voices,
     };
@@ -1048,6 +987,7 @@ export async function statusLiveSandbox(
   }
   const validatedCandidateArtifact = assertClosedCandidateArtifact(candidateArtifact, {
     candidateBinding: trustedHarness.candidateBinding,
+    candidateMigrations: expectedPhase2MigrationPaths,
     pgTapSuites: trustedHarness.pgTapSuites,
     predecessorFixture: trustedHarness.predecessorFixture,
   });

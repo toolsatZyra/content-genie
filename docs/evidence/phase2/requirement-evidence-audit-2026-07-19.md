@@ -1,9 +1,9 @@
 # Phase 2 requirement and evidence audit
 
-**Audit date:** 2026-07-19
-**Candidate base:** `d61bc1c5873e7030cfb84acdb601b598024ba390` plus the intentional dirty Phase 2 worktree
+**Audit date:** 2026-07-22 (continuing the 2026-07-19 audit)
+**Candidate base:** `49dc7ea8c2e7d85857660e775b2bed575616aa5e` plus the intentional dirty MVP cinematic/Edit worktree
 **Scope:** `P2-01`-`P2-14`, `V-P2-001`-`V-P2-034`, and all 96 `@phase2` traceability obligations
-**Status:** implementation audit in progress; this document is not phase-exit evidence
+**Status:** implementation audit reconciled through the pre-freeze gate; this document is not phase-exit evidence. Section 6 supersedes the older point-in-time dispositions in sections 2–5.
 
 > **MVP disposition (2026-07-20):** This remains the launch-hardening backlog,
 > but `docs/MVP_DELIVERY_PROFILE_2026-07-20.md` now defines the first
@@ -96,3 +96,75 @@ Closure requires:
 - Trigger.dev project reference, deployment identity, authenticated queues, and CLI/deployment authority remain unavailable in the current environment.
 - The final remote-live same-candidate suite must run from a published commit in the disposable trusted sandbox.
 - Production Supabase intentionally remains Phase 1-only until the complete local/preview/live gate and independent review pass.
+
+## 6. 2026-07-22 pre-freeze reconciliation
+
+This reconciliation uses the current worktree, preview database, generated
+traceability plan, and test output rather than the older July 19 counts. It does
+not promote any obligation. The candidate still requires a commit-bound local
+gate, remote disposable-branch proof, the one comprehensive independent review,
+fixes, re-gating, and explicit deployment.
+
+### 6.1 Work packages
+
+| Work package | Reconciled disposition | Current evidence and remaining boundary |
+|---|---|---|
+| `P2-01`–`P2-03` | `covered_pending_gate` | Exact script/upload paths, male/female voice identities, and all 117 looks pass the unit, preview, and browser layers. Candidate-bound live/review evidence remains. |
+| `P2-04` | `mvp_deferred` for Trigger cloud qualification; `covered_pending_gate` for the owner MVP | Durable database leases, fences, recovery and Vercel cron reconciliation are implemented and tested. The Trigger CLI is not authenticated in this environment, so its cloud deployment identity and queues are explicitly deferred and are not claimed verified. |
+| `P2-05` | `covered_pending_gate` | Restricted tool, prompt-text, graph cycle/later-reference/fan-out/depth/cap, ledger-before-provider, blind evaluation and corrupt-rubric cases now exist and pass. |
+| `P2-06` | `covered_pending_gate` | Broker, assertion, reservation, request, callback and reconciliation contracts pass. The disposable-branch concurrency diagnostic proved one authorization/reservation/request, replay rejection, and revoke/disable-before-consume with no provider side effect; the frozen live runner must repeat the proof for the committed candidate. |
+| `P2-07` | `covered_pending_gate` | Exact-host fetch, quarantine, strict container validation, real sandbox re-encode/inspection and provider-ingest rejection paths pass; same-candidate live scanner evidence remains. |
+| `P2-08` | `covered_pending_gate` | New v2 character identity manifests bind canonical SHA-256, topology, arms, hands/objects, vahana, weapons, ornaments, wardrobe, skin/form, dignity and transitions. Focused preview World suite passes `100/100` after combined integration. |
+| `P2-09` | `covered_pending_gate` | New immutable P2-09 bundle covers the exact nine claim categories and all twelve cultural rules, blocks incomplete/non-overridable cases and preserves qualified-human-only approval. Focused preview suite passes `59/59`; the shared World fixture now records the bundle before approval. |
+| `P2-10`–`P2-13` | `covered_pending_gate` | Pronunciation/score/sound blockers, exact narration/timeline/plan/quote inputs, upstream-failure behavior, World Lock rollback/replay/staleness, and concurrent first-lock authority are covered. The developer-MVP records spend without pausing above USD 50 as explicitly approved; that scope change is not a wider-team cap decision. |
+| `P2-14` | `covered_pending_gate` | Complete Chromium suite passes `62/62`, including all authoritative lifecycle openings, compact Atrium/Series navigation, autonomous preflight/Edit, repair/approval, mobile/accessibility, stored-markup inertness, and the 200%-zoom overlap regression. |
+
+### 6.2 Verification scenarios
+
+| Scenario set | Reconciled disposition | Evidence boundary |
+|---|---|---|
+| `V-P2-001`–`V-P2-014` | `covered_pending_gate` | Exact script/rubric/voice/look/World/media/provider retry paths pass deterministic, preview and browser checks. The live scanner/provider portion remains candidate-bound. |
+| `V-P2-015`–`V-P2-017` | `covered_pending_gate` | Disposable-branch races produced one slot/request and one reservation; micro authority cannot claim production slots. |
+| `V-P2-018`–`V-P2-020` | `covered_pending_gate` | Competency/recusal/source binding, all required audio identity components and duration/spoken-text boundaries pass. |
+| `V-P2-021`–`V-P2-025` | `covered_pending_gate`, except exhaustive every-write-boundary injection is `mvp_deferred` | The 73-assertion executable-plan suite covers cycle/later-shot/cap/stale input and failed-upstream behavior. Representative World Lock rollback, staleness, replay and concurrent-first-lock proofs pass; the original exhaustive fault matrix remains outside the owner-MVP gate. |
+| `V-P2-026` | `covered_pending_gate` | Complete 62-case browser proof passes at the current candidate worktree, including zoom, responsive, reduced-clutter and operational-state paths. |
+| `V-P2-027` | `mvp_deferred` for Trigger cloud crash qualification; `covered_pending_gate` for database/cron recovery | Lease expiry, fencing, replay and provider convergence pass; real Trigger before/after-submit crash proof awaits authenticated Trigger deployment. |
+| `V-P2-028`–`V-P2-032` | `covered_pending_gate` | Restricted-agent injection corpus, rubric corruption, offboarding, dual-signature/provider assertion and cross-kind guards pass. |
+| `V-P2-033`–`V-P2-034` | `covered_pending_gate` | Disposable-branch evidence records one-winner concurrent authority/slot claims, assertion replay rejection, bounded key behavior, and revoke/disable winning before provider side effect. Same-candidate remote repetition remains. |
+
+### 6.3 Current aggregate proof
+
+- Preview pgTAP: nine suites, `745/745` assertions.
+- RLS/database-policy/trusted-harness composite: passed; its isolated live portion
+  is intentionally skipped outside the disposable runner.
+- Unit coverage: 102 files / 637 tests; 95.58% statements, 92.16% branches,
+  96.66% functions, 97.4% lines.
+- Integration: `5/5`; the provider-backed live scanner is intentionally skipped
+  in the deterministic environment.
+- Browser: `62/62` in Chromium; the bounded Next server exited normally.
+- Formatting, lint, type checking and trusted-manifest validation: passed.
+
+### 6.4 Traceability and honest closure state
+
+The implementation-evidence generator now derives and requires all 96 Phase 2
+obligations and exactly `P2-01`–`P2-14`. Its promotion policy requires one fresh
+`genie-cold-review.v2` manifest covering acceptance, media, security and UI/UX,
+bound to the same candidate commit/tree, with no open P0/P1/P2 finding. Hostile
+tests reject missing obligation coverage and incomplete review coverage.
+
+The ledger deliberately remains `unimplemented` before the frozen candidate is
+committed and gated. After the same-candidate local/remote/review proof, the
+repository can truthfully promote the 96 entries only to
+`implemented_unverified`: `docs/traceability.md` still forbids `verified` from
+Phase 2 onward until an external cryptographic provenance contract is enabled.
+That assurance limitation is separate from owner-MVP software completion and
+must not be hidden by relabelling local evidence.
+
+### 6.5 External state correction
+
+The older statement that production is Phase-1-only is historical. Production
+already contains the deployed owner-MVP World/preflight/production/Edit lineage
+through commit `49dc7ea8c2e7d85857660e775b2bed575616aa5e`. The new P2-08 and P2-09
+migrations in this audit have been applied only to preview
+`iuzijmzcimtwyowhwinu`; they are not promoted to production before the frozen
+candidate gate and review.

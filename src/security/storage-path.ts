@@ -6,7 +6,7 @@ export class StoragePathValidationError extends Error {
 }
 
 export interface SignedStorageRequest {
-  readonly bucket: "workspace-private";
+  readonly bucket: "workspace-media" | "workspace-private";
   readonly expiresIn: number;
   readonly path: string;
   readonly workspaceId: string;
@@ -19,7 +19,7 @@ export function parseSignedStorageRequest(value: unknown): SignedStorageRequest 
     throw new StoragePathValidationError("Storage request must be an object.");
   }
   const body = value as Record<string, unknown>;
-  if (body.bucket !== "workspace-private") {
+  if (body.bucket !== "workspace-private" && body.bucket !== "workspace-media") {
     throw new StoragePathValidationError("Storage bucket is not signable.");
   }
   if (

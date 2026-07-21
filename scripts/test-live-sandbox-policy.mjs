@@ -13,29 +13,30 @@ function assertPolicy({
   contract,
   directProof,
   evidence,
+  inventory,
   ledger,
   manifest,
   remote,
   route,
+  runner,
   sandbox,
   signing,
   wrapper,
 }) {
   const errors = [];
   const trustedManifest = JSON.parse(manifest);
-  const declaredMigrationVersions = [
-    ...(sandbox
-      .match(/const expectedPhase2MigrationVersions = \[([\s\S]*?)\] as const;/u)?.[1]
-      .matchAll(/"(\d{14})"/gu) ?? []),
-  ].map((match) => match[1]);
-  const manifestMigrationVersions = trustedManifest.phase2Migrations.map(
-    (path) => path.split("/").at(-1).split("_", 1)[0],
-  );
+  const candidateMigrationInventory = JSON.parse(inventory);
   if (
-    JSON.stringify(declaredMigrationVersions) !==
-    JSON.stringify(manifestMigrationVersions)
+    candidateMigrationInventory.schemaVersion !==
+      "genie-phase2-candidate-migrations.v1" ||
+    !Array.isArray(candidateMigrationInventory.migrations) ||
+    candidateMigrationInventory.migrations.length === 0 ||
+    new Set(candidateMigrationInventory.migrations).size !==
+      candidateMigrationInventory.migrations.length ||
+    JSON.stringify(candidateMigrationInventory.migrations) !==
+      JSON.stringify(trustedManifest.phase2Migrations)
   ) {
-    errors.push("sandbox terminal migration contract differs from the sealed manifest");
+    errors.push("candidate migration inventory differs from the sealed manifest");
   }
   requirePatterns(errors, "disabled direct database proof", directProof, [
     /Standalone remote database proof is disabled/u,
@@ -67,6 +68,7 @@ function assertPolicy({
     /await assertNoCandidateProcesses\(sandbox\)/,
     /import postgres from "postgres"/,
     /expectedPhase2MigrationVersions/,
+    /candidateMigrationInventoryJson/,
     /trustedHarnessManifestJson/,
     /assertDeployedCandidate\(request\.candidate\.commit\)/,
     /await verifyTrustedHarness\(sandbox, request\.candidate\.tree\)/,
@@ -202,6 +204,7 @@ function assertPolicy({
     /MAX_BROKER_RESPONSE_BYTES = 3 \* 1024 \* 1024/,
     /readBoundedBrokerResponse\(response\)/,
     /await reader\.cancel\(\)/,
+    /loadPhase2CandidateMigrationInventory/,
   ]);
   if (/response\.(?:text|arrayBuffer)\(/.test(remote)) {
     errors.push("remote broker buffers a response before enforcing its byte limit");
@@ -221,7 +224,20 @@ function assertPolicy({
     /approvedBrokerDeploymentCommit !== candidate\.commit/,
     /brokerArtifact\.harnessSha256 !== trustedHarnessManifestSha256/,
     /executionBoundary:[\s\S]*vercel-firecracker-microvm-root-owned-source-low-privilege-candidate/s,
+    /loadPhase2CandidateMigrationInventory/,
+    /trustedHarnessManifest\.pgTapSuites\.map/,
   ]);
+  requirePatterns(errors, "candidate runner", runner, [
+    /loadPhase2CandidateMigrationInventory/,
+    /candidateMigrationVersion/,
+    /expectedPhase2MigrationPaths/,
+  ]);
+  if (/exact fifteen-file|expectedPhase2MigrationFiles\s*=\s*\[/u.test(runner)) {
+    errors.push("candidate runner still hard-codes the obsolete migration inventory");
+  }
+  if (/exact two-suite|const expectedFiles\s*=\s*\[/u.test(wrapper)) {
+    errors.push("trusted wrapper still hard-codes the obsolete pgTAP inventory");
+  }
   if (/spawnSync\([\s\S]*scripts\/run-phase1-live-suite\.mjs/s.test(wrapper)) {
     errors.push("trusted wrapper still executes the secret-bearing candidate locally");
   }
@@ -278,10 +294,12 @@ const safe = {
   contract: read("src/server/live-broker-contract.ts"),
   directProof: read("scripts/run-remote-database-proof.mjs"),
   evidence: read("src/server/live-broker-evidence.ts"),
+  inventory: read("scripts/phase2-candidate-migrations.v1.json"),
   ledger: read("src/server/live-broker-ledger.ts"),
   manifest: read("scripts/live-trusted-harness-manifest.v1.json"),
   remote: read("scripts/remote-live-broker.mjs"),
   route: read("src/app/api/internal/live-broker/route.ts"),
+  runner: read("scripts/run-phase1-live-suite.mjs"),
   sandbox: read("src/server/live-sandbox-control.ts"),
   signing: read("scripts/live-broker-signing.mjs"),
   wrapper: read("scripts/run-frozen-live-suite.mjs"),
@@ -334,9 +352,9 @@ const mutations = [
     to: "void request.candidate.commit;",
   },
   {
-    key: "sandbox",
-    from: '  "20260717121612",',
-    to: "",
+    key: "inventory",
+    from: '    "supabase/migrations/20260721185000_mvp_repair_feedback_grounding_evidence.sql"',
+    to: '    "supabase/migrations/20260721185001_untrusted_extra.sql"',
   },
   {
     key: "sandbox",

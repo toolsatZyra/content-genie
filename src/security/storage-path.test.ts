@@ -18,6 +18,16 @@ describe("signed Storage request", () => {
     ).toMatchObject({ workspaceId, expiresIn: 60 });
   });
 
+  it("allows a short-lived promoted workspace media object", () => {
+    expect(
+      parseSignedStorageRequest({
+        bucket: "workspace-media",
+        expiresIn: 120,
+        path: `${workspaceId}/mvp-edit-packages/asset/2/approved-assets.zip`,
+      }),
+    ).toMatchObject({ bucket: "workspace-media", workspaceId, expiresIn: 120 });
+  });
+
   it.each([
     { bucket: "workspace-exports", expiresIn: 60, path: `${workspaceId}/a` },
     { bucket: "workspace-private", expiresIn: 29, path: `${workspaceId}/a` },

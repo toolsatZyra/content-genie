@@ -146,7 +146,7 @@ describe("exact production quote compiler", () => {
       quoteHash: preparedQuoteHash,
       replayed: false,
     });
-    expect(result.hardCeilingMicrousd).toBeLessThanOrEqual(50_000_000);
+    expect(result.hardCeilingMicrousd).toBeGreaterThan(0);
     const recordCall = mocks.rpc.mock.calls.find(
       ([name]) => name === "command_record_production_quote",
     )!;
@@ -164,8 +164,9 @@ describe("exact production quote compiler", () => {
     );
   });
 
-  it("fails closed before persistence when quality-first high spend exceeds $50", async () => {
+  it("records the exact high envelope when quality-first spend exceeds $50", async () => {
     const input = quoteInput(10_000_000);
+    const preparedQuoteHash = hash("e");
     mocks.rpc.mockImplementation(async (name: string) => {
       if (name === "command_ensure_production_allowance_rates") {
         return { data: input.allowanceRates, error: null };
@@ -173,20 +174,31 @@ describe("exact production quote compiler", () => {
       if (name === "get_production_quote_input") {
         return { data: input, error: null };
       }
+      if (name === "prepare_production_quote") {
+        return {
+          data: {
+            quoteHash: preparedQuoteHash,
+            rateExpiresAt: input.rateExpiresAt,
+            rateSnapshotHash: hash("f"),
+          },
+          error: null,
+        };
+      }
+      if (name === "command_record_production_quote") {
+        return { data: id("91"), error: null };
+      }
       throw new Error(`unexpected RPC ${name}`);
     });
 
-    await expect(
-      ensureProductionQuote({
-        configurationCandidateId: id("4"),
-        workspaceId: id("1"),
-      }),
-    ).rejects.toMatchObject({
-      code: "PRODUCTION_QUOTE_CEILING_EXCEEDED",
-      retryable: false,
+    const result = await ensureProductionQuote({
+      configurationCandidateId: id("4"),
+      workspaceId: id("1"),
     });
+
+    expect(result).toMatchObject({ quoteHash: preparedQuoteHash, replayed: false });
+    expect(result.hardCeilingMicrousd).toBeGreaterThan(50_000_000);
     expect(
       mocks.rpc.mock.calls.some(([name]) => name === "command_record_production_quote"),
-    ).toBe(false);
+    ).toBe(true);
   });
 });

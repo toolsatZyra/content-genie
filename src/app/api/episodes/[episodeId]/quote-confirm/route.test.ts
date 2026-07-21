@@ -131,10 +131,29 @@ describe("exact production quote confirmation route", () => {
     });
   });
 
-  it("requires an exact body and never accepts a client ceiling above $50", async () => {
+  it("accepts the owner's explicit MVP ceiling above $50", async () => {
     const response = await POST(
       request({
         episodeId,
+        hardCeilingMicrousd: 50_000_001,
+        quoteHash,
+        quoteId,
+        workspaceId,
+      }),
+      { params: Promise.resolve({ episodeId }) },
+    );
+    expect(response.status).toBe(200);
+    expect(mocks.rpc).toHaveBeenCalledWith(
+      "command_confirm_production_quote",
+      expect.objectContaining({ p_hard_ceiling_microusd: 50_000_001 }),
+    );
+  });
+
+  it("requires an exact body and a safe integer ceiling", async () => {
+    const response = await POST(
+      request({
+        episodeId,
+        extra: true,
         hardCeilingMicrousd: 50_000_001,
         quoteHash,
         quoteId,

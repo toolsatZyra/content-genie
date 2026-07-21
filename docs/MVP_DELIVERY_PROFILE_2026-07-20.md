@@ -8,7 +8,7 @@
 
 Ship one working internal path as quickly as practical:
 
-script -> voice -> look -> world -> create -> review -> approve -> export.
+script -> voice -> look -> world -> preflight -> edit/review -> approve -> export.
 
 The first release is operated by the owner, at low volume, with manual
 observation and final approval. It is not represented as a hardened public or
@@ -22,10 +22,16 @@ large-team production service.
 - Keep provider credentials server-side and out of logs, browser bundles, and
   committed files.
 - Keep workspace authorization and basic row isolation intact.
-- Require explicit confirmation before production spend and keep the normal
-  Episode authority ceiling at USD 50.
+- Record the itemized forecast and actual provider spend. For the owner-operated
+  MVP, do not pause production or repair because the forecast exceeds USD 50.
+  Duplicate-request prevention, bounded automatic retries, and exact cost
+  attribution remain mandatory. The owner will select a future cap after
+  reviewing several days of real Episode costs.
 - Quarantine and validate provider media before it becomes selected input.
-- Require the owner to review the final master before approval or export.
+- Require the owner to review the final master before approval. The review
+  master itself remains downloadable so the owner can make a manual edit;
+  approved Episodes additionally expose the complete set of storyboard images
+  and video clips used in the final edit.
 - Research explicitly named real temples, festivals, and rituals from
   rights-verified public photographs and bind selected references to the shots
   where the real-world subject appears.

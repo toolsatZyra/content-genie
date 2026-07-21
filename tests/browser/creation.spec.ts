@@ -50,7 +50,9 @@ async function expectActionTargetsAtLeast44(page: Page) {
 
         const pointerTarget =
           element instanceof HTMLInputElement &&
-          (element.type === "checkbox" || element.type === "radio")
+          (element.type === "checkbox" ||
+            element.type === "radio" ||
+            element.type === "file")
             ? (element.closest("label") ?? element)
             : element;
         const targetBox = pointerTarget.getBoundingClientRect();
@@ -59,12 +61,14 @@ async function expectActionTargetsAtLeast44(page: Page) {
         return [
           {
             height: targetBox.height,
+            inputType: element instanceof HTMLInputElement ? element.type : undefined,
             name:
               element.getAttribute("aria-label") ??
               element.getAttribute("placeholder") ??
               element.textContent?.trim().replace(/\s+/gu, " ").slice(0, 80) ??
               element.tagName,
             tag: element.tagName,
+            targetClass: pointerTarget.className,
             width: targetBox.width,
           },
         ];
@@ -82,6 +86,10 @@ async function acknowledgePermanentSeal(page: Page): Promise<void> {
     .check();
 }
 
+function nextStageButton(page: Page, name: "Look" | "Voice" | "World") {
+  return page.getByRole("button", { exact: true, name });
+}
+
 test.describe("Living Cinema creation flow", () => {
   test("preserves the sealed script and exposes the six honest chambers @a11y", async ({
     page,
@@ -92,7 +100,7 @@ test.describe("Living Cinema creation flow", () => {
       name: "Episode creation chambers",
     });
     await expect(rail.getByRole("button")).toHaveCount(6);
-    for (const label of ["Script", "Voice", "Look", "World", "Preflight", "Create"]) {
+    for (const label of ["Script", "Voice", "Look", "World", "Preflight", "Edit"]) {
       await expect(rail.getByRole("button", { name: new RegExp(label) })).toBeVisible();
     }
 
@@ -102,9 +110,7 @@ test.describe("Living Cinema creation flow", () => {
     await expect(
       page.getByText("Genie can annotate your script, never rewrite it."),
     ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /Seal exact script/ }),
-    ).toBeDisabled();
+    await expect(nextStageButton(page, "Voice")).toBeDisabled();
     await expect(page.getByLabel("Sealed Hindi background narration")).toHaveText(
       exactScript,
     );
@@ -134,7 +140,7 @@ test.describe("Living Cinema creation flow", () => {
     const deliveredRail = page.getByRole("navigation", {
       name: "Episode creation chambers",
     });
-    await expect(deliveredRail.getByRole("button", { name: /Create/ })).toHaveAttribute(
+    await expect(deliveredRail.getByRole("button", { name: /Edit/ })).toHaveAttribute(
       "aria-current",
       "step",
     );
@@ -175,6 +181,10 @@ test.describe("Living Cinema creation flow", () => {
     page,
   }) => {
     await page.goto(`/episodes/${episodeId}/create?fixture=phase2-read-only-no-script`);
+    await page
+      .getByRole("navigation", { name: "Episode creation chambers" })
+      .getByRole("button", { name: /Script/ })
+      .click();
     const scriptInput = page.getByRole("textbox", {
       name: "Hindi background narration",
     });
@@ -325,7 +335,7 @@ test.describe("Living Cinema creation flow", () => {
       })
       .check();
     await acknowledgePermanentSeal(page);
-    await page.getByRole("button", { name: /Seal exact script/ }).click();
+    await nextStageButton(page, "Voice").click();
 
     const rail = page.getByRole("navigation", {
       name: "Episode creation chambers",
@@ -391,7 +401,7 @@ test.describe("Living Cinema creation flow", () => {
       })
       .check();
     await acknowledgePermanentSeal(page);
-    await page.getByRole("button", { name: /Seal exact script/ }).click();
+    await nextStageButton(page, "Voice").click();
     await expect(
       page.getByRole("status").filter({ hasText: "Finishing the script seal" }),
     ).toBeVisible();
@@ -441,7 +451,7 @@ test.describe("Living Cinema creation flow", () => {
       })
       .check();
     await acknowledgePermanentSeal(page);
-    await page.getByRole("button", { name: /Seal exact script/ }).click();
+    await nextStageButton(page, "Voice").click();
     await expect.poll(() => lockedRawText).toBe(expected);
   });
 
@@ -456,7 +466,7 @@ test.describe("Living Cinema creation flow", () => {
     const permanentAcknowledgement = page.getByRole("checkbox", {
       name: /I understand that sealing is permanent/,
     });
-    const seal = page.getByRole("button", { name: /Seal exact script/ });
+    const seal = nextStageButton(page, "Voice");
 
     await scriptInput.fill("First exact draft");
     await acknowledgement.check();
@@ -494,7 +504,7 @@ test.describe("Living Cinema creation flow", () => {
       })
       .check();
     await acknowledgePermanentSeal(page);
-    await page.getByRole("button", { name: /Seal exact script/ }).click();
+    await nextStageButton(page, "Voice").click();
 
     await expect(page).toHaveURL(/resumeCreation=script/);
     await page
@@ -529,7 +539,7 @@ test.describe("Living Cinema creation flow", () => {
       })
       .check();
     await acknowledgePermanentSeal(page);
-    await page.getByRole("button", { name: /Seal exact script/ }).click();
+    await nextStageButton(page, "Voice").click();
     await expect(page.getByText("Outcome unconfirmed - reconciling")).toBeVisible();
     await expect(
       page.getByRole("status").filter({ hasText: "outcome is unconfirmed" }),
@@ -548,7 +558,7 @@ test.describe("Living Cinema creation flow", () => {
       })
       .check();
     await acknowledgePermanentSeal(page);
-    await page.getByRole("button", { name: /Seal exact script/ }).click();
+    await nextStageButton(page, "Voice").click();
     await expect(page).toHaveURL(/resumeCreation=script/);
     await page
       .getByRole("navigation", { name: "Episode creation chambers" })
@@ -605,7 +615,7 @@ test.describe("Living Cinema creation flow", () => {
       })
       .check();
     await acknowledgePermanentSeal(page);
-    await page.getByRole("button", { name: /Seal exact script/ }).click();
+    await nextStageButton(page, "Voice").click();
     await expect.poll(() => lockedRawText).toBe(exact);
   });
 
@@ -652,7 +662,7 @@ test.describe("Living Cinema creation flow", () => {
       })
       .check();
     await acknowledgePermanentSeal(page);
-    await page.getByRole("button", { name: /Seal exact script/ }).click();
+    await nextStageButton(page, "Voice").click();
 
     await expect.poll(() => postedPayload?.sourceKind).toBe("uploaded_text");
     expect(postedPayload).toMatchObject({
@@ -722,7 +732,7 @@ test.describe("Living Cinema creation flow", () => {
       })
       .check();
     await acknowledgePermanentSeal(page);
-    await page.getByRole("button", { name: /Seal exact script/ }).click();
+    await nextStageButton(page, "Voice").click();
     await expect.poll(() => lockedRawText).toBe(`${dropped}X`);
   });
 
@@ -787,7 +797,7 @@ test.describe("Living Cinema creation flow", () => {
       })
       .check();
     await acknowledgePermanentSeal(page);
-    await page.getByRole("button", { name: /Seal exact script/ }).click();
+    await nextStageButton(page, "Voice").click();
     await expect(scriptInput).toHaveAttribute("readonly", "");
     await scriptInput.evaluate((element) => {
       const textarea = element as HTMLTextAreaElement;
@@ -838,7 +848,7 @@ test.describe("Living Cinema creation flow", () => {
       .check();
     await acknowledgePermanentSeal(page);
 
-    const seal = page.getByRole("button", { name: /Seal exact script/ });
+    const seal = nextStageButton(page, "Voice");
     await seal.click();
     await expect(
       page.getByRole("status").filter({ hasText: "outcome is unconfirmed" }),
@@ -899,7 +909,7 @@ test.describe("Living Cinema creation flow", () => {
         response.url().includes(`/episodes/${episodeId}/create`) &&
         response.request().headers().rsc === "1",
     );
-    await page.getByRole("button", { name: /Seal exact script/ }).click();
+    await nextStageButton(page, "Voice").click();
     await refresh;
     const voiceHeading = page.getByRole("heading", {
       name: "Who carries the story?",
@@ -960,7 +970,7 @@ test.describe("Living Cinema creation flow", () => {
       page.getByRole("status").filter({ hasText: "Female narrator pinned exactly." }),
     ).toHaveCount(1);
 
-    await page.getByRole("button", { name: /Enter the look vault/ }).click();
+    await nextStageButton(page, "Look").click();
     await expect(
       page.getByRole("heading", { name: /Choose the film’s visual soul/ }),
     ).toBeVisible();
@@ -989,9 +999,7 @@ test.describe("Living Cinema creation flow", () => {
         .getByRole("status")
         .filter({ hasText: "Divine Fury pinned to this Episode." }),
     ).toHaveCount(1);
-    await expect(
-      page.getByRole("button", { name: /Build world \+ preflight/ }),
-    ).toBeFocused();
+    await expect(nextStageButton(page, "World")).toBeFocused();
 
     await search.fill("");
     const familyNames = await page.locator(".look-families button").allTextContents();
@@ -1053,7 +1061,7 @@ test.describe("Living Cinema creation flow", () => {
     await expect(defaultVoice).toContainText("Selection confirmed");
     expect(commands).toEqual(["episode.voice.select"]);
 
-    await page.getByRole("button", { name: /Enter the look vault/ }).click();
+    await nextStageButton(page, "Look").click();
     await expect(
       page.getByRole("status").filter({ hasText: "This look is a system default" }),
     ).toBeVisible();
@@ -1066,9 +1074,7 @@ test.describe("Living Cinema creation flow", () => {
     await useDefault.click();
     expect(commands).toEqual(["episode.voice.select", "episode.look.select"]);
     await expect(page.getByRole("button", { name: "Look confirmed" })).toBeDisabled();
-    await expect(
-      page.getByRole("button", { name: /Build world \+ preflight/ }),
-    ).toBeEnabled();
+    await expect(nextStageButton(page, "World")).toBeEnabled();
   });
 
   test("never commits a pending look hidden by search or family filters", async ({
@@ -1087,7 +1093,7 @@ test.describe("Living Cinema creation flow", () => {
       });
     });
     await page.goto(`/episodes/${episodeId}/create?fixture=phase2-script`);
-    await page.getByRole("button", { name: /Enter the look vault/ }).click();
+    await nextStageButton(page, "Look").click();
 
     await page.getByRole("button", { name: /Divine Fury/ }).click();
     await expect(page.getByRole("button", { name: "Use this look" })).toBeEnabled();
@@ -1111,7 +1117,7 @@ test.describe("Living Cinema creation flow", () => {
   test("discloses all 117 mobile looks in safe 24-item batches", async ({ page }) => {
     await page.setViewportSize({ height: 844, width: 390 });
     await page.goto(`/episodes/${episodeId}/create?fixture=phase2-script`);
-    await page.getByRole("button", { name: /Enter the look vault/ }).click();
+    await nextStageButton(page, "Look").click();
     await page.getByRole("button", { name: "All looks" }).click();
 
     const cards = page.locator(".look-card");
@@ -1167,6 +1173,39 @@ test.describe("Living Cinema creation flow", () => {
     await expect(page.getByRole("button", { name: "Use this look" })).toBeVisible();
   });
 
+  test("reflows the creation journey at a 200% desktop-zoom equivalent", async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ height: 360, width: 640 });
+
+    for (const fixture of [
+      "phase2-script",
+      "phase2-world",
+      "phase2-preflight",
+      "mvp-review",
+    ]) {
+      await page.goto(`/episodes/${episodeId}/create?fixture=${fixture}`);
+      await expect(
+        page.getByRole("navigation", { name: "Episode creation chambers" }),
+      ).toBeVisible();
+
+      const overflow = await page.evaluate(() => {
+        const back = document.querySelector<HTMLElement>(".creation-back")!;
+        const title = document.querySelector<HTMLElement>(".creation-title-context")!;
+        const backBox = back.getBoundingClientRect();
+        const titleBox = title.getBoundingClientRect();
+        return {
+          document:
+            document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          headerGap: titleBox.left - backBox.right,
+        };
+      });
+      expect(overflow.document, `${fixture} document overflow`).toBeLessThanOrEqual(1);
+      expect(overflow.headerGap, `${fixture} header overlap`).toBeGreaterThanOrEqual(8);
+    }
+  });
+
   test("moves focus with the chamber and a roving 117-look keyboard grid", async ({
     page,
   }) => {
@@ -1179,7 +1218,7 @@ test.describe("Living Cinema creation flow", () => {
     ]) {
       await page.setViewportSize({ height: 844, width });
       await page.goto(`/episodes/${episodeId}/create?fixture=phase2-script`);
-      await page.getByRole("button", { name: /Enter the look vault/ }).click();
+      await nextStageButton(page, "Look").click();
 
       await expect(page.locator("#look-vault-instructions")).toHaveText(
         /Activate a visual look to preview it.*Previewing does not change the Episode pin/,
@@ -1259,7 +1298,7 @@ test.describe("Living Cinema creation flow", () => {
     });
 
     await page.goto(`/episodes/${episodeId}/create?fixture=phase2-advertising-look`);
-    await page.getByRole("button", { name: /Enter the look vault/ }).click();
+    await nextStageButton(page, "Look").click();
     await expect(
       page.getByRole("button", { name: /Apple Clean High-Key/ }),
     ).toHaveAttribute("aria-pressed", "true");
@@ -1268,19 +1307,17 @@ test.describe("Living Cinema creation flow", () => {
     ).toHaveAttribute("aria-pressed", "true");
 
     await page.goto(`/episodes/${episodeId}/create?fixture=phase2-invalid-look`);
-    await page.getByRole("button", { name: /Enter the look vault/ }).click();
+    await nextStageButton(page, "Look").click();
     await expect(
       page.getByRole("alert").filter({ hasText: "has not substituted another look" }),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: /Glowing Divine Realism/ }),
     ).toHaveAttribute("aria-pressed", "false");
-    await expect(
-      page.getByRole("button", { name: /Build world \+ preflight/ }),
-    ).toBeDisabled();
+    await expect(nextStageButton(page, "World")).toBeDisabled();
 
     await page.goto(`/episodes/${episodeId}/create?fixture=phase2-withdrawn-look`);
-    await page.getByRole("button", { name: /Enter the look vault/ }).click();
+    await nextStageButton(page, "Look").click();
     await expect(
       page.getByRole("alert").filter({ hasText: "missing, withdrawn, or unavailable" }),
     ).toBeVisible();
@@ -1296,7 +1333,7 @@ test.describe("Living Cinema creation flow", () => {
     await expect(page.getByText("Divine Fury pinned to this Episode.")).toBeVisible();
 
     await page.goto(`/episodes/${episodeId}/create?fixture=phase2-unavailable-look`);
-    await page.getByRole("button", { name: /Enter the look vault/ }).click();
+    await nextStageButton(page, "Look").click();
     await expect(
       page.getByRole("alert").filter({ hasText: "missing, withdrawn, or unavailable" }),
     ).toBeVisible();
@@ -1337,7 +1374,7 @@ test.describe("Living Cinema creation flow", () => {
       "true",
     );
 
-    await page.getByRole("button", { name: /Enter the look vault/ }).click();
+    await nextStageButton(page, "Look").click();
     await page.getByRole("button", { name: /Divine Fury/ }).click();
     await page.getByRole("button", { name: "Use this look" }).click();
     const authoritativeLook = page.getByRole("button", {
@@ -1354,9 +1391,7 @@ test.describe("Living Cinema creation flow", () => {
       .getByRole("searchbox", { name: "Search all looks" })
       .fill("no-such-visual-world-zyra");
     await expect(page.locator(".look-empty")).toContainText("No visual worlds match");
-    await expect(
-      page.getByRole("button", { name: /Build world \+ preflight/ }),
-    ).toBeDisabled();
+    await expect(nextStageButton(page, "World")).toBeDisabled();
     // Conflict reconciliation performs an RSC navigation. Wait for the
     // streamed document head to settle before auditing the complete document.
     await expect(page).toHaveTitle("Genie by Zyra");
@@ -1378,7 +1413,7 @@ test.describe("Living Cinema creation flow", () => {
       });
     });
     await page.goto(`/episodes/${episodeId}/create?fixture=phase2-stale-look`);
-    await page.getByRole("button", { name: /Enter the look vault/ }).click();
+    await nextStageButton(page, "Look").click();
     await page.getByRole("button", { name: /Divine Fury/ }).click();
     await page.getByRole("button", { name: "Use this look" }).click();
 
@@ -1420,7 +1455,7 @@ test.describe("Living Cinema creation flow", () => {
     await page.goto(
       `/episodes/${episodeId}/create?fixture=phase2-refresh-withdrawn-pins`,
     );
-    await page.getByRole("button", { name: /Enter the look vault/ }).click();
+    await nextStageButton(page, "Look").click();
     await expect(
       page.getByRole("heading", { name: /Choose the film’s visual soul/ }),
     ).toBeVisible();
@@ -1454,7 +1489,7 @@ test.describe("Living Cinema creation flow", () => {
     await page.setViewportSize({ height: 844, width: 390 });
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(`/episodes/${episodeId}/create?fixture=phase2-script`);
-    await page.getByRole("button", { name: /Enter the look vault/ }).click();
+    await nextStageButton(page, "Look").click();
 
     await expect(page.locator(".look-commit-bar")).toHaveCSS("position", "sticky");
     await expect(page.locator(".look-vault")).toHaveCSS("max-height", "none");
@@ -1496,9 +1531,7 @@ test.describe("Living Cinema creation flow", () => {
         "aria-pressed",
         "false",
       );
-      await expect(
-        page.getByRole("button", { name: /Enter the look vault/ }),
-      ).toBeDisabled();
+      await expect(nextStageButton(page, "Look")).toBeDisabled();
       await expect(
         page
           .getByRole("navigation", { name: "Episode creation chambers" })
@@ -1537,7 +1570,7 @@ test.describe("Living Cinema creation flow", () => {
       });
     });
     await page.goto(`/episodes/${episodeId}/create?fixture=phase2-script`);
-    await page.getByRole("button", { name: /Enter the look vault/ }).click();
+    await nextStageButton(page, "Look").click();
     await page.getByRole("button", { name: /Divine Fury/ }).click();
     await page.getByRole("button", { name: "Use this look" }).click();
     await page.waitForLoadState("networkidle");
@@ -1620,7 +1653,7 @@ test.describe("Living Cinema creation flow", () => {
     for (const width of [761, 1280]) {
       await page.setViewportSize({ height: 720, width });
       await page.goto(`/episodes/${episodeId}/create?fixture=phase2-script`);
-      await page.getByRole("button", { name: /Enter the look vault/ }).click();
+      await nextStageButton(page, "Look").click();
       await page.getByRole("button", { name: /Divine Fury/ }).click();
       await page.getByRole("button", { name: "Use this look" }).click();
       await expect(page.getByText("Authoritative mutation rejected.")).toBeVisible();
@@ -1778,6 +1811,15 @@ test.describe("Living Cinema creation flow", () => {
     page,
   }) => {
     await page.goto(`/episodes/${episodeId}/create?fixture=phase2-running`);
-    await page.waitForURL(new RegExp(`/episodes/${episodeId}/production`));
+    await expect(page).toHaveURL(
+      new RegExp(`/episodes/${episodeId}/create\\?fixture=phase2-running`),
+    );
+    await expect(page.getByRole("button", { name: /6 Edit/ })).toHaveAttribute(
+      "aria-current",
+      "step",
+    );
+    await expect(
+      page.getByRole("heading", { name: "Monica is gathering the agentic AI crew." }),
+    ).toBeVisible();
   });
 });

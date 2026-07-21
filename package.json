@@ -36,6 +36,7 @@
     "test:live:phase1:realtime": "node scripts/phase1-live-harness.mjs",
     "test:live:phase1:existing": "node scripts/run-isolated-next-dev.mjs 4176",
     "test:phase2:generation": "node scripts/test-phase2-generation-policy.mjs",
+    "test:mvp-media-proof": "node --env-file-if-exists=.tmp/vercel-sandbox.env --env-file-if-exists=.env.local scripts/run-mvp-fixed-media-proof.mjs",
     "test:coverage": "vitest run --project unit --coverage",
     "test:browser": "playwright test --project=chromium",
     "test:production": "playwright test --config=playwright.production.config.ts",

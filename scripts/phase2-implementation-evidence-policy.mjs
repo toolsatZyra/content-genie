@@ -1,4 +1,10 @@
-export const PHASE2_REVIEW_SCOPES = Object.freeze(["acceptance", "security", "ui-ux"]);
+export const PHASE2_REVIEW_COVERAGE = Object.freeze([
+  "acceptance",
+  "media",
+  "security",
+  "ui-ux",
+]);
+export const PHASE2_REVIEW_TYPE = "independent-context-minimized-comprehensive";
 
 const fullGitIdentity = /^[a-f0-9]{40}$/u;
 const reviewerIdentity = /^[a-z0-9][a-z0-9._-]{2,79}$/u;
@@ -27,7 +33,7 @@ export function assertPhase2PromotionInputs({
   localGate,
   now = Date.now(),
   remoteLiveSuite,
-  reviews,
+  review,
 }) {
   if (
     !fullGitIdentity.test(candidateCommit) ||
@@ -104,18 +110,35 @@ export function assertPhase2PromotionInputs({
     );
   }
 
-  if (!Array.isArray(reviews) || reviews.length !== PHASE2_REVIEW_SCOPES.length) {
-    throw new Error("Phase 2 promotion requires exactly three cold-review manifests.");
-  }
-  const actualScopes = reviews.map(({ scope }) => scope).sort();
-  const reviewerIds = reviews.map(({ reviewerId }) => reviewerId);
   if (
-    JSON.stringify(actualScopes) !== JSON.stringify([...PHASE2_REVIEW_SCOPES].sort()) ||
-    new Set(actualScopes).size !== actualScopes.length ||
-    new Set(reviewerIds).size !== reviewerIds.length
+    !exactKeys(review, [
+      "candidateCommit",
+      "candidateTree",
+      "coverage",
+      "disposition",
+      "findings",
+      "openP0",
+      "openP1",
+      "openP2",
+      "reviewedAt",
+      "reviewerId",
+      "reviewType",
+      "schemaVersion",
+    ]) ||
+    review.schemaVersion !== "genie-cold-review.v2" ||
+    review.candidateCommit !== candidateCommit ||
+    review.candidateTree !== candidateTree ||
+    review.reviewType !== PHASE2_REVIEW_TYPE ||
+    JSON.stringify(review.coverage) !== JSON.stringify(PHASE2_REVIEW_COVERAGE) ||
+    review.disposition !== "passed" ||
+    review.openP0 !== 0 ||
+    review.openP1 !== 0 ||
+    review.openP2 !== 0 ||
+    !reviewerIdentity.test(review.reviewerId ?? "") ||
+    !Array.isArray(review.findings)
   ) {
     throw new Error(
-      "Phase 2 promotion requires distinct acceptance, security, and UI/UX reviews.",
+      "Phase 2 promotion requires one valid independent context-minimized comprehensive review.",
     );
   }
   const freshnessFloor = Math.max(
@@ -123,47 +146,22 @@ export function assertPhase2PromotionInputs({
     localCompletedAt,
     remoteCompletedAt,
   );
-  for (const review of reviews) {
+  const reviewedAt = timestamp(
+    review.reviewedAt,
+    "The comprehensive Phase 2 review",
+    now,
+  );
+  if (reviewedAt < freshnessFloor) {
+    throw new Error("The comprehensive Phase 2 review is stale for this evidence set.");
+  }
+  for (const finding of review.findings) {
     if (
-      !exactKeys(review, [
-        "candidateCommit",
-        "candidateTree",
-        "disposition",
-        "findings",
-        "openP0",
-        "openP1",
-        "openP2",
-        "reviewedAt",
-        "reviewerId",
-        "schemaVersion",
-        "scope",
-      ]) ||
-      review.schemaVersion !== "genie-cold-review.v1" ||
-      review.candidateCommit !== candidateCommit ||
-      review.candidateTree !== candidateTree ||
-      review.disposition !== "passed" ||
-      review.openP0 !== 0 ||
-      review.openP1 !== 0 ||
-      review.openP2 !== 0 ||
-      !PHASE2_REVIEW_SCOPES.includes(review.scope) ||
-      !reviewerIdentity.test(review.reviewerId ?? "") ||
-      !Array.isArray(review.findings)
+      !exactKeys(finding, ["id", "severity", "status", "title"]) ||
+      !["P0", "P1", "P2", "P3"].includes(finding.severity) ||
+      !["closed", "open"].includes(finding.status) ||
+      (["P0", "P1", "P2"].includes(finding.severity) && finding.status !== "closed")
     ) {
-      throw new Error("Phase 2 promotion received an invalid cold-review manifest.");
-    }
-    const reviewedAt = timestamp(review.reviewedAt, `${review.scope} review`, now);
-    if (reviewedAt < freshnessFloor) {
-      throw new Error(`The ${review.scope} review is stale for this evidence set.`);
-    }
-    for (const finding of review.findings) {
-      if (
-        !exactKeys(finding, ["id", "severity", "status", "title"]) ||
-        !["P0", "P1", "P2", "P3"].includes(finding.severity) ||
-        !["closed", "open"].includes(finding.status) ||
-        (["P0", "P1", "P2"].includes(finding.severity) && finding.status !== "closed")
-      ) {
-        throw new Error(`The ${review.scope} review contains an invalid finding.`);
-      }
+      throw new Error("The comprehensive Phase 2 review contains an invalid finding.");
     }
   }
 
@@ -171,6 +169,7 @@ export function assertPhase2PromotionInputs({
     candidate: Object.freeze({ commit: candidateCommit, tree: candidateTree }),
     localCompletedAt: localGate.completedAt,
     remoteCompletedAt: remoteLiveSuite.finishedAt,
-    reviewScopes: PHASE2_REVIEW_SCOPES,
+    reviewCoverage: PHASE2_REVIEW_COVERAGE,
+    reviewType: PHASE2_REVIEW_TYPE,
   });
 }

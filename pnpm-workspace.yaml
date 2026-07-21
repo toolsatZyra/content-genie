@@ -7,7 +7,10 @@ allowBuilds:
 autoInstallPeers: false
 engineStrict: true
 overrides:
+  engine.io: 6.6.7
+  fast-uri: 3.1.4
   postcss: 8.5.19
+  sharp: 0.35.0
   tar: 7.5.20
   ws: 8.21.1
 resolutionMode: highest

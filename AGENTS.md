@@ -14,9 +14,11 @@ external state before relying on any status claim in a document.
   mythology look.
 - Narrator gender is user-selected and defaults to male. Do not silently
   substitute a voice.
-- Quality order is cinematic quality, reliability, cost, then speed. A normal
-  Episode must not receive production authority above USD 50 without explicit
-  top-up authority.
+- Quality order is cinematic quality, reliability, cost, then speed. During the
+  owner-operated developer MVP, production records forecast and actual cost but
+  does not pause when an Episode exceeds USD 50. Re-establish a cap only after
+  the owner reviews several days of real Episode cost evidence and explicitly
+  selects one for wider use.
 - After World Lock, production is autonomous until final review. Human review
   remains the release authority until the calibration contract is satisfied.
 

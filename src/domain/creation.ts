@@ -1,4 +1,5 @@
 import type { EpisodeWorkflowState } from "@/domain/studio";
+import type { CreationProductionProjection } from "@/domain/mvp-production";
 import type {
   CreationPreflightProjection,
   CreationWorldProjection,
@@ -65,6 +66,7 @@ export interface CreationProjection {
     readonly revisionNumber: number;
   } | null;
   readonly preflight: CreationPreflightProjection;
+  readonly production: CreationProductionProjection;
   readonly world: CreationWorldProjection;
 }
 

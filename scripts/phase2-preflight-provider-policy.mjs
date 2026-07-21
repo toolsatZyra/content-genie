@@ -323,8 +323,8 @@ export function analyzePreflightProviderMigrations(sources) {
 
 export function analyzePreflightProviderPgTap(source) {
   const errors = [];
-  if (!/select\s+plan\(85\)\s*;/i.test(source)) {
-    errors.push("preflight/provider pgTAP must declare its exact 85-test plan");
+  if (!/select\s+plan\(100\)\s*;/i.test(source)) {
+    errors.push("preflight/provider pgTAP must declare its exact 100-test plan");
   }
   for (const required of [
     "underquoted provider cost cannot become authority",

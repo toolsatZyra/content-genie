@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { inspectStillImageContainer } from "./still-image-container";
+import {
+  inspectStillImageContainer,
+  inspectStillImageDimensions,
+} from "./still-image-container";
 
 function uint32(value: number) {
   const bytes = Buffer.alloc(4);
@@ -41,6 +44,10 @@ describe("still image container envelope", () => {
   it("accepts an exact PNG envelope", () => {
     expect(inspectStillImageContainer(minimalPng(), "image/png")).toEqual({
       status: "valid",
+    });
+    expect(inspectStillImageDimensions(minimalPng(), "image/png")).toEqual({
+      height: 320,
+      width: 320,
     });
   });
 
@@ -89,5 +96,31 @@ describe("still image container envelope", () => {
         "image/webp",
       ),
     ).toEqual({ status: "trailing_data" });
+  });
+
+  it("derives JPEG and WebP dimensions only from valid image headers", () => {
+    const jpeg = Buffer.concat([
+      Buffer.from([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x02, 0x80, 0x01, 0x68]),
+      Buffer.alloc(55),
+      Buffer.from([0xff, 0xd9]),
+    ]);
+    expect(inspectStillImageDimensions(jpeg, "image/jpeg")).toEqual({
+      height: 640,
+      width: 360,
+    });
+
+    const webp = Buffer.alloc(48);
+    webp.write("RIFF", 0, "ascii");
+    webp.writeUInt32LE(40, 4);
+    webp.write("WEBPVP8X", 8, "ascii");
+    webp.writeUInt32LE(10, 16);
+    webp.writeUIntLE(359, 24, 3);
+    webp.writeUIntLE(639, 27, 3);
+    webp.write("VP8 ", 30, "ascii");
+    webp.writeUInt32LE(10, 34);
+    expect(inspectStillImageDimensions(webp, "image/webp")).toEqual({
+      height: 640,
+      width: 360,
+    });
   });
 });

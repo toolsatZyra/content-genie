@@ -59,23 +59,20 @@ function validInputs() {
         validationError: null,
       },
     },
-    reviews: [
-      ["acceptance", "cold-acceptance-reviewer"],
-      ["security", "cold-security-reviewer"],
-      ["ui-ux", "cold-ui-reviewer"],
-    ].map(([scope, reviewerId]) => ({
+    review: {
       candidateCommit,
       candidateTree,
+      coverage: ["acceptance", "media", "security", "ui-ux"],
       disposition: "passed",
       findings: [],
       openP0: 0,
       openP1: 0,
       openP2: 0,
       reviewedAt: "2026-07-19T03:00:00.000Z",
-      reviewerId,
-      schemaVersion: "genie-cold-review.v1",
-      scope,
-    })),
+      reviewerId: "cold-comprehensive-reviewer",
+      reviewType: "independent-context-minimized-comprehensive",
+      schemaVersion: "genie-cold-review.v2",
+    },
   };
 }
 
@@ -106,48 +103,55 @@ assert.throws(
   /same-candidate remote live-suite/,
 );
 
-const missingReviewer = validInputs();
-missingReviewer.reviews.pop();
+const missingReview = validInputs();
+delete missingReview.review;
 assert.throws(
-  () => assertPhase2PromotionInputs(missingReviewer),
-  /exactly three cold-review manifests/,
+  () => assertPhase2PromotionInputs(missingReview),
+  /one valid independent context-minimized comprehensive review/,
 );
 
-const duplicateReviewer = validInputs();
-duplicateReviewer.reviews[1].reviewerId = duplicateReviewer.reviews[0].reviewerId;
+const incompleteCoverage = validInputs();
+incompleteCoverage.review.coverage = ["acceptance", "security", "ui-ux"];
 assert.throws(
-  () => assertPhase2PromotionInputs(duplicateReviewer),
-  /distinct acceptance, security, and UI\/UX reviews/,
+  () => assertPhase2PromotionInputs(incompleteCoverage),
+  /one valid independent context-minimized comprehensive review/,
+);
+
+const wrongReviewType = validInputs();
+wrongReviewType.review.reviewType = "comprehensive";
+assert.throws(
+  () => assertPhase2PromotionInputs(wrongReviewType),
+  /one valid independent context-minimized comprehensive review/,
 );
 
 const staleReviewer = validInputs();
-staleReviewer.reviews[2].reviewedAt = "2026-07-19T01:30:00.000Z";
+staleReviewer.review.reviewedAt = "2026-07-19T01:30:00.000Z";
 assert.throws(
   () => assertPhase2PromotionInputs(staleReviewer),
-  /ui-ux review is stale/,
+  /comprehensive Phase 2 review is stale/,
 );
 
 const openP1 = validInputs();
-openP1.reviews[0].openP1 = 1;
+openP1.review.openP1 = 1;
 assert.throws(
   () => assertPhase2PromotionInputs(openP1),
-  /invalid cold-review manifest/,
+  /one valid independent context-minimized comprehensive review/,
 );
 
 const openP2 = validInputs();
-openP2.reviews[1].openP2 = 1;
+openP2.review.openP2 = 1;
 assert.throws(
   () => assertPhase2PromotionInputs(openP2),
-  /invalid cold-review manifest/,
+  /one valid independent context-minimized comprehensive review/,
 );
 
 const openP2Finding = validInputs();
-openP2Finding.reviews[2].findings = [
+openP2Finding.review.findings = [
   { id: "UI-P2-001", severity: "P2", status: "open", title: "open P2" },
 ];
 assert.throws(
   () => assertPhase2PromotionInputs(openP2Finding),
-  /contains an invalid finding/,
+  /comprehensive Phase 2 review contains an invalid finding/,
 );
 
 const generatorSource = fs.readFileSync(
@@ -156,9 +160,10 @@ const generatorSource = fs.readFileSync(
 );
 for (const requiredBinding of [
   "phase1-live-suite.json",
-  "phase2-cold-review.${scope}.v1.json",
+  "phase2-cold-review.comprehensive.v2.json",
   "assertPhase2PromotionInputs",
-  "genie-implementation-evidence.v2",
+  "genie-implementation-evidence.v3",
+  "p2-01-through-p2-14.implementation.json",
 ]) {
   assert.ok(
     generatorSource.includes(requiredBinding),
@@ -172,5 +177,5 @@ const liveSuiteSource = fs.readFileSync(
 assert.match(liveSuiteSource, /candidateCommit: candidate\.commit/);
 
 console.log(
-  "PASS Phase 2 implementation promotion requires exact local, remote, and three-review evidence",
+  "PASS Phase 2 implementation promotion requires exact local, remote, and one comprehensive review",
 );

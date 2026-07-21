@@ -69,13 +69,21 @@ Editing judgement is split deliberately:
   exact 60-120 second master.
 
 The earlier six-clip repeating concat and the intermediate twelve-beat cap were
-sufficient only as renderer proofs. The production rule is now one planned
-visual slot per three seconds of locked narration: `ceil(duration_ms / 3000)`,
-or 20-40 shots across the 60-120 second launch range. Slot boundaries are
-aligned to the narration alignment, and the EDD records exact text, Unicode
-scalar coordinates, and millisecond coordinates for every shot. The renderer
-cuts on those EDD timestamps. The owner remains the release authority and may
-use the one bounded rejection and repair pass.
+sufficient only as renderer proofs. `ceil(duration_ms / 3000)` is now creative
+planning guidance, not a minimum, maximum, database constraint, or acceptance
+rule. The Director first creates semantic shots and assigns each one an exact,
+contiguous span of immutable script words. After the final ElevenLabs narration
+exists, word alignment gives those shot spans their exact millisecond windows.
+The EDD records the exact text, Unicode scalar coordinates, and resulting
+millisecond coordinates, and the renderer cuts on those timestamps.
+
+Provider request durations are derived from the aligned editorial window. When
+a provider accepts only whole-second quanta, Genie requests the smallest
+supported duration that covers the shot plus a small edit handle, then trims to
+the exact aligned duration. It never loops or time-stretches a short clip to
+fill the window. A shot may be subdivided at a phrase/action boundary only when
+its actual duration or action cannot be generated coherently by a qualified
+provider.
 
 A Seedance multi-shot generation may cover adjacent slots in one longer source
 clip (for example, five planned visual changes in a 15-second clip), but only
@@ -95,8 +103,14 @@ FFmpeg already executes reliably.
 - Public-catalogue canaries return multiple file candidates for a representative
   named festival, ritual, and temple; unit evidence proves distinct references
   are allocated to applicable storyboard shots before reuse.
-- A 60-120 second render contains 20-40 word-bound visual slots; cut points
-  follow the locked EDD timestamps and the final media probe reports H.264,
-  1080x1920, `yuv420p`, and the locked narration duration.
-- The final owner review can reject once with direction, rerender, approve, and
-  download the approved master.
+- A 60-120 second render contains the Director's evidence-bound semantic shots;
+  `ceil(duration_ms / 3000)` is available as guidance but is never enforced.
+  Cut points follow the locked word-aligned EDD timestamps and the final media
+  probe reports H.264, 1080x1920, `yuv420p`, and the locked narration duration.
+- Stage 6 is labelled Edit and keeps production progress, final playback,
+  repair feedback, Monica's authoritative repair progress, approval, and
+  downloads inside the six-stage Episode flow. It never redirects to a separate
+  production screen.
+- A review-ready master can always be downloaded. After approval, Genie also
+  provides a complete package of every storyboard image and video clip used by
+  that approved master, with a manifest and checksums.

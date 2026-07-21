@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, auth, storage, private, audit, pg_catalog;
-select plan(85);
+select plan(100);
 
 create temp table fixture_values (
   key text primary key,
@@ -367,6 +367,102 @@ select throws_ok(
   'another workspace provider capability cannot be quoted'
 );
 
+select throws_ok(
+  $sql$
+    select public.command_create_micro_quote(
+      'a1100000-0000-4000-8000-000000000001',
+      'a1400000-0000-4000-8000-000000000001',
+      'a1600000-0000-4000-8000-000000000001',
+      'a1500000-0000-4000-8000-000000000001',
+      'secure_ingest', repeat('0', 64), repeat('1', 64),
+      jsonb_build_array(jsonb_build_object(
+        'slotKey', 'production.video.forbidden',
+        'capabilityId', 'a1720000-0000-4000-8000-000000000001',
+        'operation', 'gen_video', 'quantity', 1,
+        'unitPriceMinor', 40, 'amountMinor', 40,
+        'requestSchemaHash', repeat('2', 64)
+      )), statement_timestamp() + interval '1 hour'
+    )
+  $sql$,
+  '22023', 'micro quote line is invalid',
+  'micro authority cannot quote or claim a production video slot'
+);
+
+select throws_ok(
+  $sql$
+    select public.command_create_micro_quote(
+      'a1100000-0000-4000-8000-000000000001',
+      'a1400000-0000-4000-8000-000000000001',
+      'a1600000-0000-4000-8000-000000000001',
+      'a1500000-0000-4000-8000-000000000001',
+      'secure_ingest', repeat('3', 64), repeat('4', 64),
+      jsonb_build_array(jsonb_build_object(
+        'slotKey', 'production.render.forbidden',
+        'capabilityId', 'a1720000-0000-4000-8000-000000000001',
+        'operation', 'render', 'quantity', 1,
+        'unitPriceMinor', 40, 'amountMinor', 40,
+        'requestSchemaHash', repeat('5', 64)
+      )), statement_timestamp() + interval '1 hour'
+    )
+  $sql$,
+  '22023', 'micro quote line is invalid',
+  'micro authority cannot quote or claim a render slot'
+);
+
+select throws_ok(
+  $sql$
+    select public.command_create_micro_quote(
+      'a1100000-0000-4000-8000-000000000001',
+      'a1400000-0000-4000-8000-000000000001',
+      'a1600000-0000-4000-8000-000000000001',
+      'a1500000-0000-4000-8000-000000000001',
+      'secure_ingest', repeat('6', 64), repeat('7', 64),
+      jsonb_build_array(jsonb_build_object(
+        'slotKey', 'production.export.forbidden',
+        'capabilityId', 'a1720000-0000-4000-8000-000000000001',
+        'operation', 'export', 'quantity', 1,
+        'unitPriceMinor', 40, 'amountMinor', 40,
+        'requestSchemaHash', repeat('8', 64)
+      )), statement_timestamp() + interval '1 hour'
+    )
+  $sql$,
+  '22023', 'micro quote line is invalid',
+  'micro authority cannot quote or claim an export slot'
+);
+
+select throws_ok(
+  $sql$
+    select public.command_create_micro_quote(
+      'a1100000-0000-4000-8000-000000000001',
+      'a1400000-0000-4000-8000-000000000001',
+      'a1600000-0000-4000-8000-000000000001',
+      'a1500000-0000-4000-8000-000000000001',
+      'secure_ingest', repeat('9', 64), repeat('a', 64),
+      jsonb_build_array(jsonb_build_object(
+        'slotKey', 'production.approval.forbidden',
+        'capabilityId', 'a1720000-0000-4000-8000-000000000001',
+        'operation', 'approve', 'quantity', 1,
+        'unitPriceMinor', 40, 'amountMinor', 40,
+        'requestSchemaHash', repeat('b', 64)
+      )), statement_timestamp() + interval '1 hour'
+    )
+  $sql$,
+  '22023', 'micro quote line is invalid',
+  'micro authority cannot quote or claim an approval slot'
+);
+
+select is(
+  jsonb_build_object(
+    'quotes', (select count(*) from private.micro_quotes),
+    'quoteLines', (select count(*) from private.micro_quote_lines),
+    'requests', (select count(*) from private.provider_requests),
+    'costEvents', (select count(*) from private.provider_cost_events),
+    'settledMinor', (select coalesce(sum(settled_minor), 0) from private.micro_reservations)
+  ),
+  '{"costEvents":0,"quoteLines":0,"quotes":0,"requests":0,"settledMinor":0}'::jsonb,
+  'forbidden production operations create no quote, request, or spend authority'
+);
+
 insert into fixture_values (key, value)
 select 'quote_id', public.command_create_micro_quote(
   'a1100000-0000-4000-8000-000000000001',
@@ -380,6 +476,22 @@ select 'quote_id', public.command_create_micro_quote(
     'operation', 'gen_image', 'quantity', 1,
     'unitPriceMinor', 40, 'amountMinor', 40,
     'requestSchemaHash', repeat('3', 64)
+  )), statement_timestamp() + interval '1 hour'
+)::text;
+
+insert into fixture_values (key, value)
+select 'aal1_quote_id', public.command_create_micro_quote(
+  'a1100000-0000-4000-8000-000000000001',
+  'a1400000-0000-4000-8000-000000000001',
+  'a1600000-0000-4000-8000-000000000001',
+  'a1500000-0000-4000-8000-000000000001',
+  'secure_ingest', repeat('6', 64), repeat('7', 64),
+  jsonb_build_array(jsonb_build_object(
+    'slotKey', 'anchor.image.aal1_probe',
+    'capabilityId', 'a1720000-0000-4000-8000-000000000001',
+    'operation', 'gen_image', 'quantity', 1,
+    'unitPriceMinor', 40, 'amountMinor', 40,
+    'requestSchemaHash', repeat('8', 64)
   )), statement_timestamp() + interval '1 hour'
 )::text;
 
@@ -400,16 +512,15 @@ select set_config('request.jwt.claim.sub', 'a1200000-0000-4000-8000-000000000001
 select set_config('request.jwt.claim.role', 'authenticated', true);
 set local role authenticated;
 
-select throws_ok(
+select lives_ok(
   format(
     'select public.command_authorize_micro_quote(%L,%L,1,%L,40,%L,%L,%L,%L)',
     'a1100000-0000-4000-8000-000000000001',
-    (select value from fixture_values where key = 'quote_id'), repeat('1', 64),
+    (select value from fixture_values where key = 'aal1_quote_id'), repeat('6', 64),
     'a1800000-0000-4000-8000-000000000001', 'micro-authorize-aal1',
     repeat('4', 64), 'a1810000-0000-4000-8000-000000000001'
   ),
-  '42501', 'aal2 required',
-  'micro-spend authorization fails closed without AAL2'
+  'the exact single-owner developer may authorize a bounded micro-spend at the actual AAL1 session'
 );
 
 reset role;
@@ -560,6 +671,155 @@ select lives_ok(
   'the exact claimed attempt starts'
 );
 
+insert into fixture_values (key, value)
+values ('cross_kind_input_manifest_id', 'a1900000-0000-4000-8000-000000000002');
+
+select public.command_register_provider_input_manifest(
+  (select value::uuid from fixture_values where key = 'cross_kind_input_manifest_id'),
+  'a1100000-0000-4000-8000-000000000001',
+  'gen_image', 'fal.image.v1',
+  '{"imageSize":"portrait_9_16","numImages":1,"outputFormat":"png","prompt":"Cross-kind fixture","targetAssetId":"a1910000-0000-4000-8000-000000000002"}'::jsonb,
+  repeat('5', 64)
+);
+
+insert into fixture_values (key, value)
+select 'cross_kind_run_id', (
+  public.command_create_preflight_run(
+    'a1100000-0000-4000-8000-000000000001',
+    'a1400000-0000-4000-8000-000000000001',
+    'a1600000-0000-4000-8000-000000000001',
+    'a1500000-0000-4000-8000-000000000001', 'world_anchor', false,
+    null, null, null, 'a1820000-0000-4000-8000-000000000004',
+    'preflight-create-cross-kind-001', repeat('9', 64)
+  ) ->> 'preflightRunId'
+);
+
+select public.command_transition_preflight_run(
+  (select value::uuid from fixture_values where key = 'cross_kind_run_id'),
+  1, 'enqueue', null
+);
+select public.command_transition_preflight_run(
+  (select value::uuid from fixture_values where key = 'cross_kind_run_id'),
+  2, 'started', 'trigger-run-cross-kind-001'
+);
+
+insert into fixture_values (key, value)
+select 'cross_kind_stage_id', id::text
+from public.preflight_stage_runs
+where preflight_run_id = (
+  select value::uuid from fixture_values where key = 'cross_kind_run_id'
+);
+
+select public.command_make_preflight_stage_ready(
+  (select value::uuid from fixture_values where key = 'cross_kind_stage_id'),
+  1,
+  (select value::uuid from fixture_values where key = 'cross_kind_input_manifest_id'),
+  repeat('5', 64)
+);
+
+insert into fixture_values (key, value)
+select 'cross_kind_claim', public.command_claim_preflight_stage(
+  (select value::uuid from fixture_values where key = 'cross_kind_stage_id'),
+  2, 1, 'trigger.worker.cross.kind.001', 120
+)::text;
+
+select public.command_start_preflight_attempt(
+  ((select value::jsonb from fixture_values where key = 'cross_kind_claim')
+    ->> 'stageAttemptId')::uuid,
+  1, 1, repeat('5', 64), 'task-cross-kind-001', 'task-run-cross-kind-001'
+);
+
+select throws_ok(
+  format(
+    'select public.command_claim_micro_provider_slot(%L,%L,%L,%L,%L,%L,%L,%L,null)',
+    'a1100000-0000-4000-8000-000000000001',
+    (select value from fixture_values where key = 'preflight_run_id'),
+    ((select value::jsonb from fixture_values where key = 'cross_kind_claim')
+      ->> 'stageAttemptId'),
+    (select id from private.micro_quote_lines where micro_quote_id = (
+      select value::uuid from fixture_values where key = 'quote_id'
+    )),
+    (select value from fixture_values where key = 'input_manifest_id'),
+    repeat('8', 64), 'cross-stage-provider-request-001',
+    'a1940000-0000-4000-8000-000000000002'
+  ),
+  '23503', null,
+  'a stage attempt from another preflight run cannot create a provider request'
+);
+
+select throws_ok(
+  format(
+    'select public.command_claim_micro_provider_slot(%L,%L,%L,%L,%L,%L,%L,%L,null)',
+    'a1100000-0000-4000-8000-000000000001',
+    (select value from fixture_values where key = 'cross_kind_run_id'),
+    ((select value::jsonb from fixture_values where key = 'cross_kind_claim')
+      ->> 'stageAttemptId'),
+    (select id from private.micro_quote_lines where micro_quote_id = (
+      select value::uuid from fixture_values where key = 'quote_id'
+    )),
+    (select value from fixture_values where key = 'cross_kind_input_manifest_id'),
+    repeat('5', 64), 'cross-kind-provider-request-001',
+    'a1940000-0000-4000-8000-000000000003'
+  ),
+  '40001', 'provider slot authority is stale',
+  'a world-anchor preflight cannot consume a secure-ingest micro slot'
+);
+
+select throws_ok(
+  format(
+    'select public.command_claim_micro_provider_slot(%L,%L,%L,%L,%L,%L,%L,%L,null)',
+    'a1100000-0000-4000-8000-000000000001',
+    (select value from fixture_values where key = 'preflight_run_id'),
+    ((select value::jsonb from fixture_values where key = 'claim_response')
+      ->> 'stageAttemptId'),
+    (select id from private.micro_quote_lines where micro_quote_id = (
+      select value::uuid from fixture_values where key = 'aal1_quote_id'
+    )),
+    (select value from fixture_values where key = 'input_manifest_id'),
+    repeat('8', 64), 'cross-slot-provider-request-001',
+    'a1940000-0000-4000-8000-000000000004'
+  ),
+  '40001', 'provider slot authority is stale',
+  'a quote line from another authority cannot be cross-linked into the run'
+);
+
+select throws_ok(
+  format(
+    'select public.command_claim_micro_provider_slot(%L,%L,%L,%L,%L,%L,%L,%L,null)',
+    'a1100000-0000-4000-8000-000000000001',
+    (select value from fixture_values where key = 'preflight_run_id'),
+    ((select value::jsonb from fixture_values where key = 'claim_response')
+      ->> 'stageAttemptId'),
+    (select id from private.micro_quote_lines where micro_quote_id = (
+      select value::uuid from fixture_values where key = 'quote_id'
+    )),
+    (select value from fixture_values where key = 'cross_kind_input_manifest_id'),
+    repeat('5', 64), 'cross-manifest-provider-request-001',
+    'a1940000-0000-4000-8000-000000000005'
+  ),
+  '40001', 'provider slot authority is stale',
+  'a manifest from another preflight run cannot be cross-linked into the stage'
+);
+
+select is(
+  jsonb_build_object(
+    'requests', (select count(*) from private.provider_requests),
+    'claims', (select count(*) from private.provider_request_quote_claims),
+    'costEvents', (select count(*) from private.provider_cost_events),
+    'settledMinor', (select coalesce(sum(settled_minor), 0) from private.micro_reservations)
+  ),
+  '{"claims":0,"costEvents":0,"requests":0,"settledMinor":0}'::jsonb,
+  'cross-kind, stage, slot, and manifest attempts create no request or spend'
+);
+
+select lives_ok(
+  format(
+    'select public.command_transition_preflight_run(%L,3,%L,null)',
+    (select value from fixture_values where key = 'cross_kind_run_id'), 'fail'
+  ),
+  'the cross-kind fixture terminalizes without leaving active authority'
+);
+
 select ok(
   public.command_heartbeat_preflight_attempt(
     ((select value::jsonb from fixture_values where key = 'claim_response')
@@ -666,7 +926,8 @@ select is(
 select is(
   (select version_number from private.remote_fetch_allowlist_versions
     where id = (select value::uuid from fixture_values where key = 'allowlist_v2')),
-  2,
+  (select version_number + 1 from private.remote_fetch_allowlist_versions
+    where id = (select value::uuid from fixture_values where key = 'allowlist_v1')),
   'allowlist rotation activates one monotonically versioned successor'
 );
 
@@ -716,6 +977,64 @@ select 'provider_request_id', public.command_claim_micro_provider_slot(
   repeat('8', 64), 'provider-request-primary-001',
   'a1940000-0000-4000-8000-000000000001', null
 )::text;
+
+select ok(
+  (
+    select constraint_row.convalidated
+      and not constraint_row.condeferrable
+      and constraint_row.conkey::smallint[] = array[attribute.attnum]::smallint[]
+    from pg_catalog.pg_constraint constraint_row
+    join pg_catalog.pg_attribute attribute
+      on attribute.attrelid = constraint_row.conrelid
+      and attribute.attname = 'micro_quote_line_id'
+      and not attribute.attisdropped
+    where constraint_row.conrelid =
+        'private.provider_request_quote_claims'::regclass
+      and constraint_row.contype = 'u'
+      and constraint_row.conkey::smallint[] = array[attribute.attnum]::smallint[]
+  ),
+  'one provider slot retains one immediate validated quote-line constraint'
+);
+select is(
+  public.command_claim_micro_provider_slot(
+    'a1100000-0000-4000-8000-000000000001',
+    (select value::uuid from fixture_values where key = 'preflight_run_id'),
+    ((select value::jsonb from fixture_values where key = 'claim_response')
+      ->> 'stageAttemptId')::uuid,
+    (select id from private.micro_quote_lines where micro_quote_id = (
+      select value::uuid from fixture_values where key = 'quote_id'
+    )),
+    (select value::uuid from fixture_values where key = 'input_manifest_id'),
+    repeat('8', 64), 'provider-request-replay-002',
+    'a1940000-0000-4000-8000-000000000099', null
+  )::text,
+  (select value from fixture_values where key = 'provider_request_id'),
+  'a repeated caller converges on the exact authoritative provider request'
+);
+select is(
+  format(
+    '%s/%s',
+    (select count(*) from private.provider_requests where id = (
+      select value::uuid from fixture_values where key = 'provider_request_id'
+    )),
+    (select count(*) from private.provider_request_quote_claims where micro_quote_line_id = (
+      select id from private.micro_quote_lines where micro_quote_id = (
+        select value::uuid from fixture_values where key = 'quote_id'
+      )
+    ))
+  ),
+  '1/1',
+  'a repeated provider-slot claim leaves exactly one request and one quote claim'
+);
+select is(
+  (
+    select idempotency_key || '/' || correlation_id::text
+    from private.provider_requests
+    where id = (select value::uuid from fixture_values where key = 'provider_request_id')
+  ),
+  'provider-request-primary-001/a1940000-0000-4000-8000-000000000001',
+  'the first caller tokens remain immutable audit evidence after convergence'
+);
 
 insert into fixture_values (key, value)
 values ('capability_jti', 'a1950000-0000-4000-8000-000000000001');

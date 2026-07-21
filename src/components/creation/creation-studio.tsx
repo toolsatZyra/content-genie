@@ -88,7 +88,7 @@ const chambers: readonly {
   { id: "look", label: "Look" },
   { id: "world", label: "World" },
   { id: "preflight", label: "Preflight" },
-  { id: "create", label: "Create" },
+  { id: "create", label: "Edit" },
 ];
 
 interface MutationResult {
@@ -306,14 +306,14 @@ function agentActivityFor(
     }
     if (!projection.preflight.quote) {
       return {
-        action: "Pricing the exact quality-first plan inside the $50 ceiling",
+        action: "Pricing the exact quality-first plan and recording its full envelope",
         name: "Production Accountant",
         sequence: "Preflight sequence · quote",
       };
     }
     if (!projection.preflight.quote.confirmed) {
       return {
-        action: "Sealing the exact production ceiling under standing MVP authority",
+        action: "Sealing the exact production envelope under standing MVP authority",
         name: "Production Accountant",
         sequence: "Preflight sequence · authority",
       };
@@ -324,8 +324,38 @@ function agentActivityFor(
       sequence: "Preflight sequence · handoff",
     };
   }
+  const productionState = projection.production.job?.state;
+  if (productionState === "generating") {
+    const completed = projection.production.job?.completed_clips ?? 0;
+    const total = projection.production.job?.total_clips ?? 0;
+    return {
+      action:
+        total > 0
+          ? `Animating locked storyboard shots · ${completed} of ${total} complete`
+          : "Animating locked storyboard shots from their narration windows",
+      name: "Storyboard + Motion Crew",
+      sequence: "Edit sequence · generation",
+    };
+  }
+  if (productionState === "rendering") {
+    return {
+      action: "Executing the cut, sound cues, mix and final machine-quality checks",
+      name: "Editor + Monica QC",
+      sequence: "Edit sequence · assembly",
+    };
+  }
+  if (productionState === "needs_repair") {
+    return {
+      action: "Interpreting feedback and opening the next preserved repair attempt",
+      name: "Monica · Repair Director",
+      sequence: "Repair sequence · interpretation",
+    };
+  }
   return {
-    action: "Preparing the autonomous production baton and final human review path",
+    action:
+      productionState === "review_ready"
+        ? "The exact edited master is waiting for your review"
+        : "Preparing the autonomous production and edit work queue",
     name: "Monica · Quality Director",
     sequence: "15 specialist agents coordinated",
   };
@@ -396,9 +426,11 @@ export function CreationStudio({
   const chamberButtonRefs = useRef(new Map<CreationChamber, HTMLButtonElement>());
   const lookCardRefs = useRef(new Map<string, HTMLButtonElement>());
   const lookSearchRef = useRef<HTMLInputElement>(null);
+  const lookCommitRef = useRef<HTMLButtonElement>(null);
   const scriptTextareaRef = useRef<HTMLTextAreaElement>(null);
   const toastRef = useRef<HTMLDivElement>(null);
   const worldActionRef = useRef<HTMLButtonElement>(null);
+  const focusWorldAfterLookSave = useRef(false);
   const mountedChamber = useRef(false);
   const focusInitialChamber = useRef(Boolean(initialChamber));
   const scriptLockIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
@@ -667,6 +699,29 @@ export function CreationStudio({
       requestAnimationFrame(() => worldActionRef.current?.focus()),
     );
   }, []);
+
+  useEffect(() => {
+    if (
+      !focusWorldAfterLookSave.current ||
+      chamber !== "look" ||
+      working ||
+      saveState !== "saved" ||
+      pendingLookId !== selectedLookId ||
+      !worldConfigurationReady
+    ) {
+      return;
+    }
+    focusWorldAfterLookSave.current = false;
+    focusWorldAction();
+  }, [
+    chamber,
+    focusWorldAction,
+    pendingLookId,
+    saveState,
+    selectedLookId,
+    working,
+    worldConfigurationReady,
+  ]);
 
   const dismissNotice = useCallback((): void => {
     setNotice("");
@@ -1174,6 +1229,11 @@ export function CreationStudio({
     lookId: string,
   ): void {
     if (working) return;
+    if (event.key === "Tab" && !event.shiftKey) {
+      event.preventDefault();
+      lookCommitRef.current?.focus();
+      return;
+    }
     const current = selectableVisibleLooks.findIndex(({ id }) => id === lookId);
     if (current < 0 || selectableVisibleLooks.length === 0) return;
     let next = current;
@@ -1340,6 +1400,7 @@ export function CreationStudio({
       setSaveState("saved");
       return;
     }
+    focusWorldAfterLookSave.current = false;
     const payload = {
       configurationCandidateId: projection.configuration.id,
       episodeId: projection.episode.id,
@@ -1369,7 +1430,7 @@ export function CreationStudio({
       setEpisodeVersion(result.episodeVersion ?? episodeVersion + 1);
       setNotice(`${look.name} pinned to this Episode.`);
       setSaveState("saved");
-      focusWorldAction();
+      focusWorldAfterLookSave.current = true;
     } catch (error) {
       if (error instanceof CommandMutationError && error.definitive) {
         lookIdempotencyKey.current = null;
@@ -2596,6 +2657,7 @@ export function CreationStudio({
                       lookHumanConfirmed)
                   }
                   onClick={() => void commitLook()}
+                  ref={lookCommitRef}
                   type="button"
                 >
                   {working
@@ -2667,8 +2729,11 @@ export function CreationStudio({
         {chamber === "create" ? (
           <CreationLaunchpad
             episodeId={projection.episode.id}
+            episodeTitle={projection.episode.title}
             preflight={projection.preflight}
+            production={projection.production}
             stageHeadingRef={stageHeadingRef}
+            workspaceId={projection.episode.workspaceId}
           />
         ) : null}
       </section>

@@ -1,12 +1,12 @@
 # Genie by Zyra — implementation continuation handoff
 
-**Snapshot date:** 2026-07-19
+**Snapshot date:** 2026-07-22
 **Workspace:** `C:\Work\Code\zyrastudio`
 **Git branch:** `main`
-**Deployed implementation checkpoint:** `098a89cfe0f62e0f963143735002fa8436800b13`
-**Goal status:** active — the grounded real-world visual pipeline is deployed;
-obtain owner-observable real Episode proof and iterate from that MVP test
-**Current phase:** deployed developer-MVP completion
+**Deployed implementation checkpoint:** `49dc7ea8c2e7d85857660e775b2bed575616aa5e`
+**Goal status:** active — freeze, independently review, deploy and prove the
+owner-MVP cinematic/Edit candidate described in section 25
+**Current phase:** owner-MVP cinematic production and Edit release candidate
 **Status vocabulary:** work described below is either committed, implemented in
 the working tree, or externally verified. Those states are deliberately not
 treated as interchangeable.
@@ -20,9 +20,11 @@ truth. Begin with the startup audit in section 13 before changing code.
 The owner explicitly prioritized a working application over the original
 launch-scale assurance program. `docs/MVP_DELIVERY_PROFILE_2026-07-20.md` is now
 the active release gate. Preserve the immutable-script, exact identity,
-cultural, provider-secret, media-ingest, USD 50, workspace-isolation, and final
-human-review invariants. Defer exhaustive concurrency, fault-injection,
-all-state/all-device matrices, per-phase independent reviews, and enterprise
+cultural, provider-secret, media-ingest, workspace-isolation, and final
+human-review invariants. For this owner-operated MVP, record exact forecast and
+actual spend but do not pause production or repair above USD 50; the owner will
+set a later cap from observed usage. Defer exhaustive fault-injection,
+all-state/all-device matrices, Trigger cloud qualification and enterprise
 operations until owner testing or wider-team rollout. Deferred obligations are
 not verified and must remain labelled honestly.
 
@@ -1244,5 +1246,78 @@ per-file percentage rule. Aggregate thresholds remain enforced at 90%
 statements/functions/lines and 80% branches, while changed high-risk behavior
 still requires focused tests. This avoids blocking an internal MVP because an
 unrelated read projection falls below an arbitrary per-file percentage despite
-the suite's strong aggregate coverage; it does not relax any media, cultural,
-security, budget, or release-quality threshold.
+the suite's strong aggregate coverage; it does not relax media, cultural,
+provider-boundary, spend-observability, or release-quality checks.
+
+## 25. 2026-07-22 cinematic pipeline, Edit and Phase 2 pre-freeze candidate
+
+The owner approved the revised AI-filmmaking flow in
+`docs/MVP_CINEMATIC_PIPELINE_IMPLEMENTATION_PLAN_2026-07-21.md`. The current
+dirty candidate implements the compact owner-MVP portions of the original Phase
+3 production and Phase 4 review/repair experience without claiming the original
+enterprise matrices complete:
+
+- the Director creates semantic scenes and shots with exact immutable-script
+  word spans, camera/lighting/mood/composition/action, cut and SFX cues;
+- final ElevenLabs V3 word alignment assigns editorial timing, while the
+  three-second shot-density value remains guidance rather than a validation
+  rule;
+- Nano Banana reference bindings are explicit and bijective, and the Seedance,
+  Kling 2.5 and Kling 3 compilers use their model-specific image fields/tokens;
+- storyboard A/B states remain separate full-frame assets; provider duration
+  rounds only for generation and the EDD trims to the narration-derived window;
+- Stage 6 is Edit inside the six-stage creation route. It shows durable
+  production/repair progress, the actual master, feedback, approval, video
+  download and approved storyboard/clip package. The legacy production URL is a
+  compatibility redirect;
+- Monica grounds each feedback point to the exact half-open shot window,
+  classifies image-and-clip, clip-only or edit-only repair, asks one precise
+  clarification before spend when grounding is ambiguous, preserves the base
+  master and replaces only the dependency-closed affected shots;
+- exact forecast/actual cost remains observable, while owner-MVP production and
+  repair no longer pause solely because the estimate exceeds USD 50.
+
+The compact UI changes requested during owner testing are part of the same
+candidate: consistent small Series/Episode cards, no redundant right-side
+Episode detail on the Atrium, a Series selection column containing only its
+Episodes plus Create Episode, direct current-stage links, tighter creation-stage
+vertical rhythm, stable Stage 6 navigation, and a no-overlap layout at the
+200%-zoom equivalent.
+
+Phase 2 gaps found by the July 19 audit are also closed in preview:
+
+- P2-08 now requires a closed v2 character/deity identity manifest with exact
+  topology, hands/objects, vahana, weapons, ornaments, wardrobe, skin/form,
+  dignity, transitions and canonical content hash;
+- P2-09 now records an immutable bundle covering the exact nine cultural-claim
+  categories and all twelve cultural rules before qualified approval;
+- the Phase 2 evidence generator now binds all 96 obligations across
+  `P2-01`–`P2-14` and requires one independent context-minimized comprehensive
+  review covering acceptance, media, provider-boundary controls and UI/UX.
+
+Current pre-freeze evidence is green:
+
+- preview pgTAP: nine suites, `745/745` assertions;
+- RLS/database-policy/trusted-harness composite: passed;
+- formatting, lint and route-aware type checking: passed;
+- unit coverage: 102 files / 637 tests, 95.58% statements, 92.16% branches,
+  96.66% functions and 97.4% lines;
+- integration: `5/5` with the provider-backed scanner intentionally skipped in
+  the deterministic environment;
+- Chromium: `62/62` in 5.7 minutes, with the bounded server stopped.
+
+The trusted manifest now includes 112 Phase 2/MVP migrations and nine pgTAP
+suites. The new P2-08/P2-09 migrations are applied only to preview
+`iuzijmzcimtwyowhwinu`; production is unchanged by this candidate. Trigger.dev
+cloud qualification remains an explicit external deferment because its CLI is
+not authenticated here; the owner-MVP continues to use durable database state
+and bounded Vercel cron reconciliation.
+
+This is not yet a frozen checkpoint. Remaining immediate steps are: finish the
+production build/media/dependency checks, commit the exact candidate, run the
+same-candidate local and disposable-branch live gates, run the one independent
+review, fix and re-gate, push `main` explicitly, verify the automatic Vercel
+deployment and public/authenticated owner path, then record the final evidence
+here. The traceability ledger must remain honest: without the external
+cryptographic provenance contract, Phase 2 entries may advance only to
+`implemented_unverified`, even after the owner-MVP software gate passes.
