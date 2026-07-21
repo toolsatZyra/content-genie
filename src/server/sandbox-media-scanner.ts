@@ -107,6 +107,32 @@ async function commandCombinedOutput(
   return `${stdout}\n${stderr}`.trim();
 }
 
+async function dependencyVersionOutput(
+  sandbox: Sandbox,
+  command: string,
+  args: string[],
+  safeClass: string,
+): Promise<string> {
+  const result = await sandbox.runCommand(command, args, { timeoutMs: 120_000 });
+  const [stdout, stderr] = await Promise.all([result.stdout(), result.stderr()]);
+  if (result.exitCode !== 0) {
+    console.error("Sandbox media dependency check failed safely", {
+      command,
+      exitCode: result.exitCode,
+      safeClass,
+      systemOutput: `${stdout}\n${stderr}`
+        .replaceAll(/[\u0000-\u001f\u007f]/gu, " ")
+        .trim()
+        .slice(0, 500),
+    });
+    throw new SandboxMediaScannerError(
+      "The isolated media scanner dependency is unavailable.",
+      safeClass,
+    );
+  }
+  return stdout.trim();
+}
+
 function parseProbe(value: string, mime: ImageMime): { height: number; width: number } {
   const rows = value
     .split(/\r?\n/u)
@@ -420,13 +446,13 @@ export async function scanAndReencodeNarrationAudio(input: {
       150_000,
     );
     const [clamVersion, ffmpegVersion] = await Promise.all([
-      commandOutput(
+      dependencyVersionOutput(
         sandbox,
         "clamscan",
         ["--version"],
         "scanner.audio_clam_version_failed",
       ),
-      commandOutput(
+      dependencyVersionOutput(
         sandbox,
         "/usr/bin/ffmpeg",
         ["-version"],
