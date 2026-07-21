@@ -20,6 +20,23 @@ type NarrationSeed = Readonly<{
 const sha256 = (value: string) =>
   createHash("sha256").update(value, "utf8").digest("hex");
 
+export function narrationRunNeedsSuccessor(state: string): boolean {
+  return ["canceled", "failed", "superseded"].includes(state);
+}
+
+export function narrationRunIdempotencyKey(
+  input: Readonly<{
+    configurationCandidateId: string;
+    sourceReviewPacketId: string;
+    supersededRunId?: string | null;
+  }>,
+): string {
+  const base = `narration-auto:${input.configurationCandidateId}:${input.sourceReviewPacketId}`;
+  return input.supersededRunId
+    ? `${base}:retry:${sha256(input.supersededRunId).slice(0, 16)}`
+    : base;
+}
+
 function deterministicUuid(seed: string): string {
   const bytes = Buffer.from(sha256(seed).slice(0, 32), "hex");
   bytes[6] = (bytes[6]! & 0x0f) | 0x50;
@@ -112,7 +129,7 @@ export async function ensureNarrationClockRun(
   if (existingError) {
     throw new PreflightAutoReconcilerError("Narration run reconciliation failed.");
   }
-  if (existing) {
+  if (existing && !narrationRunNeedsSuccessor(existing.state as string)) {
     return Object.freeze({
       preflightRunId: existing.id as string,
       shouldTrigger: existing.state === "queued" && existing.trigger_run_id === null,
@@ -120,13 +137,19 @@ export async function ensureNarrationClockRun(
     });
   }
 
-  const idempotencyKey = `narration-auto:${prepared.configurationCandidateId}:${prepared.sourceReviewPacketId}`;
+  const supersededRunId = existing?.id as string | undefined;
+  const idempotencyKey = narrationRunIdempotencyKey({
+    configurationCandidateId: prepared.configurationCandidateId,
+    sourceReviewPacketId: prepared.sourceReviewPacketId,
+    supersededRunId: supersededRunId ?? null,
+  });
   const request = Object.freeze({
     configurationCandidateId: prepared.configurationCandidateId,
     episodeId: prepared.episodeId,
     kind: "narration_clock",
     scriptRevisionId: prepared.scriptRevisionId,
     sourceReviewPacketId: prepared.sourceReviewPacketId,
+    supersededRunId: supersededRunId ?? null,
     workspaceId: prepared.workspaceId,
   });
   const requestHash = sha256(postgresJsonbText(request));
