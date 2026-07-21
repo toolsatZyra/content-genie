@@ -2293,39 +2293,32 @@ export async function executePlanPreflight(
     }
   }
 
-  for (;;) {
-    const evaluation = await evaluateMaterializedPlan(input, materialized, challenges);
-    if (evaluation.consensus.verdict === "pass") {
-      return Object.freeze({
-        blindGroupId: evaluation.blindGroupId,
-        consensusId: evaluation.consensusId,
-        cvp: evaluation.consensus.cvp,
-        evidenceDensity: evaluation.consensus.evidence_density,
-        evaluatorRecords: evaluation.evaluatorRecords,
-        ovs: evaluation.consensus.ovs,
-        pfs: evaluation.consensus.pfs,
-        planBundleId: materialized.planBundleId,
-        planHash: materialized.planHash,
-        replayed: resumed,
-        schemaVersion: "genie.plan-preflight-output.v1",
-      });
-    }
-    const feedback = requireRepairFeedback(
-      await loadRepairFeedback(input, materialized),
-    );
-    const repaired = materializePlan(
-      input,
-      await directPlan(input, { feedback, priorPlan: materialized.plan }),
-    );
-    if (repaired.planHash === materialized.planHash) {
-      throw new PreflightPlanAgentError(
-        "Monica's plan repair made no material change.",
-        false,
-        "PLAN_REPAIR_NO_CHANGE",
-      );
-    }
-    materialized = repaired;
-    challenges = Object.freeze([]);
-    await persistPlan(input, materialized);
+  const evaluation = await evaluateMaterializedPlan(input, materialized, challenges);
+  if (evaluation.consensus.verdict === "pass") {
+    return Object.freeze({
+      blindGroupId: evaluation.blindGroupId,
+      consensusId: evaluation.consensusId,
+      cvp: evaluation.consensus.cvp,
+      evidenceDensity: evaluation.consensus.evidence_density,
+      evaluatorRecords: evaluation.evaluatorRecords,
+      ovs: evaluation.consensus.ovs,
+      pfs: evaluation.consensus.pfs,
+      planBundleId: materialized.planBundleId,
+      planHash: materialized.planHash,
+      replayed: resumed,
+      schemaVersion: "genie.plan-preflight-output.v1",
+    });
   }
+
+  // Persisted consensus is the repair checkpoint. A single serverless invocation
+  // must never attempt another full Director + two-evaluator cycle: the next
+  // claimed stage attempt resumes this blocked bundle and performs exactly one
+  // bounded repair cycle. This keeps every invocation below the platform timeout
+  // while preserving the two-repair quality budget in the database.
+  requireRepairFeedback(await loadRepairFeedback(input, materialized));
+  throw new PreflightPlanAgentError(
+    "Monica queued the next bounded cinematic plan repair.",
+    true,
+    "PLAN_REPAIR_PENDING",
+  );
 }

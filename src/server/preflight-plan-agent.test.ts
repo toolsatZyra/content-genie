@@ -271,6 +271,7 @@ function fixture() {
 
 type PersistedPlanParameters = Readonly<{
   p_component_ids: Readonly<Record<string, string>>;
+  p_graph_hash: string;
   p_plan: Readonly<Record<string, unknown>>;
   p_plan_bundle_id: string;
   p_plan_hash: string;
@@ -577,12 +578,52 @@ describe("executable cinematic plan agent", () => {
     const data = fixture();
     const plans: PersistedPlanParameters[] = [];
     const blindGroups: string[] = [];
+    let resumeBlocked = false;
     let evaluatorRecord = 0;
     let scoreSet = 0;
     let consensus = 0;
     mocks.rpc.mockReset().mockImplementation(async (name: string, parameters) => {
       if (name === "get_plan_preflight_input") {
-        return { data: data.input, error: null };
+        const prior = plans[0];
+        return {
+          data:
+            resumeBlocked && prior
+              ? {
+                  ...data.input,
+                  existingPlan: {
+                    beatVersionId: prior.p_component_ids.beat,
+                    compositionVersionId: prior.p_component_ids.composition,
+                    eddVersionId: prior.p_component_ids.edd,
+                    graphHash: prior.p_graph_hash,
+                    planBundleId: prior.p_plan_bundle_id,
+                    planHash: prior.p_plan_hash,
+                    routingVersionId: prior.p_component_ids.routing,
+                    safetyVersionId: prior.p_component_ids.safety,
+                    shotVersionId: prior.p_component_ids.shot,
+                    soundVersionId: prior.p_component_ids.sound,
+                    state: "blocked",
+                    storyVersionId: prior.p_component_ids.story,
+                  },
+                }
+              : data.input,
+          error: null,
+        };
+      }
+      if (name === "get_plan_preflight_resume") {
+        const prior = plans[0]!;
+        return {
+          data: {
+            challenges: [],
+            componentIds: prior.p_component_ids,
+            consensus: { consensusId: id("81") },
+            graphHash: prior.p_graph_hash,
+            plan: prior.p_plan,
+            planBundleId: prior.p_plan_bundle_id,
+            planHash: prior.p_plan_hash,
+            state: "blocked",
+          },
+          error: null,
+        };
       }
       if (name === "command_record_preflight_plan") {
         plans.push(parameters as PersistedPlanParameters);
@@ -656,7 +697,7 @@ describe("executable cinematic plan agent", () => {
       .mockResolvedValueOnce(blockedSummary)
       .mockResolvedValueOnce(passingSummary);
 
-    const result = await executePlanPreflight({
+    const envelope = {
       authorityEpoch: 1,
       capabilityGrantId: null,
       fencingToken: 1,
@@ -667,9 +708,19 @@ describe("executable cinematic plan agent", () => {
       stageAttemptId: id("9"),
       stageRunId: id("91"),
       workspaceId: id("1"),
-    });
+    } as const;
 
-    expect(result).toMatchObject({ consensusId: id("82"), replayed: false });
+    await expect(executePlanPreflight(envelope)).rejects.toMatchObject({
+      code: "PLAN_REPAIR_PENDING",
+      retryable: true,
+    });
+    expect(plans).toHaveLength(1);
+    expect(mocks.agent).toHaveBeenCalledTimes(3);
+
+    resumeBlocked = true;
+    const result = await executePlanPreflight(envelope);
+
+    expect(result).toMatchObject({ consensusId: id("82"), replayed: true });
     expect(plans).toHaveLength(2);
     expect(plans[1]!.p_plan_hash).not.toBe(plans[0]!.p_plan_hash);
     expect(blindGroups).toHaveLength(2);
@@ -688,15 +739,55 @@ describe("executable cinematic plan agent", () => {
     expect(mocks.agent.mock.calls[3]![1].input.length).toBeLessThan(100_000);
   });
 
-  it("stops after exactly two blocked automatic repairs", async () => {
+  it("honors persisted repair exhaustion before another model call", async () => {
     const data = fixture();
     const plans: PersistedPlanParameters[] = [];
+    let resumeExhausted = false;
     let evaluatorRecord = 0;
     let scoreSet = 0;
     let consensus = 0;
     mocks.rpc.mockReset().mockImplementation(async (name: string, parameters) => {
       if (name === "get_plan_preflight_input") {
-        return { data: data.input, error: null };
+        const prior = plans[0];
+        return {
+          data:
+            resumeExhausted && prior
+              ? {
+                  ...data.input,
+                  existingPlan: {
+                    beatVersionId: prior.p_component_ids.beat,
+                    compositionVersionId: prior.p_component_ids.composition,
+                    eddVersionId: prior.p_component_ids.edd,
+                    graphHash: prior.p_graph_hash,
+                    planBundleId: prior.p_plan_bundle_id,
+                    planHash: prior.p_plan_hash,
+                    routingVersionId: prior.p_component_ids.routing,
+                    safetyVersionId: prior.p_component_ids.safety,
+                    shotVersionId: prior.p_component_ids.shot,
+                    soundVersionId: prior.p_component_ids.sound,
+                    state: "blocked",
+                    storyVersionId: prior.p_component_ids.story,
+                  },
+                }
+              : data.input,
+          error: null,
+        };
+      }
+      if (name === "get_plan_preflight_resume") {
+        const prior = plans[0]!;
+        return {
+          data: {
+            challenges: [],
+            componentIds: prior.p_component_ids,
+            consensus: { consensusId: id("303") },
+            graphHash: prior.p_graph_hash,
+            plan: prior.p_plan,
+            planBundleId: prior.p_plan_bundle_id,
+            planHash: prior.p_plan_hash,
+            state: "blocked",
+          },
+          error: null,
+        };
       }
       if (name === "command_record_preflight_plan") {
         plans.push(parameters as PersistedPlanParameters);
@@ -716,7 +807,7 @@ describe("executable cinematic plan agent", () => {
       }
       if (name === "get_plan_repair_feedback") {
         const plan = plans.at(-1)!;
-        if (plans.length === 3) {
+        if (resumeExhausted) {
           return {
             data: {
               consensusId: id("303"),
@@ -748,52 +839,49 @@ describe("executable cinematic plan agent", () => {
       responseId: "director_1",
       responseRequestId: null,
     });
-    for (let iteration = 1; iteration <= 3; iteration += 1) {
-      mocks.agent
-        .mockResolvedValueOnce({
-          output: blocked,
-          requestHash: hash("2"),
-          responseId: `sol_${iteration}`,
-          responseRequestId: null,
-        })
-        .mockResolvedValueOnce({
-          output: blocked,
-          requestHash: hash("3"),
-          responseId: `terra_${iteration}`,
-          responseRequestId: null,
-        });
-      if (iteration < 3) {
-        mocks.agent.mockResolvedValueOnce({
-          output: repairedDirector(data, (iteration + 1) as 2 | 3),
-          requestHash: hash("4"),
-          responseId: `director_${iteration + 1}`,
-          responseRequestId: null,
-        });
-      }
-    }
+    mocks.agent
+      .mockResolvedValueOnce({
+        output: blocked,
+        requestHash: hash("2"),
+        responseId: "sol_1",
+        responseRequestId: null,
+      })
+      .mockResolvedValueOnce({
+        output: blocked,
+        requestHash: hash("3"),
+        responseId: "terra_1",
+        responseRequestId: null,
+      });
     mocks.summary.mockReset().mockResolvedValue(blockedSummary);
 
-    await expect(
-      executePlanPreflight({
-        authorityEpoch: 1,
-        capabilityGrantId: null,
-        fencingToken: 1,
-        inputManifestId: id("90"),
-        inputManifestSha256: hash("a"),
-        preflightRunId: id("6"),
-        schemaVersion: "genie.preflight-task.v1",
-        stageAttemptId: id("9"),
-        stageRunId: id("91"),
-        workspaceId: id("1"),
-      }),
-    ).rejects.toMatchObject({ code: "PLAN_QUALITY_BLOCKED", retryable: false });
-    expect(plans).toHaveLength(3);
+    const envelope = {
+      authorityEpoch: 1,
+      capabilityGrantId: null,
+      fencingToken: 1,
+      inputManifestId: id("90"),
+      inputManifestSha256: hash("a"),
+      preflightRunId: id("6"),
+      schemaVersion: "genie.preflight-task.v1",
+      stageAttemptId: id("9"),
+      stageRunId: id("91"),
+      workspaceId: id("1"),
+    } as const;
+    await expect(executePlanPreflight(envelope)).rejects.toMatchObject({
+      code: "PLAN_REPAIR_PENDING",
+      retryable: true,
+    });
+    resumeExhausted = true;
+    await expect(executePlanPreflight(envelope)).rejects.toMatchObject({
+      code: "PLAN_QUALITY_BLOCKED",
+      retryable: false,
+    });
+    expect(plans).toHaveLength(1);
     expect(
       mocks.rpc.mock.calls.filter(
         ([name]) => name === "command_issue_plan_evaluator_challenges",
       ),
-    ).toHaveLength(3);
-    expect(mocks.agent).toHaveBeenCalledTimes(9);
+    ).toHaveLength(1);
+    expect(mocks.agent).toHaveBeenCalledTimes(3);
   });
 
   it("resumes a published candidate and runs only the missing blind evaluator", async () => {
