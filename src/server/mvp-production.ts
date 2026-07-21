@@ -330,8 +330,7 @@ async function submitJob(job: JobRow): Promise<void> {
         .not("asset_version_id", "is", null)
         .order("reference_ordinal"),
       client
-        .schema("private")
-        .from("mvp_production_clips")
+        .from("mvp_production_clip_worker")
         .select("shot_number")
         .eq("production_run_id", job.production_run_id)
         .eq("attempt_number", job.attempt_number),
@@ -440,8 +439,7 @@ async function submitJob(job: JobRow): Promise<void> {
       prompt: promptWithControls,
     });
     const { error: insertError } = await client
-      .schema("private")
-      .from("mvp_production_clips")
+      .from("mvp_production_clip_worker")
       .insert({
         attempt_number: job.attempt_number,
         end_ms: shot.end_ms,
@@ -663,8 +661,7 @@ async function completeClip(clip: ClipRow): Promise<boolean> {
     );
   }
   const { error: updateError } = await client
-    .schema("private")
-    .from("mvp_production_clips")
+    .from("mvp_production_clip_worker")
     .update({
       byte_length: bytes.length,
       completed_at: new Date().toISOString(),
@@ -690,8 +687,7 @@ async function completeClip(clip: ClipRow): Promise<boolean> {
 async function pollJob(job: JobRow): Promise<void> {
   const client = createAdminSupabaseClient();
   const { data, error } = await client
-    .schema("private")
-    .from("mvp_production_clips")
+    .from("mvp_production_clip_worker")
     .select(
       "id,workspace_id,production_run_id,attempt_number,shot_number,state,external_request_id,status_url,response_url,object_name,duration_ms",
     )
@@ -711,8 +707,7 @@ async function pollJob(job: JobRow): Promise<void> {
     if (clip.state === "submitted") polledThisPass += 1;
   }
   const { data: completed, error: countError } = await client
-    .schema("private")
-    .from("mvp_production_clips")
+    .from("mvp_production_clip_worker")
     .select("id", { count: "exact" })
     .eq("production_run_id", job.production_run_id)
     .eq("attempt_number", job.attempt_number)
@@ -775,8 +770,7 @@ async function renderJob(job: JobRow): Promise<void> {
     { data: narration, error: narrationError },
   ] = await Promise.all([
     client
-      .schema("private")
-      .from("mvp_production_clips")
+      .from("mvp_production_clip_worker")
       .select("shot_number,start_ms,end_ms,object_name,duration_ms,state")
       .eq("production_run_id", job.production_run_id)
       .eq("attempt_number", job.attempt_number)
