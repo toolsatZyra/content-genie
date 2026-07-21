@@ -935,8 +935,11 @@ begin
   if job.state<>'dispatching' then
     raise exception 'narration output arrived outside active authority' using errcode='40001'; end if;
   if request.state<>'succeeded' then
-    update private.provider_requests set state='succeeded',safe_response_hash=p_provider_response_hash,
-      billable_state='estimated',completed_at=statement_timestamp(),aggregate_version=aggregate_version+1
+    -- Provider output is only quarantined here. The common secure-ingest
+    -- promotion command is the sole authority that may mark media requests
+    -- succeeded after immutable scan evidence is accepted.
+    update private.provider_requests set safe_response_hash=p_provider_response_hash,
+      billable_state='estimated',aggregate_version=aggregate_version+1
       where id=request.id;
   end if;
   update private.narration_generation_jobs set
