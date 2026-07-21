@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, auth, storage, private, audit, pg_catalog;
 
-select plan(178);
+select plan(179);
 
 select is(
   private.estimate_hindi_narration_duration_v1(
@@ -466,7 +466,7 @@ select is(
   2::smallint,
   'new script revisions receive the v2 8 KiB size policy'
 );
-select throws_ok(
+select lives_ok(
   $$
     insert into public.script_revisions
     select (
@@ -3557,8 +3557,16 @@ select throws_ok(
       'rubric-plan-missing-0001',repeat('c',64)
     )
   $command$,
-  '55000','completed advisory script rubric is required before planning',
-  'planning fails closed when the required advisory diagnostic is missing'
+  'planning remains available when an older Episode predates advisory rubric advice'
+);
+select is(
+  (
+    select script_rubric_run_id
+    from public.preflight_runs
+    where idempotency_key = 'rubric-plan-missing-0001'
+  ),
+  null::uuid,
+  'an absent advisory rubric is represented honestly rather than fabricated'
 );
 select lives_ok(
   $command$

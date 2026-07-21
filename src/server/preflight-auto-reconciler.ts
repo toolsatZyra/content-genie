@@ -24,6 +24,19 @@ export function narrationRunNeedsSuccessor(state: string): boolean {
   return ["canceled", "failed", "superseded"].includes(state);
 }
 
+export function planRunIdempotencyKey(
+  input: Readonly<{
+    configurationCandidateId: string;
+    masterClockVersionId: string;
+    supersededRunId?: string | null;
+  }>,
+): string {
+  const base = `plan-auto:${input.configurationCandidateId}:${input.masterClockVersionId}`;
+  return input.supersededRunId
+    ? `${base}:retry:${sha256(input.supersededRunId).slice(0, 16)}`
+    : base;
+}
+
 export function narrationRunIdempotencyKey(
   input: Readonly<{
     configurationCandidateId: string;
@@ -265,7 +278,7 @@ export async function ensurePlanEvaluationRun(
   if (existingError) {
     throw new PreflightAutoReconcilerError("Plan run reconciliation failed.");
   }
-  if (existing) {
+  if (existing && !narrationRunNeedsSuccessor(existing.state as string)) {
     return Object.freeze({
       configurationCandidateId: narrationRun.configuration_candidate_id,
       preflightRunId: existing.id as string,
@@ -273,13 +286,19 @@ export async function ensurePlanEvaluationRun(
       state: existing.state as string,
     });
   }
-  const idempotencyKey = `plan-auto:${narrationRun.configuration_candidate_id}:${clock.id}`;
+  const supersededRunId = existing?.id as string | undefined;
+  const idempotencyKey = planRunIdempotencyKey({
+    configurationCandidateId: narrationRun.configuration_candidate_id,
+    masterClockVersionId: clock.id,
+    supersededRunId: supersededRunId ?? null,
+  });
   const request = Object.freeze({
     configurationCandidateId: narrationRun.configuration_candidate_id,
     episodeId: narrationRun.episode_id,
     kind: "plan_evaluation",
     masterClockVersionId: clock.id,
     scriptRevisionId: narrationRun.script_revision_id,
+    supersededRunId: supersededRunId ?? null,
     workspaceId: input.workspaceId,
   });
   const { data: createdValue, error: createError } = await client.rpc(

@@ -787,7 +787,6 @@ function directorSchema(input: PlanInput, beatCount: number, shotCount: number) 
               type: "array",
               minItems: 1,
               maxItems: Math.min(4, characterIds.length),
-              uniqueItems: true,
               items: { enum: characterIds, type: "string" },
             },
             emotionalRead: boundedString,

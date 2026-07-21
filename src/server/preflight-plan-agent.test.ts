@@ -527,6 +527,9 @@ describe("executable cinematic plan agent", () => {
       ).size,
     ).toBe(2);
     expect(mocks.agent).toHaveBeenCalledTimes(3);
+    expect(JSON.stringify(mocks.agent.mock.calls[0]![1].schema)).not.toContain(
+      "uniqueItems",
+    );
   });
 
   it("rejects a researched photograph repeated before its alternatives", async () => {

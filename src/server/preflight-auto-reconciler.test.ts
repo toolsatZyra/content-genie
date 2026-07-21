@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   narrationRunIdempotencyKey,
   narrationRunNeedsSuccessor,
+  planRunIdempotencyKey,
 } from "@/server/preflight-auto-reconciler";
 
 describe("Preflight auto-reconciliation", () => {
@@ -24,6 +25,22 @@ describe("Preflight auto-reconciliation", () => {
     const retry = narrationRunIdempotencyKey({
       ...base,
       supersededRunId: "be9f3aa7-8f3c-406d-9c8f-dfc0120e68c7",
+    });
+
+    expect(retry).not.toBe(first);
+    expect(retry.length).toBeLessThanOrEqual(127);
+    expect(retry).toMatch(/:retry:[a-f0-9]{16}$/u);
+  });
+
+  it("derives a fresh plan identity after a terminal plan attempt", () => {
+    const base = {
+      configurationCandidateId: "830c078b-4aa3-4c02-a066-83f508ba8a49",
+      masterClockVersionId: "bcdbabc2-326b-59a7-ba20-a38fb052c155",
+    };
+    const first = planRunIdempotencyKey(base);
+    const retry = planRunIdempotencyKey({
+      ...base,
+      supersededRunId: "000a0ec6-a2cc-40c9-86eb-9bf74ecf2e53",
     });
 
     expect(retry).not.toBe(first);
