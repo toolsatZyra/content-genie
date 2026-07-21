@@ -199,6 +199,16 @@ export async function advanceNextMvpPreflight(): Promise<
     });
   } catch (caught) {
     const classified = classifyPreflightControlFailure(caught);
+    console.error("MVP preflight control execution failed", {
+      errorCode:
+        caught && typeof caught === "object" && "code" in caught
+          ? String(caught.code)
+          : null,
+      errorMessage: caught instanceof Error ? caught.message : "Unknown error",
+      errorName: caught instanceof Error ? caught.name : "UnknownError",
+      preflightRunId: run.id,
+      safeErrorClass: classified?.safeErrorClass ?? "mvp-preflight-failed",
+    });
     if (regenerationRequestId) {
       await failWorldRegeneration(
         regenerationRequestId,
