@@ -428,7 +428,7 @@ export async function scanAndReencodeNarrationAudio(input: {
       ),
       commandOutput(
         sandbox,
-        "ffmpeg",
+        "/usr/bin/ffmpeg",
         ["-version"],
         "scanner.audio_ffmpeg_version_failed",
       ),
@@ -454,7 +454,7 @@ export async function scanAndReencodeNarrationAudio(input: {
     const sourceProbe = parseAudioProbe(
       await commandOutput(
         sandbox,
-        "ffprobe",
+        "/usr/bin/ffprobe",
         [...probeArguments, inputPath],
         "media.audio_parser_rejected",
       ),
@@ -474,7 +474,7 @@ export async function scanAndReencodeNarrationAudio(input: {
     }
     await commandOutput(
       sandbox,
-      "ffmpeg",
+      "/usr/bin/ffmpeg",
       [
         "-v",
         "error",
@@ -508,7 +508,7 @@ export async function scanAndReencodeNarrationAudio(input: {
     const sanitizedProbe = parseAudioProbe(
       await commandOutput(
         sandbox,
-        "ffprobe",
+        "/usr/bin/ffprobe",
         [...probeArguments, outputPath],
         "media.audio_output_probe_failed",
       ),
@@ -521,14 +521,14 @@ export async function scanAndReencodeNarrationAudio(input: {
     }
     await commandOutput(
       sandbox,
-      "ffmpeg",
+      "/usr/bin/ffmpeg",
       ["-v", "error", "-xerror", "-i", outputPath, "-f", "null", "-"],
       "media.audio_corrupt_frames",
       180_000,
     );
     const silenceDiagnostics = await commandCombinedOutput(
       sandbox,
-      "ffmpeg",
+      "/usr/bin/ffmpeg",
       [
         "-hide_banner",
         "-i",
