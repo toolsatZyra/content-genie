@@ -531,6 +531,10 @@ describe("executable cinematic plan agent", () => {
       "uniqueItems",
     );
     expect(mocks.agent.mock.calls[0]![1].reasoningEffort).toBe("medium");
+    expect(mocks.agent.mock.calls[0]![1]).toMatchObject({
+      maxOutputTokens: 10_000,
+      model: "gpt-5.6-terra",
+    });
   });
 
   it("rejects a researched photograph repeated before its alternatives", async () => {
