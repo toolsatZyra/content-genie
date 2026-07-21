@@ -144,6 +144,17 @@ export async function advanceNextMvpPreflight(): Promise<
   }
   await ensureNextWorldRegenerationRun();
   const client = createAdminSupabaseClient();
+  const { data: reconciled, error: reconciliationError } = await client.rpc(
+    "command_reconcile_expired_preflight_leases",
+    { p_limit: 100 },
+  );
+  if (
+    reconciliationError ||
+    !Number.isSafeInteger(reconciled) ||
+    (reconciled as number) < 0
+  ) {
+    throw new MvpPreflightError("Expired preflight work could not be reconciled.");
+  }
   const { data: run, error } = await client
     .from("preflight_runs")
     .select("id")
