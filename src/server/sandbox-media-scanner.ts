@@ -420,8 +420,18 @@ export async function scanAndReencodeNarrationAudio(input: {
       150_000,
     );
     const [clamVersion, ffmpegVersion] = await Promise.all([
-      commandOutput(sandbox, "clamscan", ["--version"], "scanner.version_failed"),
-      commandOutput(sandbox, "ffmpeg", ["-version"], "scanner.version_failed"),
+      commandOutput(
+        sandbox,
+        "clamscan",
+        ["--version"],
+        "scanner.audio_clam_version_failed",
+      ),
+      commandOutput(
+        sandbox,
+        "ffmpeg",
+        ["-version"],
+        "scanner.audio_ffmpeg_version_failed",
+      ),
     ]);
     await sandbox.updateNetworkPolicy("deny-all");
     const inputPath = "/vercel/sandbox/untrusted-narration";
