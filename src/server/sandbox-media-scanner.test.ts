@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ create: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  create: vi.fn(),
+  runCommand: vi.fn(),
+  stop: vi.fn(),
+}));
 
 vi.mock("@vercel/sandbox", () => ({
   Sandbox: { create: mocks.create },
@@ -10,6 +14,7 @@ import { launchMediaLimits } from "@/security/media-ingest";
 
 import {
   SandboxMediaScannerError,
+  scanAndReencodeNarrationAudio,
   scanAndReencodeWorldImage,
 } from "./sandbox-media-scanner";
 
@@ -59,7 +64,13 @@ async function safeClass(input: Parameters<typeof scanAndReencodeWorldImage>[0])
 }
 
 describe("sandbox media scanner input envelope", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.create.mockResolvedValue({
+      runCommand: mocks.runCommand,
+      stop: mocks.stop.mockResolvedValue(undefined),
+    });
+  });
 
   it("rejects malformed and polyglot containers before sandbox creation", async () => {
     const png = containerPng();
@@ -87,5 +98,30 @@ describe("sandbox media scanner input envelope", () => {
       safeClass({ bytes: oversized, declaredMime: "image/png" }),
     ).resolves.toBe("media.magic_mismatch");
     expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("enables the Amazon Linux supplementary repository before installing FFmpeg", async () => {
+    mocks.runCommand
+      .mockResolvedValueOnce({ exitCode: 0, stdout: vi.fn().mockResolvedValue("") })
+      .mockResolvedValueOnce({ exitCode: 1, stdout: vi.fn().mockResolvedValue("") });
+    const audio = Buffer.alloc(1_000);
+    audio.write("ID3", 0, "ascii");
+
+    await expect(
+      scanAndReencodeNarrationAudio({ bytes: audio, declaredMime: "audio/mpeg" }),
+    ).rejects.toMatchObject({ safeClass: "scanner.audio_install_failed" });
+    expect(mocks.runCommand).toHaveBeenNthCalledWith(
+      1,
+      "sudo",
+      ["dnf", "install", "-y", "spal-release"],
+      { timeoutMs: 180_000 },
+    );
+    expect(mocks.runCommand).toHaveBeenNthCalledWith(
+      2,
+      "sudo",
+      ["dnf", "install", "-y", "ffmpeg-free", "clamav", "clamav-update"],
+      { timeoutMs: 180_000 },
+    );
+    expect(mocks.stop).toHaveBeenCalledOnce();
   });
 });

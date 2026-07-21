@@ -380,7 +380,7 @@ declare run public.preflight_runs%rowtype;
   reservation_id uuid:=gen_random_uuid(); speech_line_id uuid:=gen_random_uuid();
   asr_line_id uuid:=gen_random_uuid(); judge_line_id uuid:=gen_random_uuid();
   manifest_id uuid:=gen_random_uuid(); quote_hash text; rate_hash text;
-  manifest_hash text; expires_at timestamptz;
+  manifest_hash text; authority_expires_at timestamptz;
 begin
   if auth.role() is distinct from 'service_role' then
     raise exception 'service authority required' using errcode='42501'; end if;
@@ -427,7 +427,12 @@ begin
       and status='verified' and expires_at>statement_timestamp();
   select * into voice_config from private.voice_provider_configurations
     where voice_version_id=selection.voice_version_id;
-  expires_at:=least(intent.expires_at,speech.expires_at,asr_cap.expires_at,judge_cap.expires_at);
+  authority_expires_at:=least(
+    intent.expires_at,
+    speech.expires_at,
+    asr_cap.expires_at,
+    judge_cap.expires_at
+  );
   if run.id is null or run.kind<>'narration_clock' or run.state<>'running'
     or attempt.id is null or attempt.state<>'claimed'
     or attempt.authority_epoch<>run.authority_epoch
@@ -458,7 +463,7 @@ begin
     'speechCapabilityId',speech.id,'speechMinor',88,
     'asrCapabilityId',asr_cap.id,'asrMinor',3,
     'audioJudgeCapabilityId',judge_cap.id,'audioJudgeMinor',25,
-    'expiresAt',expires_at)::text,'UTF8'),'sha256'),'hex');
+    'expiresAt',authority_expires_at)::text,'UTF8'),'sha256'),'hex');
   manifest_hash:=encode(extensions.digest(convert_to(p_provider_payload::text,'UTF8'),'sha256'),'hex');
   insert into private.micro_quotes(id,workspace_id,episode_id,configuration_candidate_id,
     script_revision_id,preflight_kind,quote_number,quote_hash,rate_snapshot_hash,
@@ -467,16 +472,24 @@ begin
     run.script_revision_id,'narration_clock',coalesce((select max(q.quote_number)+1
       from private.micro_quotes q where q.configuration_candidate_id=run.configuration_candidate_id
       and q.preflight_kind='narration_clock'),1),quote_hash,rate_hash,'USD',116,'confirmed',
-    expires_at,statement_timestamp());
+    authority_expires_at,statement_timestamp());
   insert into private.micro_authorizations(id,workspace_id,micro_quote_id,configuration_candidate_id,
     script_revision_id,authorized_by,actor_authority_epoch,aal,quote_hash,
     hard_ceiling_minor,state,expires_at)
   values(authorization_id,run.workspace_id,quote_id,run.configuration_candidate_id,
     run.script_revision_id,intent.authorized_by,intent.actor_authority_epoch,'aal2',quote_hash,
-    116,'active',expires_at);
+    116,'active',authority_expires_at);
   insert into private.micro_reservations(id,workspace_id,micro_quote_id,micro_authorization_id,
     amount_minor,state,expires_at)
-  values(reservation_id,run.workspace_id,quote_id,authorization_id,116,'held',expires_at);
+  values(
+    reservation_id,
+    run.workspace_id,
+    quote_id,
+    authorization_id,
+    116,
+    'held',
+    authority_expires_at
+  );
   insert into private.micro_quote_lines(id,micro_quote_id,line_number,slot_key,capability_id,
     operation,quantity,unit_price_minor,amount_minor,request_schema_hash)
   values
@@ -881,7 +894,7 @@ create or replace function public.command_record_narration_provider_output(
 returns jsonb language plpgsql security definer set search_path=''
 as $$
 declare job private.narration_generation_jobs%rowtype; request private.provider_requests%rowtype;
-  alignment_hash text; character_count integer; start_count integer; end_count integer;
+  computed_alignment_hash text; character_count integer; start_count integer; end_count integer;
 begin
   if auth.role() is distinct from 'service_role' then
     raise exception 'service authority required' using errcode='42501'; end if;
@@ -908,10 +921,14 @@ begin
         and quarantine.source_sha256=p_source_audio_sha256
         and quarantine.declared_mime='audio/mpeg' and quarantine.state='quarantined')
   then raise exception 'narration provider output is stale' using errcode='40001'; end if;
-  alignment_hash:=encode(extensions.digest(convert_to(p_alignment::text,'UTF8'),'sha256'),'hex');
+  computed_alignment_hash:=encode(
+    extensions.digest(convert_to(p_alignment::text,'UTF8'),'sha256'),
+    'hex'
+  );
   if job.state='quarantined' then
     if job.quarantine_asset_version_id<>p_quarantine_asset_version_id
-      or job.provider_response_hash<>p_provider_response_hash or job.alignment_hash<>alignment_hash
+      or job.provider_response_hash<>p_provider_response_hash
+      or job.alignment_hash<>computed_alignment_hash
     then raise exception 'narration output replay conflicts' using errcode='40001'; end if;
     return jsonb_build_object('ok',true,'replayed',true,'jobId',job.id,'state',job.state);
   end if;
@@ -925,7 +942,7 @@ begin
   update private.narration_generation_jobs set
     quarantine_asset_version_id=p_quarantine_asset_version_id,
     provider_response_hash=p_provider_response_hash,source_audio_sha256=p_source_audio_sha256,
-    alignment=p_alignment,alignment_hash=alignment_hash,state='quarantined'
+    alignment=p_alignment,alignment_hash=computed_alignment_hash,state='quarantined'
   where id=job.id;
   return jsonb_build_object('ok',true,'replayed',false,'jobId',job.id,'state','quarantined');
 end;

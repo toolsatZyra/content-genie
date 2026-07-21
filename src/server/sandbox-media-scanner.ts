@@ -401,6 +401,13 @@ export async function scanAndReencodeNarrationAudio(input: {
     await commandOutput(
       sandbox,
       "sudo",
+      ["dnf", "install", "-y", "spal-release"],
+      "scanner.audio_repository_install_failed",
+      180_000,
+    );
+    await commandOutput(
+      sandbox,
+      "sudo",
       ["dnf", "install", "-y", "ffmpeg-free", "clamav", "clamav-update"],
       "scanner.audio_install_failed",
       180_000,

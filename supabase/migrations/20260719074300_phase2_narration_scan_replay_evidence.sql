@@ -110,7 +110,10 @@ begin
   if job.id is null or job.state<>'scanning' or job.ingest_lease_token<>p_lease_token
     or p_safe_failure_class !~ '^[a-z][a-z0-9_.-]{2,100}$'
   then raise exception 'narration failure authority is stale' using errcode='40001'; end if;
-  update private.narration_generation_jobs set state=case when p_retryable then 'quarantined' else 'failed' end,
+  update private.narration_generation_jobs set state=case when p_retryable
+      then 'quarantined'::private.narration_job_state
+      else 'failed'::private.narration_job_state
+    end,
     safe_failure_class=p_safe_failure_class,
     completed_at=case when p_retryable then null else statement_timestamp() end,
     ingest_lease_token=null,ingest_lease_expires_at=null where id=job.id;
