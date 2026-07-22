@@ -16,6 +16,7 @@ const allowanceRateKeys = [
   "repair_allowance",
   "score_music",
   "sfx_ambience",
+  "storyboard_generation",
   "upscale",
 ] as const;
 type AllowanceRateKey = (typeof allowanceRateKeys)[number];
@@ -62,6 +63,7 @@ type QuoteInput = Readonly<{
   planQcConsensusId: string;
   rateExpiresAt: string;
   slots: readonly QuoteSlot[];
+  storyboardBillingQuantumCount: number;
   workspaceId: string;
 }>;
 
@@ -227,6 +229,7 @@ function parseQuoteInput(value: unknown): QuoteInput {
       "planQcConsensusId",
       "rateExpiresAt",
       "slots",
+      "storyboardBillingQuantumCount",
       "workspaceId",
     ],
     "Production quote input",
@@ -350,6 +353,12 @@ function parseQuoteInput(value: unknown): QuoteInput {
     planQcConsensusId: uuid(root.planQcConsensusId, "Plan consensus"),
     rateExpiresAt: timestamp(root.rateExpiresAt, "Quote rate expiry"),
     slots: Object.freeze(slots),
+    storyboardBillingQuantumCount: number(
+      root.storyboardBillingQuantumCount,
+      "Storyboard billing quantum count",
+      1.525,
+      610,
+    ),
     workspaceId: uuid(root.workspaceId, "Workspace"),
   });
 }
@@ -473,7 +482,12 @@ export function compileProductionQuoteLines(input: QuoteInput): readonly QuoteLi
     ],
     repair_allowance: [0, 1, 1],
     score_music: [1, 1, 2],
-    sfx_ambience: [1, 1, 2],
+    sfx_ambience: [0, 5_000, 10_000],
+    storyboard_generation: [
+      input.storyboardBillingQuantumCount,
+      input.storyboardBillingQuantumCount,
+      input.storyboardBillingQuantumCount,
+    ],
     upscale: [retainedUpscaleMinutes, retainedUpscaleMinutes, retainedUpscaleMinutes],
   });
   for (const rateKey of allowanceRateKeys) {
@@ -524,7 +538,10 @@ export async function ensureProductionQuote(
   const allowanceValue = await rpc("command_ensure_production_allowance_rates", {
     p_workspace_id: input.workspaceId,
   });
-  if (!Array.isArray(allowanceValue) || allowanceValue.length !== 7) {
+  if (
+    !Array.isArray(allowanceValue) ||
+    allowanceValue.length !== allowanceRateKeys.length
+  ) {
     throw new ProductionQuoteError("Production allowance registration is malformed.");
   }
   const allowanceRates = allowanceValue.map((rate, index) =>

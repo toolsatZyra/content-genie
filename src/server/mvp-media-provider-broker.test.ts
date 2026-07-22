@@ -4,6 +4,7 @@ vi.mock("server-only", () => ({}));
 
 import {
   fetchMvpFalQueueJson,
+  fetchMvpFalQueueResult,
   MvpMediaProviderBrokerError,
   submitMvpFalProvider,
 } from "./mvp-media-provider-broker";
@@ -19,6 +20,15 @@ function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     headers: { "content-type": "application/json" },
     status,
+  });
+}
+
+function billedJsonResponse(body: unknown, billableUnits?: string): Response {
+  return new Response(JSON.stringify(body), {
+    headers: {
+      "content-type": "application/json",
+      ...(billableUnits === undefined ? {} : { "x-fal-billable-units": billableUnits }),
+    },
   });
 }
 
@@ -148,6 +158,32 @@ describe("MVP FAL provider broker", () => {
       }),
     );
   });
+
+  it("returns exact provider billing units and receipt evidence with results", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      billedJsonResponse(
+        { images: [{ url: "https://x.fal.media/frame.png" }] },
+        "1.525",
+      ),
+    );
+
+    await expect(fetchMvpFalQueueResult(responseUrl, 12_345)).resolves.toEqual({
+      billingEvidenceSha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      billableUnits: 1.525,
+      data: { images: [{ url: "https://x.fal.media/frame.png" }] },
+    });
+  });
+
+  it.each([undefined, "", "-1", "NaN", "1.00001", "10001"])(
+    "rejects missing or invalid provider billing evidence: %s",
+    async (units) => {
+      vi.mocked(fetch).mockResolvedValue(billedJsonResponse({ images: [] }, units));
+      await expect(fetchMvpFalQueueResult(responseUrl, 5_000)).rejects.toMatchObject({
+        disposition: "terminal",
+        safeCode: "PROVIDER_BILLING_UNRECONCILED",
+      });
+    },
+  );
 
   it.each([
     {

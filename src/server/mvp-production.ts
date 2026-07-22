@@ -7,6 +7,10 @@ import { Sandbox } from "@vercel/sandbox";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { launchMediaLimits, sniffMediaMagic } from "@/security/media-ingest";
 import {
+  BoundedResponseBodyError,
+  readResponseBodyBounded,
+} from "@/server/bounded-response-body";
+import {
   compileMvpEditRenderPlan,
   MvpEditRenderPlanError,
 } from "@/server/mvp-edit-render-plan";
@@ -15,8 +19,16 @@ import {
   loadEffectiveEddPayload,
   recordReadyRepairSelections,
 } from "@/server/mvp-effective-production-assets";
-import { completeMvpMediaDispatchOutput } from "@/server/mvp-media-dispatch";
+import {
+  completeMvpMediaDispatchOutput,
+  fetchMvpFalBilledResultForDispatch,
+} from "@/server/mvp-media-dispatch";
 import { fetchMvpFalQueueJson } from "@/server/mvp-media-provider-broker";
+import {
+  persistedMasterObjectMatches,
+  persistedMasterRecordMatches,
+  type RenderedMasterIdentity,
+} from "@/server/mvp-master-integrity";
 import {
   advanceMvpStoryboardAndClipSubmission,
   MvpStoryboardProductionError,
@@ -180,8 +192,20 @@ async function completeClip(clip: ClipRow): Promise<boolean> {
     }
     return false;
   }
-  const result = await fetchMvpFalQueueJson(clip.response_url, 60_000);
-  const video = result.video as Record<string, unknown> | undefined;
+  if (!clip.provider_dispatch_id) {
+    throw new MvpProductionError(
+      "The completed video is missing provider dispatch evidence.",
+      "PRODUCTION_COST_AUTHORITY_UNAVAILABLE",
+      false,
+    );
+  }
+  const billedResult = await fetchMvpFalBilledResultForDispatch({
+    externalRequestId: clip.external_request_id,
+    providerDispatchId: clip.provider_dispatch_id,
+    responseUrl: clip.response_url,
+    timeoutMs: 60_000,
+  });
+  const video = billedResult.data.video as Record<string, unknown> | undefined;
   if (!video || typeof video.url !== "string") {
     throw new MvpProductionError(
       "The completed video result is malformed.",
@@ -207,17 +231,26 @@ async function completeClip(clip: ClipRow): Promise<boolean> {
     redirect: "error",
     signal: AbortSignal.timeout(120_000),
   });
-  const declared = Number(mediaResponse.headers.get("content-length") ?? "0");
-  if (
-    !mediaResponse.ok ||
-    (declared > 0 && declared > launchMediaLimits.maximumBytes)
-  ) {
+  if (!mediaResponse.ok) {
     throw new MvpProductionError(
       "The generated video could not be downloaded safely.",
       "PROVIDER_MEDIA_UNAVAILABLE",
     );
   }
-  const bytes = Buffer.from(await mediaResponse.arrayBuffer());
+  let bytes: Buffer;
+  try {
+    bytes = await readResponseBodyBounded(
+      mediaResponse,
+      launchMediaLimits.maximumBytes,
+    );
+  } catch (caught) {
+    if (!(caught instanceof BoundedResponseBodyError)) throw caught;
+    throw new MvpProductionError(
+      "The generated video could not be downloaded safely.",
+      "PROVIDER_MEDIA_UNAVAILABLE",
+      false,
+    );
+  }
   const client = createAdminSupabaseClient();
   const providerSha256 = sha256(bytes);
   const quarantineObjectName = `${clip.workspace_id}/mvp-clip-quarantine/${clip.production_run_id}/${clip.attempt_number}/${clip.shot_number}/${providerSha256}.mp4`;
@@ -291,13 +324,13 @@ async function completeClip(clip: ClipRow): Promise<boolean> {
       );
     }
   }
-  if (clip.provider_dispatch_id) {
-    await completeMvpMediaDispatchOutput({
-      externalRequestId: clip.external_request_id,
-      outputContentSha256: scan.outputSha256,
-      providerDispatchId: clip.provider_dispatch_id,
-    });
-  }
+  await completeMvpMediaDispatchOutput({
+    billingEvidenceSha256: billedResult.billingEvidenceSha256,
+    billableUnits: billedResult.billableUnits,
+    externalRequestId: clip.external_request_id,
+    outputContentSha256: scan.outputSha256,
+    providerDispatchId: clip.provider_dispatch_id,
+  });
   const { error: updateError } = await client
     .from("mvp_production_clip_worker")
     .update({
@@ -760,6 +793,15 @@ async function renderJob(job: JobRow): Promise<void> {
       );
     }
     const objectName = `${job.workspace_id}/mvp-masters/${job.production_run_id}/${job.attempt_number}/master.mp4`;
+    const masterSha256 = sha256(masterBytes);
+    const renderedMasterIdentity: RenderedMasterIdentity = {
+      byteLength: masterBytes.length,
+      contentSha256: masterSha256,
+      durationMs: Math.round(durationSeconds * 1_000),
+      height: 1920,
+      objectName,
+      width: 1080,
+    };
     const { error: uploadError } = await client.storage
       .from(MASTER_BUCKET)
       .upload(objectName, masterBytes, { contentType: "video/mp4", upsert: false });
@@ -769,10 +811,28 @@ async function renderJob(job: JobRow): Promise<void> {
         "PRODUCTION_STORAGE_FAILED",
       );
     }
+    if (uploadError?.message === "The resource already exists") {
+      const existingBytes = await storageBytes(objectName);
+      if (
+        !persistedMasterObjectMatches(
+          {
+            byteLength: existingBytes.length,
+            contentSha256: sha256(existingBytes),
+          },
+          renderedMasterIdentity,
+        )
+      ) {
+        throw new MvpProductionError(
+          "The existing master object does not match the rendered film.",
+          "PRODUCTION_STORAGE_COLLISION",
+          false,
+        );
+      }
+    }
     const { error: masterError } = await client.from("mvp_episode_masters").insert({
       attempt_number: job.attempt_number,
       byte_length: masterBytes.length,
-      content_sha256: sha256(masterBytes),
+      content_sha256: masterSha256,
       duration_ms: Math.round(durationSeconds * 1_000),
       episode_id: job.episode_id,
       height: 1920,
@@ -788,6 +848,26 @@ async function renderJob(job: JobRow): Promise<void> {
         "PRODUCTION_LEDGER_FAILED",
         false,
       );
+    }
+    if (masterError?.code === "23505") {
+      const { data: existingMaster, error: existingMasterError } = await client
+        .from("mvp_episode_masters")
+        .select("object_name,content_sha256,byte_length,duration_ms,width,height")
+        .eq("workspace_id", job.workspace_id)
+        .eq("production_run_id", job.production_run_id)
+        .eq("attempt_number", job.attempt_number)
+        .maybeSingle();
+      if (
+        existingMasterError ||
+        !existingMaster ||
+        !persistedMasterRecordMatches(existingMaster, renderedMasterIdentity)
+      ) {
+        throw new MvpProductionError(
+          "The existing master record does not match the rendered film.",
+          "PRODUCTION_STORAGE_COLLISION",
+          false,
+        );
+      }
     }
     const { data: transitionedJob, error: transitionError } = await client
       .from("mvp_production_jobs")

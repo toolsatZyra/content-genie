@@ -1,11 +1,11 @@
 -- Focused structural gate for Monica's immutable, UI-safe repair grounding.
--- Run after migrations through 20260721185000.
+-- Run after migrations through 20260722191000.
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions,auth,storage,private,audit,pg_catalog;
-select plan(16);
+select plan(17);
 
 select ok(
   to_regclass('public.mvp_repair_feedback_grounding_versions') is not null
@@ -205,22 +205,37 @@ select ok(
   position('storyboard_and_clip' in pg_get_constraintdef(
     (select oid from pg_constraint
      where conrelid='public.mvp_repair_action_grounding_evidence'::regclass
-       and contype='c' and pg_get_constraintdef(oid) like '%selected_action%'
-     limit 1)
+       and conname='mvp_repair_action_grounding_evidence_selected_action_check')
   )) > 0
   and position('clip_only' in pg_get_constraintdef(
     (select oid from pg_constraint
      where conrelid='public.mvp_repair_action_grounding_evidence'::regclass
-       and contype='c' and pg_get_constraintdef(oid) like '%selected_action%'
-     limit 1)
+       and conname='mvp_repair_action_grounding_evidence_selected_action_check')
   )) > 0
   and position('re_edit' in pg_get_constraintdef(
     (select oid from pg_constraint
      where conrelid='public.mvp_repair_action_grounding_evidence'::regclass
-       and contype='c' and pg_get_constraintdef(oid) like '%selected_action%'
-     limit 1)
+       and conname='mvp_repair_action_grounding_evidence_selected_action_check')
+  )) > 0
+  and position('legacy_storyboard_migration' in pg_get_constraintdef(
+    (select oid from pg_constraint
+     where conrelid='public.mvp_repair_action_grounding_evidence'::regclass
+       and conname='mvp_repair_action_grounding_evidence_selected_action_check')
   )) > 0,
-  'only storyboard+clip, clip-only and re-edit actions can be persisted'
+  'feedback actions and explicitly labeled legacy storyboard migrations can be persisted'
+);
+
+select ok(
+  position('selected_action_value = ''legacy_storyboard_migration''' in pg_get_functiondef(
+    'private.record_mvp_repair_grounding_evidence(uuid,uuid,uuid,uuid,text,text,text,text,text,text,text,text,jsonb,text,jsonb,text,text)'::regprocedure
+  )) > 0
+  and position('split_screen_two_state' in pg_get_functiondef(
+    'private.record_mvp_repair_grounding_evidence(uuid,uuid,uuid,uuid,text,text,text,text,text,text,text,text,jsonb,text,jsonb,text,text)'::regprocedure
+  )) > 0
+  and position('cardinality(feedback_indexes) <> 0' in pg_get_functiondef(
+    'private.record_mvp_repair_grounding_evidence(uuid,uuid,uuid,uuid,text,text,text,text,text,text,text,text,jsonb,text,jsonb,text,text)'::regprocedure
+  )) > 0,
+  'zero feedback indexes are reserved for a verified audit-only split-screen migration'
 );
 
 select * from finish();

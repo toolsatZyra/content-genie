@@ -6,7 +6,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions,auth,storage,private,audit,pg_catalog;
 
-select plan(102);
+select plan(110);
 
 create temp table mvp_pipeline_fixture(
   key text primary key,
@@ -906,6 +906,17 @@ set local role authenticated;
 
 select throws_ok(
   format(
+    'select public.command_review_mvp_master(%L,%L,1,%L,false,true,%L)',
+    'c1100000-0000-4000-8000-000000000001',
+    'c1b00000-0000-4000-8000-000000000001','approve',''
+  ),
+  '23514',
+  'explicit cultural review confirmation is required',
+  'final approval cannot fabricate a cultural confirmation from a false request flag'
+);
+
+select throws_ok(
+  format(
     'select public.command_review_mvp_master(%L,%L,1,%L,true,true,%L)',
     'c1100000-0000-4000-8000-000000000001',
     'c1b00000-0000-4000-8000-000000000001','approve',''
@@ -1170,9 +1181,12 @@ select ok(
     'public.command_fail_mvp_media_dispatch(uuid,bigint,uuid,bigint,boolean,text,text)'
   ) is not null
   and to_regprocedure(
-    'public.command_complete_mvp_media_dispatch_output(uuid,text,text)'
+    'public.command_complete_mvp_media_dispatch_output(uuid,text,text,numeric,text)'
+  ) is not null
+  and to_regprocedure(
+    'public.command_record_mvp_media_billing_unreconciled(uuid,text,text)'
   ) is not null,
-  'media dispatch exposes the complete reserve claim receipt failure and output protocol'
+  'media dispatch exposes reserve claim receipt billing failure and costed output protocols'
 );
 
 select ok(
@@ -1251,7 +1265,81 @@ select ok(
   'provider receipt bindings are revalidated whenever media evidence changes'
 );
 
+select ok(
+  (select count(*)=8 from information_schema.columns
+    where table_schema='private' and table_name='mvp_media_dispatches'
+      and column_name=any(array[
+        'rate_card_version_id','billing_state','actual_cost_required',
+        'actual_billable_units','actual_unit_price_microusd',
+        'actual_cost_microusd','billing_evidence_sha256','billing_error_code'
+      ]))
+  and (select column_default='true' from information_schema.columns
+    where table_schema='private' and table_name='mvp_media_dispatches'
+      and column_name='actual_cost_required')
+  and (select count(*)=4 from information_schema.columns
+    where table_schema='private' and table_name='mvp_production_sfx'
+      and column_name=any(array[
+        'provider_usage_unit_price_microusd','provider_actual_cost_microusd',
+        'provider_rate_card_version_id','provider_billing_evidence_sha256'
+      ])),
+  'FAL and ElevenLabs ledgers retain provider usage and exact monetary evidence'
+);
+
+select ok(
+  exists(select 1 from pg_constraint
+    where conname='production_rate_card_versions_line_kind_check'
+      and pg_get_constraintdef(oid) like '%provider_storyboard%')
+  and exists(select 1 from information_schema.triggers
+    where event_object_schema='public' and event_object_table='production_quotes'
+      and trigger_name='production_quotes_require_storyboard_cost')
+  and exists(select 1 from information_schema.triggers
+    where event_object_schema='private' and event_object_table='mvp_media_dispatches'
+      and trigger_name='mvp_media_dispatches_bind_rate'),
+  'new quotes and provider dispatches bind the exact storyboard rate authority'
+);
+
+select ok(
+  has_function_privilege(
+    'authenticated','public.get_mvp_episode_actual_costs(uuid)','execute'
+  )
+  and not has_function_privilege(
+    'anon','public.get_mvp_episode_actual_costs(uuid)','execute'
+  )
+  and not has_table_privilege(
+    'authenticated','private.mvp_media_dispatches','select'
+  )
+  and not has_table_privilege(
+    'authenticated','private.mvp_production_sfx','select'
+  ),
+  'members can inspect per-Episode actual cost without direct provider-ledger access'
+);
+
 set local session_replication_role = replica;
+
+insert into private.production_rate_card_versions(
+  id,rate_key,version_number,line_kind,capability_version_id,currency,
+  unit_name,unit_price_microusd,minimum_quantity,maximum_line_microusd,
+  mandatory_addon,pricing_evidence_snapshot_id,rate_hash,verified_at,
+  expires_at,state
+) values(
+  'c1a80000-0000-4000-8000-000000000001','storyboard_generation',1,
+  'provider_storyboard',null,'USD','billing_quantum',80000,0,50000000,true,
+  'c1a80000-0000-4000-8000-000000000002',repeat('8',64),
+  '2026-01-01 00:00:00+00','2099-01-01 00:00:00+00','verified'
+);
+insert into public.production_quote_lines(
+  id,workspace_id,production_quote_id,line_number,line_key,line_kind,
+  provider_request_slot_id,rate_card_version_id,low_quantity,expected_quantity,
+  high_quantity,low_amount_microusd,expected_amount_microusd,
+  high_amount_microusd,evidence_hash
+) values(
+  'c1a90000-0000-4000-8000-000000000001',
+  'c1100000-0000-4000-8000-000000000001',
+  'c1a30000-0000-4000-8000-000000000002',1,
+  'storyboard_generation','provider_storyboard',null,
+  'c1a80000-0000-4000-8000-000000000001',1.525,1.525,1.525,
+  122000,122000,122000,repeat('9',64)
+);
 
 insert into public.production_runs(
   id,workspace_id,episode_id,series_id,configuration_candidate_id,
@@ -1270,7 +1358,7 @@ insert into public.production_runs(
   'c1a20000-0000-4000-8000-000000000002',
   'c1a30000-0000-4000-8000-000000000002',
   'c1a40000-0000-4000-8000-000000000002',
-  'c1a50000-0000-4000-8000-000000000002',2,2,repeat('1',64),1000000,1000000,
+  'c1a50000-0000-4000-8000-000000000002',2,2,repeat('1',64),366000,366000,
   'c1200000-0000-4000-8000-000000000001',
   (select id from private.workspace_authority_profiles where workspace_id='c1100000-0000-4000-8000-000000000001'),
   (select profile_epoch from private.workspace_authority_profiles where workspace_id='c1100000-0000-4000-8000-000000000001'),
@@ -1446,7 +1534,7 @@ select 'dispatch-reserve-1', public.command_reserve_mvp_media_dispatch(
   'c1a00000-0000-4000-8000-000000000002',
   'c1400000-0000-4000-8000-000000000001',1,1,
   'storyboard:1:single','storyboard','fal-ai/nano-banana-2',repeat('3',64),
-  25000,50000
+  122000,122000
 );
 
 select ok(
@@ -1463,7 +1551,7 @@ select 'dispatch-reserve-replay', public.command_reserve_mvp_media_dispatch(
   'c1a00000-0000-4000-8000-000000000002',
   'c1400000-0000-4000-8000-000000000001',1,1,
   'storyboard:1:single','storyboard','fal-ai/nano-banana-2',repeat('3',64),
-  25000,50000
+  122000,122000
 );
 
 select ok(
@@ -1478,7 +1566,7 @@ select ok(
 
 select throws_ok(
   format(
-    'select public.command_reserve_mvp_media_dispatch(%L,%L,%L,1,1,%L,%L,%L,%L,25000,50000)',
+    'select public.command_reserve_mvp_media_dispatch(%L,%L,%L,1,1,%L,%L,%L,%L,122000,122000)',
     'c1100000-0000-4000-8000-000000000001',
     'c1a00000-0000-4000-8000-000000000002',
     'c1400000-0000-4000-8000-000000000001',
@@ -1586,15 +1674,54 @@ select throws_ok(
 );
 
 insert into mvp_pipeline_fixture(key,value)
+select 'dispatch-billing-unreconciled-1',
+  public.command_record_mvp_media_billing_unreconciled(
+    (select (value->>'id')::uuid from mvp_pipeline_fixture
+      where key='dispatch-submit-1'),
+    'request_123456','The provider result is missing exact billing evidence.'
+  );
+insert into mvp_pipeline_fixture(key,value)
+select 'dispatch-billing-unreconciled-replay',
+  public.command_record_mvp_media_billing_unreconciled(
+    (select (value->>'id')::uuid from mvp_pipeline_fixture
+      where key='dispatch-submit-1'),
+    'request_123456','The provider result is missing exact billing evidence.'
+  );
+
+select ok(
+  (select value->>'billing_state' from mvp_pipeline_fixture
+    where key='dispatch-billing-unreconciled-replay')='unreconciled'
+  and (select value->>'version' from mvp_pipeline_fixture
+    where key='dispatch-billing-unreconciled-replay')=
+      (select value->>'version' from mvp_pipeline_fixture
+        where key='dispatch-billing-unreconciled-1')
+  and (select value->>'actual_cost_microusd' from mvp_pipeline_fixture
+    where key='dispatch-billing-unreconciled-replay') is null,
+  'a missing billing header is explicit and an exact retry does not churn or record zero'
+);
+
+select throws_ok(
+  format(
+    'select public.command_record_mvp_media_billing_unreconciled(%L,%L,%L)',
+    (select value->>'id' from mvp_pipeline_fixture where key='dispatch-submit-1'),
+    'request_123456','A conflicting billing failure summary.'
+  ),
+  '40001','media dispatch billing failure is stale',
+  'an unreconciled billing receipt cannot be rebound to conflicting evidence'
+);
+
+insert into mvp_pipeline_fixture(key,value)
 select 'dispatch-complete-1', public.command_complete_mvp_media_dispatch_output(
   (select (value->>'id')::uuid from mvp_pipeline_fixture
-    where key='dispatch-submit-1'),'request_123456',repeat('4',64)
+    where key='dispatch-submit-1'),'request_123456',repeat('4',64),
+    1.525,repeat('6',64)
 );
 insert into mvp_pipeline_fixture(key,value)
 select 'dispatch-complete-replay',
   public.command_complete_mvp_media_dispatch_output(
     (select (value->>'id')::uuid from mvp_pipeline_fixture
-      where key='dispatch-submit-1'),'request_123456',repeat('4',64)
+      where key='dispatch-submit-1'),'request_123456',repeat('4',64),
+      1.525,repeat('6',64)
   );
 
 select ok(
@@ -1605,17 +1732,21 @@ select ok(
       (select value->>'version' from mvp_pipeline_fixture
         where key='dispatch-complete-1')
   and (select value->>'output_content_sha256' from mvp_pipeline_fixture
-    where key='dispatch-complete-replay') = repeat('4',64),
-  'provider output completion is exact and idempotent after a lost response'
+    where key='dispatch-complete-replay') = repeat('4',64)
+  and (select (value->>'actual_cost_microusd')::bigint
+    from mvp_pipeline_fixture where key='dispatch-complete-replay')=122000
+  and (select value->>'billing_evidence_sha256'
+    from mvp_pipeline_fixture where key='dispatch-complete-replay')=repeat('6',64),
+  'provider output completion is costed exactly and idempotent after a lost response'
 );
 
 select throws_ok(
   format(
-    'select public.command_complete_mvp_media_dispatch_output(%L,%L,%L)',
+    'select public.command_complete_mvp_media_dispatch_output(%L,%L,%L,1.525,%L)',
     (select value->>'id' from mvp_pipeline_fixture where key='dispatch-submit-1'),
-    'request_123456',repeat('5',64)
+    'request_123456',repeat('5',64),repeat('6',64)
   ),
-  '40001','media dispatch output completion is stale',
+  '40001','media dispatch billing evidence conflicts with completion',
   'a completed dispatch cannot be rebound to conflicting output bytes'
 );
 
@@ -1625,7 +1756,7 @@ select 'dispatch-expiring-reserve', public.command_reserve_mvp_media_dispatch(
   'c1a00000-0000-4000-8000-000000000002',
   'c1400000-0000-4000-8000-000000000001',1,2,
   'storyboard:2:single','storyboard','fal-ai/nano-banana-2',repeat('6',64),
-  25000,50000
+  122000,122000
 );
 insert into mvp_pipeline_fixture(key,value)
 select 'dispatch-expiring-claim', public.command_claim_mvp_media_dispatch(
@@ -1682,7 +1813,7 @@ select 'dispatch-expired-replay', public.command_reserve_mvp_media_dispatch(
   'c1a00000-0000-4000-8000-000000000002',
   'c1400000-0000-4000-8000-000000000001',1,2,
   'storyboard:2:single','storyboard','fal-ai/nano-banana-2',repeat('6',64),
-  25000,50000
+  122000,122000
 );
 
 select ok(
@@ -1729,22 +1860,22 @@ select ok(
 
 select lives_ok(
   format(
-    'select public.command_reserve_mvp_media_dispatch(%L,%L,%L,1,3,%L,%L,%L,%L,0,900000)',
+    'select public.command_reserve_mvp_media_dispatch(%L,%L,%L,1,3,%L,%L,%L,%L,122000,122000)',
     'c1100000-0000-4000-8000-000000000001',
     'c1a00000-0000-4000-8000-000000000002',
     'c1400000-0000-4000-8000-000000000001',
-    'clip:3:motion','clip','fal-ai/bytedance/seedance-v1',repeat('7',64)
+    'storyboard:3:single','storyboard','fal-ai/nano-banana-2',repeat('7',64)
   ),
   'aggregate reservation can consume the exact remaining run authority'
 );
 
 select throws_ok(
   format(
-    'select public.command_reserve_mvp_media_dispatch(%L,%L,%L,1,4,%L,%L,%L,%L,0,1)',
+    'select public.command_reserve_mvp_media_dispatch(%L,%L,%L,1,4,%L,%L,%L,%L,122000,122000)',
     'c1100000-0000-4000-8000-000000000001',
     'c1a00000-0000-4000-8000-000000000002',
     'c1400000-0000-4000-8000-000000000001',
-    'clip:4:motion','clip','fal-ai/bytedance/seedance-v1',repeat('8',64)
+    'storyboard:4:single','storyboard','fal-ai/nano-banana-2',repeat('8',64)
   ),
   '23514',
   'media dispatch aggregate maximum exceeds production run authority',
@@ -1864,6 +1995,28 @@ select ok(
     'public.command_reject_episode_narration_upload(uuid,uuid,text)'
   ) is not null,
   'uploaded narration exposes exact prepare, confirm and master-clock commands'
+);
+
+select ok(
+  to_regprocedure(
+    'public.get_episode_narration_upload_processing_state(uuid,uuid)'
+  ) is not null
+  and has_function_privilege(
+    'service_role',
+    'public.get_episode_narration_upload_processing_state(uuid,uuid)',
+    'execute'
+  )
+  and not has_function_privilege(
+    'authenticated',
+    'public.get_episode_narration_upload_processing_state(uuid,uuid)',
+    'execute'
+  )
+  and not has_function_privilege(
+    'anon',
+    'public.get_episode_narration_upload_processing_state(uuid,uuid)',
+    'execute'
+  ),
+  'only service processing can recover a retained narration-upload attestation identity'
 );
 
 select ok(
@@ -2134,6 +2287,52 @@ select ok(
        where episode_id='d1400000-0000-4000-8000-000000000001')=2,
   'the earlier user script revision remains preserved after transcript confirmation'
 );
+
+reset role;
+set local session_replication_role = replica;
+update public.episode_configuration_candidates
+set voice_confirmed_by = null,
+    voice_confirmed_at = null
+where id = 'd1500000-0000-4000-8000-000000000001';
+set local session_replication_role = origin;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"c1200000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal2","session_id":"c1210000-0000-4000-8000-000000000002"}',
+  true
+);
+select set_config(
+  'request.jwt.claim.sub',
+  'c1200000-0000-4000-8000-000000000002',
+  true
+);
+select set_config('request.jwt.claim.role','authenticated',true);
+set local role authenticated;
+select lives_ok(
+  $sql$
+  select public.command_authorize_world_build_intent(
+    'c1100000-0000-4000-8000-000000000001',
+    'd1400000-0000-4000-8000-000000000001',
+    'd1500000-0000-4000-8000-000000000001',
+    (
+      select aggregate_version
+      from public.episode_configuration_candidates
+      where id = 'd1500000-0000-4000-8000-000000000001'
+    ),
+    500,
+    'd2b00000-0000-4000-8000-000000000011',
+    'uploaded-world-intent-0001',
+    repeat('1', 64)
+  )
+  $sql$,
+  'a confirmed uploaded source reaches the real World authority command with null voice confirmation'
+);
+reset role;
+set local session_replication_role = replica;
+update public.episode_configuration_candidates
+set voice_confirmed_by = 'c1200000-0000-4000-8000-000000000002',
+    voice_confirmed_at = statement_timestamp()
+where id = 'd1500000-0000-4000-8000-000000000001';
+set local session_replication_role = origin;
 
 reset role;
 select set_config('request.jwt.claims','{"role":"service_role"}',true);

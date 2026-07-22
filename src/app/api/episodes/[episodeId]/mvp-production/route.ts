@@ -271,6 +271,13 @@ export async function POST(
       }
       return reply({ ok: true, result: data }, 200, requestId);
     }
+    if (input.decision === "approve" && !input.culturalReviewConfirmed) {
+      return reply(
+        { code: "CULTURAL_REVIEW_CONFIRMATION_REQUIRED", ok: false },
+        409,
+        requestId,
+      );
+    }
     if (input.decision === "approve") {
       const { error: culturalError } = await client.rpc(
         "command_record_mvp_master_cultural_decision",

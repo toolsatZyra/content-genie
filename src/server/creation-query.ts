@@ -62,12 +62,12 @@ interface ConfigurationRow {
 
 interface NarrationUploadRow {
   script_comparison_json: Readonly<Record<string, unknown>> | null;
-  duration_ms: number | string;
+  duration_ms: number | string | null;
   id: string;
   promoted_asset_version_id: string | null;
   display_filename: string;
   state: string;
-  transcription_text: string;
+  transcription_text: string | null;
 }
 
 interface WorldProgressRow {
@@ -283,17 +283,29 @@ export async function loadCreationProjection(
 
   const script = scriptResult.data as ScriptRow | null;
   const configuration = configurationResult.data as ConfigurationRow | null;
-  const narrationUploadResult = configuration?.selected_narration_upload_version_id
-    ? await client
-        .from("episode_narration_upload_versions")
-        .select(
-          "id,state,display_filename,duration_ms,promoted_asset_version_id,transcription_text,script_comparison_json,created_at",
+  let narrationUploadResult: { data: unknown; error: unknown } = {
+    data: null,
+    error: null,
+  };
+  if (configuration) {
+    let narrationUploadQuery = client
+      .from("episode_narration_upload_versions")
+      .select(
+        "id,state,display_filename,duration_ms,promoted_asset_version_id,transcription_text,script_comparison_json,version_number",
+      )
+      .eq("workspace_id", episode.workspace_id)
+      .eq("configuration_candidate_id", configuration.id);
+    narrationUploadQuery = configuration.selected_narration_upload_version_id
+      ? narrationUploadQuery.eq(
+          "id",
+          configuration.selected_narration_upload_version_id,
         )
-        .eq("workspace_id", episode.workspace_id)
-        .eq("configuration_candidate_id", configuration.id)
-        .eq("id", configuration.selected_narration_upload_version_id)
-        .maybeSingle()
-    : { data: null, error: null };
+      : narrationUploadQuery
+          .in("state", ["prepared", "verified"])
+          .order("version_number", { ascending: false })
+          .limit(1);
+    narrationUploadResult = await narrationUploadQuery.maybeSingle();
+  }
   if (narrationUploadResult.error) throw narrationUploadResult.error;
   const narrationUpload = narrationUploadResult.data as NarrationUploadRow | null;
   const productionJobRow = productionJobResult.data as ProductionJobRow | null;
@@ -404,7 +416,10 @@ export async function loadCreationProjection(
           ? {
               assetVersionId: narrationUpload.promoted_asset_version_id,
               comparisonEvidence: narrationUpload.script_comparison_json ?? {},
-              durationMs: Number(narrationUpload.duration_ms),
+              durationMs:
+                narrationUpload.duration_ms === null
+                  ? null
+                  : Number(narrationUpload.duration_ms),
               id: narrationUpload.id,
               originalFilename: narrationUpload.display_filename,
               state: narrationUpload.state,

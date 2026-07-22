@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
+
 const QUEUE_ORIGIN = "https://queue.fal.run";
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -75,6 +77,35 @@ export type MvpFalControl = Readonly<{
   responseUrl: string;
   statusUrl: string;
 }>;
+
+export type MvpFalBilledResult = Readonly<{
+  billingEvidenceSha256: string;
+  billableUnits: number;
+  data: Record<string, unknown>;
+}>;
+
+function billableUnits(response: Response): Readonly<{
+  canonical: string;
+  value: number;
+}> {
+  const raw = response.headers.get("x-fal-billable-units")?.trim() ?? "";
+  if (!/^(?:0|[1-9][0-9]*)(?:[.][0-9]{1,4})?$/u.test(raw)) {
+    throw new MvpMediaProviderBrokerError(
+      "The provider result is missing exact billing evidence.",
+      "terminal",
+      "PROVIDER_BILLING_UNRECONCILED",
+    );
+  }
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0 || value > 10_000) {
+    throw new MvpMediaProviderBrokerError(
+      "The provider result contains invalid billing evidence.",
+      "terminal",
+      "PROVIDER_BILLING_UNRECONCILED",
+    );
+  }
+  return Object.freeze({ canonical: String(value), value });
+}
 
 export async function submitMvpFalProvider(
   endpoint: string,
@@ -182,10 +213,10 @@ export async function submitMvpFalProvider(
   }
 }
 
-export async function fetchMvpFalQueueJson(
+async function fetchMvpFalQueueResponse(
   urlValue: string,
   timeoutMs: number,
-): Promise<Record<string, unknown>> {
+): Promise<Readonly<{ data: Record<string, unknown>; response: Response; url: URL }>> {
   const url = queueUrl(urlValue);
   let response: Response;
   try {
@@ -228,5 +259,38 @@ export async function fetchMvpFalQueueJson(
       "PROVIDER_RESPONSE_INVALID",
     );
   }
-  return parsed as Record<string, unknown>;
+  return Object.freeze({
+    data: parsed as Record<string, unknown>,
+    response,
+    url,
+  });
+}
+
+export async function fetchMvpFalQueueJson(
+  urlValue: string,
+  timeoutMs: number,
+): Promise<Record<string, unknown>> {
+  return (await fetchMvpFalQueueResponse(urlValue, timeoutMs)).data;
+}
+
+export async function fetchMvpFalQueueResult(
+  urlValue: string,
+  timeoutMs: number,
+): Promise<MvpFalBilledResult> {
+  const result = await fetchMvpFalQueueResponse(urlValue, timeoutMs);
+  const billing = billableUnits(result.response);
+  return Object.freeze({
+    billingEvidenceSha256: createHash("sha256")
+      .update(
+        JSON.stringify({
+          billableUnits: billing.canonical,
+          responseUrl: result.url.toString(),
+          sourceHeader: "x-fal-billable-units",
+        }),
+        "utf8",
+      )
+      .digest("hex"),
+    billableUnits: billing.value,
+    data: result.data,
+  });
 }

@@ -665,6 +665,7 @@ select is(
     'command_select_episode_voice',
     'command_start_mvp_production',
     'command_submit_source_review',
+    'get_mvp_episode_actual_costs',
     'prepare_first_episode_world_lock'
   ]::text[],
   'authenticated can execute only the reviewed Phase 1 and Phase 2 commands'

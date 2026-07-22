@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -37,6 +37,15 @@ export type ProcessedNarrationUpload = Readonly<{
   uploadVersionId: string;
 }>;
 
+type NarrationUploadProcessingState = Readonly<{
+  attestationId: string | null;
+  attestationPolicyVersionId: string | null;
+  promotedAssetVersionId: string | null;
+  state: string;
+  stateVersion: number;
+  uploadVersionId: string;
+}>;
+
 export class NarrationUploadProcessingError extends Error {
   override readonly name = "NarrationUploadProcessingError";
 
@@ -51,6 +60,16 @@ export class NarrationUploadProcessingError extends Error {
 
 function sha256(value: string | Buffer): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+export function deterministicNarrationUploadUuid(
+  uploadVersionId: string,
+  purpose: "asset-version" | "attestation",
+): string {
+  const digest = createHash("sha256")
+    .update(`genie.owner-narration-upload.${purpose}.v1\0${uploadVersionId}`)
+    .digest("hex");
+  return `${digest.slice(0, 8)}-${digest.slice(8, 12)}-8${digest.slice(13, 16)}-a${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
 }
 
 function exactObject(value: unknown, keys: readonly string[]): value is object {
@@ -95,6 +114,41 @@ export function parseNarrationUploadPreparation(
     );
   }
   return value as NarrationUploadPreparation;
+}
+
+export function parseNarrationUploadProcessingState(
+  value: unknown,
+): NarrationUploadProcessingState {
+  const keys = [
+    "attestationId",
+    "attestationPolicyVersionId",
+    "promotedAssetVersionId",
+    "state",
+    "stateVersion",
+    "uploadVersionId",
+  ] as const;
+  const record = value as Record<string, unknown>;
+  const nullableIds = [
+    record.attestationId,
+    record.attestationPolicyVersionId,
+    record.promotedAssetVersionId,
+  ];
+  if (
+    !exactObject(value, keys) ||
+    typeof record.uploadVersionId !== "string" ||
+    typeof record.state !== "string" ||
+    !Number.isSafeInteger(record.stateVersion) ||
+    (record.stateVersion as number) < 1 ||
+    nullableIds.some((id) => id !== null && typeof id !== "string") ||
+    (record.attestationId === null) !== (record.attestationPolicyVersionId === null)
+  ) {
+    throw new NarrationUploadProcessingError(
+      "Narration upload recovery evidence was malformed.",
+      "narration_upload.recovery_evidence_malformed",
+      true,
+    );
+  }
+  return value as NarrationUploadProcessingState;
 }
 
 async function rpc(
@@ -308,6 +362,7 @@ export async function processNarrationUpload(input: {
 
   const quarantineObjectName = `${input.workspaceId}/quarantine/${input.preparation.stableAssetId}/${input.preparation.quarantineAssetVersionId}/source`;
   let finalObjectName: string | null = null;
+  let finalObjectCleanupAllowed = false;
   try {
     await uploadOrVerify(
       client,
@@ -388,29 +443,51 @@ export async function processNarrationUpload(input: {
       },
       schemaVersion: "genie.owner-narration-quality-evidence.v1",
     });
-    const policyValue = await rpc(
-      client,
-      "get_active_narration_upload_ingest_policy",
-      {},
+    const processingState = parseNarrationUploadProcessingState(
+      await rpc(client, "get_episode_narration_upload_processing_state", {
+        p_upload_version_id: input.preparation.uploadVersionId,
+        p_workspace_id: input.workspaceId,
+      }),
     );
-    if (
-      !exactObject(policyValue, ["id", "policy", "policyHash"]) ||
-      typeof (policyValue as Record<string, unknown>).id !== "string"
-    ) {
+    if (processingState.uploadVersionId !== input.preparation.uploadVersionId) {
       throw new NarrationUploadProcessingError(
-        "Narration ingest policy evidence is unavailable.",
-        "narration_upload.policy_unavailable",
-        true,
+        "Narration upload recovery evidence did not bind this upload.",
+        "narration_upload.recovery_evidence_conflict",
       );
     }
-    const attestationId = randomUUID();
+    const policyVersionId = processingState.attestationPolicyVersionId
+      ? processingState.attestationPolicyVersionId
+      : await (async () => {
+          const policyValue = await rpc(
+            client,
+            "get_active_narration_upload_ingest_policy",
+            {},
+          );
+          if (
+            !exactObject(policyValue, ["id", "policy", "policyHash"]) ||
+            typeof (policyValue as Record<string, unknown>).id !== "string"
+          ) {
+            throw new NarrationUploadProcessingError(
+              "Narration ingest policy evidence is unavailable.",
+              "narration_upload.policy_unavailable",
+              true,
+            );
+          }
+          return (policyValue as Record<string, string>).id;
+        })();
+    const attestationId =
+      processingState.attestationId ??
+      deterministicNarrationUploadUuid(
+        input.preparation.uploadVersionId,
+        "attestation",
+      );
     const attested = await rpc(client, "command_attest_episode_narration_upload", {
       p_alignment_hash: sha256(postgresJsonbText(alignment)),
       p_alignment_json: alignment,
       p_attestation_id: attestationId,
       p_decompressed_bytes: scanned.decompressedBytes,
       p_duration_ms: scanned.durationMs,
-      p_policy_version_id: (policyValue as Record<string, string>).id,
+      p_policy_version_id: policyVersionId,
       p_probe_sha256: scanned.probeSha256,
       p_quality_evidence: qualityEvidence,
       p_quality_evidence_hash: sha256(postgresJsonbText(qualityEvidence)),
@@ -431,7 +508,10 @@ export async function processNarrationUpload(input: {
         "narration_upload.attestation_malformed",
       );
     }
-    const assetVersionId = randomUUID();
+    const assetVersionId = deterministicNarrationUploadUuid(
+      input.preparation.uploadVersionId,
+      "asset-version",
+    );
     finalObjectName = `${input.workspaceId}/narration/${input.preparation.stableAssetId}/${assetVersionId}/source`;
     const storageVersion = await uploadOrVerify(
       client,
@@ -440,6 +520,10 @@ export async function processNarrationUpload(input: {
       scanned.outputBytes,
       "audio/mpeg",
     );
+    finalObjectCleanupAllowed = true;
+    // Once promotion starts, a lost response may hide a committed transaction.
+    // Retain the deterministic object and let the next attempt reconcile it.
+    finalObjectCleanupAllowed = false;
     const promotion = await rpc(client, "command_promote_episode_narration_upload", {
       p_asset_version_id: assetVersionId,
       p_attestation_id: attestationId,
@@ -461,6 +545,8 @@ export async function processNarrationUpload(input: {
     const promotedAssetVersionId = (promotion as Record<string, string>).assetVersionId;
     if (promotedAssetVersionId !== assetVersionId && finalObjectName) {
       await client.storage.from("workspace-media").remove([finalObjectName]);
+      finalObjectName = null;
+    } else {
       finalObjectName = null;
     }
     const result = await completedUpload(
@@ -508,7 +594,7 @@ export async function processNarrationUpload(input: {
         // The original failure remains authoritative; rejection is best effort.
       }
     }
-    if (finalObjectName) {
+    if (finalObjectName && finalObjectCleanupAllowed) {
       await client.storage
         .from("workspace-media")
         .remove([finalObjectName])

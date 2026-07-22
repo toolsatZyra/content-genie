@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  authoritativeNarrationSourceIsConfirmed,
   configurationConfirmationGate,
   creationAccessForEpisode,
   lookAvailabilityCanBeSelected,
@@ -34,6 +35,42 @@ describe("creation lifecycle access", () => {
 });
 
 describe("creation choice confirmation", () => {
+  it("accepts only the confirmation authority for the selected narration source", () => {
+    const humanId = "10000000-0000-4000-8000-000000000001";
+    const confirmedAt = "2026-07-22T10:00:00.000Z";
+
+    expect(
+      authoritativeNarrationSourceIsConfirmed({
+        narrationSourceConfirmedAt: confirmedAt,
+        narrationSourceConfirmedBy: humanId,
+        narrationSourceKind: "uploaded_audio",
+        selectedNarrationUploadVersionId: "10000000-0000-4000-8000-000000000002",
+        voiceConfirmedAt: null,
+        voiceConfirmedBy: null,
+      }),
+    ).toBe(true);
+    expect(
+      authoritativeNarrationSourceIsConfirmed({
+        narrationSourceConfirmedAt: confirmedAt,
+        narrationSourceConfirmedBy: humanId,
+        narrationSourceKind: "uploaded_audio",
+        selectedNarrationUploadVersionId: null,
+        voiceConfirmedAt: confirmedAt,
+        voiceConfirmedBy: humanId,
+      }),
+    ).toBe(false);
+    expect(
+      authoritativeNarrationSourceIsConfirmed({
+        narrationSourceConfirmedAt: null,
+        narrationSourceConfirmedBy: null,
+        narrationSourceKind: "elevenlabs_v3",
+        selectedNarrationUploadVersionId: null,
+        voiceConfirmedAt: confirmedAt,
+        voiceConfirmedBy: humanId,
+      }),
+    ).toBe(true);
+  });
+
   it("distinguishes untouched system defaults from explicit human confirmation", () => {
     expect(projectCreativeChoiceConfirmation(null, null)).toEqual({
       confirmedAt: null,

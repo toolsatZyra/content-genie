@@ -4,6 +4,10 @@ import { createHash } from "node:crypto";
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import {
+  BoundedResponseBodyError,
+  readResponseBodyBounded,
+} from "@/server/bounded-response-body";
+import {
   compileElevenLabsSfx,
   ELEVENLABS_SFX_ENDPOINT,
   ELEVENLABS_SFX_MAX_AUDIO_BYTES,
@@ -577,19 +581,19 @@ export async function advanceNextMvpSfx(): Promise<boolean> {
         "SFX_PROVIDER_FAILED",
       );
     }
-    const declared = Number(response.headers.get("content-length") ?? "0");
-    if (
-      !Number.isSafeInteger(declared) ||
-      declared < 0 ||
-      declared > ELEVENLABS_SFX_MAX_AUDIO_BYTES
-    ) {
+    try {
+      responseBytes = await readResponseBodyBounded(
+        response,
+        ELEVENLABS_SFX_MAX_AUDIO_BYTES,
+      );
+    } catch (caught) {
+      if (!(caught instanceof BoundedResponseBodyError)) throw caught;
       throw new MvpSfxProductionError(
         "The ElevenLabs SFX response exceeded its media bound.",
         "SFX_MEDIA_INVALID",
         false,
       );
     }
-    responseBytes = Buffer.from(await response.arrayBuffer());
     const validated = validateElevenLabsSfxResponse({
       bytes: responseBytes,
       characterCostHeader: response.headers.get("character-cost"),

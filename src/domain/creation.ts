@@ -32,11 +32,11 @@ export type ConfigurationConfirmationBlocker =
 export interface CreationNarrationUpload {
   readonly assetVersionId: string | null;
   readonly comparisonEvidence: Readonly<Record<string, unknown>>;
-  readonly durationMs: number;
+  readonly durationMs: number | null;
   readonly id: string;
   readonly originalFilename: string;
   readonly state: string;
-  readonly transcriptionText: string;
+  readonly transcriptionText: string | null;
 }
 
 export interface CreationConfiguration {
@@ -132,6 +132,24 @@ export function configurationConfirmationGate(
     blockers.push("look_human_confirmation_required");
   }
   return { blockers, canProgress: blockers.length === 0 };
+}
+
+export function authoritativeNarrationSourceIsConfirmed(configuration: {
+  readonly narrationSourceConfirmedAt: string | null;
+  readonly narrationSourceConfirmedBy: string | null;
+  readonly narrationSourceKind: "elevenlabs_v3" | "uploaded_audio";
+  readonly selectedNarrationUploadVersionId: string | null;
+  readonly voiceConfirmedAt: string | null;
+  readonly voiceConfirmedBy: string | null;
+}): boolean {
+  if (configuration.narrationSourceKind === "uploaded_audio") {
+    return Boolean(
+      configuration.selectedNarrationUploadVersionId &&
+      configuration.narrationSourceConfirmedAt &&
+      configuration.narrationSourceConfirmedBy,
+    );
+  }
+  return Boolean(configuration.voiceConfirmedAt && configuration.voiceConfirmedBy);
 }
 
 export function creationAccessForEpisode(

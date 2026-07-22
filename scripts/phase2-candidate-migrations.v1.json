@@ -116,6 +116,12 @@
     "supabase/migrations/20260722125600_owner_uploaded_narration_source_enum.sql",
     "supabase/migrations/20260722125603_owner_uploaded_narration_source.sql",
     "supabase/migrations/20260722125830_owner_uploaded_narration_qc_authority.sql",
-    "supabase/migrations/20260722184000_owner_uploaded_narration_release_inheritance.sql"
+    "supabase/migrations/20260722184000_owner_uploaded_narration_release_inheritance.sql",
+    "supabase/migrations/20260722190001_owner_uploaded_narration_processing_recovery.sql",
+    "supabase/migrations/20260722190002_owner_uploaded_narration_world_authority.sql",
+    "supabase/migrations/20260722191000_mvp_review_confirmation_and_legacy_grounding.sql",
+    "supabase/migrations/20260722192000_mvp_media_actual_cost_and_storyboard_quote.sql",
+    "supabase/migrations/20260722192001_mvp_sfx_actual_cost_receipts.sql",
+    "supabase/migrations/20260722193000_mvp_review_owner_authority_restoration.sql"
   ]
 }

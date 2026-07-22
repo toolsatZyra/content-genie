@@ -6,7 +6,9 @@ import { setTimeout as delay } from "node:timers/promises";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import {
   MvpMediaProviderBrokerError,
+  fetchMvpFalQueueResult,
   submitMvpFalProvider,
+  type MvpFalBilledResult,
   type MvpFalControl,
 } from "@/server/mvp-media-provider-broker";
 
@@ -307,15 +309,47 @@ export async function dispatchMvpFalMedia(
 }
 
 export async function completeMvpMediaDispatchOutput(input: {
+  billingEvidenceSha256: string;
+  billableUnits: number;
   externalRequestId: string;
   outputContentSha256: string;
   providerDispatchId: string;
 }): Promise<void> {
   await rpc("command_complete_mvp_media_dispatch_output", {
+    p_actual_billable_units: input.billableUnits,
+    p_billing_evidence_sha256: input.billingEvidenceSha256,
     p_dispatch_id: input.providerDispatchId,
     p_external_request_id: input.externalRequestId,
     p_output_content_sha256: input.outputContentSha256,
   });
+}
+
+export async function fetchMvpFalBilledResultForDispatch(input: {
+  externalRequestId: string;
+  providerDispatchId: string;
+  responseUrl: string;
+  timeoutMs: number;
+}): Promise<MvpFalBilledResult> {
+  try {
+    return await fetchMvpFalQueueResult(input.responseUrl, input.timeoutMs);
+  } catch (caught) {
+    if (
+      caught instanceof MvpMediaProviderBrokerError &&
+      caught.safeCode === "PROVIDER_BILLING_UNRECONCILED"
+    ) {
+      await rpc("command_record_mvp_media_billing_unreconciled", {
+        p_dispatch_id: input.providerDispatchId,
+        p_error_summary: caught.message.slice(0, 500),
+        p_external_request_id: input.externalRequestId,
+      });
+      throw new MvpMediaDispatchError(
+        caught.message,
+        "PROVIDER_BILLING_UNRECONCILED",
+        true,
+      );
+    }
+    throw caught;
+  }
 }
 
 export async function reconcileMvpMediaDispatchWebhook(input: {

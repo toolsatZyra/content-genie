@@ -911,7 +911,7 @@ $sql$,'World Lock uses one current authenticated vertical-video capability');
 select is(
   jsonb_array_length(public.command_ensure_production_allowance_rates(
     'b1100000-0000-4000-8000-000000000001')),
-  7,'the integration quote carries every mandatory production allowance'
+  8,'the integration quote carries every mandatory production allowance'
 );
 select public.command_record_authenticated_voice_canary(
   configuration.voice_version_id,
@@ -1064,6 +1064,9 @@ join public.world_reference_pack_versions pack
 join public.cultural_policy_versions policy on policy.id=packet.policy_version_id
 where packet.id='b2100000-0000-4000-8000-000000000001';
 set local session_replication_role=origin;
+select is(coalesce(recorded.result->>'machineState','__missing__'),'eligible',
+  'the complete World fixture records its exact P2-09 cultural bundle before qualified approval')
+from (
 with claims as (
   select jsonb_agg(jsonb_build_object(
     'category',required.category,
@@ -1110,9 +1113,8 @@ with claims as (
   ) as result
   from claims,assessments,contract
 )
-select is(recorded.result->>'machineState','eligible',
-  'the complete World fixture records its exact P2-09 cultural bundle before qualified approval')
-from recorded;
+select result from recorded
+) recorded;
 reset role;
 select set_config('request.jwt.claims','{"sub":"b1200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2","session_id":"b1210000-0000-4000-8000-000000000001"}',true);
 select set_config('request.jwt.claim.sub','b1200000-0000-4000-8000-000000000001',true);

@@ -71,6 +71,12 @@ function creationProjectionKey(projection: CreationProjection): string {
 function canResumeCreationInLook(projection: CreationProjection): boolean {
   const configuration = projection.configuration;
   if (!projection.script || !configuration) return false;
+  if (
+    configuration.narrationUpload &&
+    configuration.narrationUpload.state !== "confirmed"
+  ) {
+    return false;
+  }
 
   if (configuration.narrationSourceKind === "uploaded_audio") {
     return Boolean(
@@ -189,6 +195,7 @@ export default async function CreationPage({
       "phase2-ambiguous-script",
       "phase2-stale-script",
       "phase2-script",
+      "phase2-pending-narration",
       "phase2-divine-look",
       "phase2-advertising-look",
       "phase2-withdrawn-look",
@@ -230,7 +237,23 @@ export default async function CreationPage({
       query.fixture === "phase2-read-only-no-script"
         ? deterministicReadOnlyNoScriptCreationProjection()
         : projection;
-    if (query.fixture === "phase2-world") {
+    if (query.fixture === "phase2-pending-narration" && projection.configuration) {
+      fixtureProjection = {
+        ...projection,
+        configuration: {
+          ...projection.configuration,
+          narrationUpload: {
+            assetVersionId: null,
+            comparisonEvidence: {},
+            durationMs: null,
+            id: "10000000-0000-4000-8000-000000000140",
+            originalFilename: "owner-narration-processing.wav",
+            state: "prepared",
+            transcriptionText: null,
+          },
+        },
+      };
+    } else if (query.fixture === "phase2-world") {
       fixtureProjection = deterministicReadyCreationProjection("review");
     } else if (query.fixture === "phase2-world-ready") {
       fixtureProjection = deterministicReadyCreationProjection("ready");

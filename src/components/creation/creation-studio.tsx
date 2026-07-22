@@ -106,12 +106,12 @@ interface PendingUploadedScript {
 interface NarrationUploadView {
   readonly assetVersionId: string | null;
   readonly comparisonEvidence: Readonly<Record<string, unknown>>;
-  readonly durationMs: number;
+  readonly durationMs: number | null;
   readonly id: string;
   readonly originalFilename: string;
   readonly signedUrl: string | null;
   readonly state: string;
-  readonly transcriptionText: string;
+  readonly transcriptionText: string | null;
 }
 
 interface NarrationUploadMutationResult {
@@ -1412,7 +1412,8 @@ export function CreationStudio({
     if (
       !canEditCreation ||
       projection.episode.workflowState !== "world_setup" ||
-      !projection.configuration
+      !projection.configuration ||
+      narrationUploadAwaitingConfirmation
     )
       return;
     const voice = voiceForGender(gender);
@@ -2648,6 +2649,7 @@ export function CreationStudio({
                   disabled={
                     !canEditCreation ||
                     !configurationReady ||
+                    narrationUploadAwaitingConfirmation ||
                     working ||
                     !voiceAvailabilityCanBeSelected(
                       projection.configuration?.voiceAvailabilityByVersionId[
@@ -2719,7 +2721,9 @@ export function CreationStudio({
                 <span className="voice-validation">
                   {narrationUploadProgress ||
                     (narrationUpload
-                      ? `${narrationUpload.originalFilename} · ${Math.round(narrationUpload.durationMs / 1000)} sec`
+                      ? narrationUpload.durationMs === null
+                        ? `${narrationUpload.originalFilename} · processing`
+                        : `${narrationUpload.originalFilename} · ${Math.round(narrationUpload.durationMs / 1000)} sec`
                       : "ElevenLabs generation will be skipped")}
                 </span>
                 <em>
@@ -2753,7 +2757,11 @@ export function CreationStudio({
                     <span className="eyebrow">Transcript comparison</span>
                     <h2>{narrationUpload.originalFilename}</h2>
                   </div>
-                  <span>{Math.round(narrationUpload.durationMs / 1000)} sec</span>
+                  <span>
+                    {narrationUpload.durationMs === null
+                      ? "Processing"
+                      : `${Math.round(narrationUpload.durationMs / 1000)} sec`}
+                  </span>
                 </div>
                 {narrationUpload.signedUrl ? (
                   <audio
@@ -2762,23 +2770,33 @@ export function CreationStudio({
                     preload="metadata"
                     src={narrationUpload.signedUrl}
                   />
-                ) : (
+                ) : narrationUpload.assetVersionId ? (
                   <p role="status">Opening the secure audio preview...</p>
+                ) : (
+                  <p role="status">
+                    The uploaded audio is still being inspected. It remains pending and
+                    no other narration can bypass this review.
+                  </p>
                 )}
-                <p className="narration-comparison" role="status">
-                  {narrationComparisonSummary(narrationUpload.comparisonEvidence)}
-                </p>
-                <div className="narration-transcript">
-                  <strong>Transcribed narration</strong>
-                  <p lang="hi">{narrationUpload.transcriptionText}</p>
-                </div>
+                {narrationUpload.transcriptionText ? (
+                  <>
+                    <p className="narration-comparison" role="status">
+                      {narrationComparisonSummary(narrationUpload.comparisonEvidence)}
+                    </p>
+                    <div className="narration-transcript">
+                      <strong>Transcribed narration</strong>
+                      <p lang="hi">{narrationUpload.transcriptionText}</p>
+                    </div>
+                  </>
+                ) : null}
                 {narrationSourceKind === "uploaded_audio" &&
                 narrationSourceConfirmed ? (
                   <p className="narration-final-note">
                     Uploaded audio and this transcription are final for this Episode.
                     The earlier script revision remains preserved in its history.
                   </p>
-                ) : (
+                ) : narrationUpload.state === "verified" &&
+                  narrationUpload.transcriptionText ? (
                   <button
                     className="creation-secondary narration-confirm"
                     disabled={working}
@@ -2787,7 +2805,7 @@ export function CreationStudio({
                   >
                     Use this audio and transcript
                   </button>
-                )}
+                ) : null}
               </section>
             ) : null}
             {projection.configuration ? (

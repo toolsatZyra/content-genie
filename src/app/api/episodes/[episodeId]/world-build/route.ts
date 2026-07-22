@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { after, NextResponse, type NextRequest } from "next/server";
 
 import { getServerEnvironment } from "@/config/server-env";
+import { authoritativeNarrationSourceIsConfirmed } from "@/domain/creation";
 import {
   parseWorldBuildRequest,
   WORLD_BUILD_MAX_BODY_BYTES,
@@ -124,7 +125,7 @@ export async function POST(
     const { data: configuration, error: scopeError } = await userClient
       .from("episode_configuration_candidates")
       .select(
-        "id,aggregate_version,script_revision_id,state,voice_confirmed_at,look_confirmed_at",
+        "id,aggregate_version,script_revision_id,state,voice_confirmed_at,voice_confirmed_by,look_confirmed_at,narration_source_kind,selected_narration_upload_version_id,narration_source_confirmed_at,narration_source_confirmed_by",
       )
       .eq("id", input.configurationCandidateId)
       .eq("workspace_id", input.workspaceId)
@@ -133,7 +134,15 @@ export async function POST(
     if (
       scopeError ||
       !configuration ||
-      !configuration.voice_confirmed_at ||
+      !authoritativeNarrationSourceIsConfirmed({
+        narrationSourceConfirmedAt: configuration.narration_source_confirmed_at,
+        narrationSourceConfirmedBy: configuration.narration_source_confirmed_by,
+        narrationSourceKind: configuration.narration_source_kind,
+        selectedNarrationUploadVersionId:
+          configuration.selected_narration_upload_version_id,
+        voiceConfirmedAt: configuration.voice_confirmed_at,
+        voiceConfirmedBy: configuration.voice_confirmed_by,
+      }) ||
       !configuration.look_confirmed_at ||
       !["world_design", "preflight"].includes(configuration.state)
     ) {

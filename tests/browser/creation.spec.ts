@@ -1134,6 +1134,33 @@ test.describe("Living Cinema creation flow", () => {
     expect(commands).toEqual(["episode.voice.select"]);
   });
 
+  test("keeps a prepared narration upload blocking bypass after reload", async ({
+    page,
+  }) => {
+    await page.goto(
+      `/episodes/${episodeId}/create?fixture=phase2-pending-narration&resumeCreation=look`,
+    );
+
+    const review = page.getByRole("region", { name: "Uploaded narration review" });
+    await expect(
+      page.getByRole("heading", { name: "Who carries the story?" }),
+    ).toBeVisible();
+    await expect(review).toContainText("owner-narration-processing.wav");
+    await expect(review).toContainText("still being inspected");
+    await expect(
+      page.getByRole("button", { name: /Male Target: expressive Hindi/ }),
+    ).toBeDisabled();
+    await expect(
+      page.getByRole("button", { name: /Female Target: expressive Hindi/ }),
+    ).toBeDisabled();
+    await expect(nextStageButton(page, "Look")).toBeDisabled();
+
+    await page.reload();
+    await expect(review).toContainText("owner-narration-processing.wav");
+    await expect(review).toContainText("still being inspected");
+    await expect(nextStageButton(page, "Look")).toBeDisabled();
+  });
+
   test("requires explicit human confirmation for system-default voice and look", async ({
     page,
   }) => {

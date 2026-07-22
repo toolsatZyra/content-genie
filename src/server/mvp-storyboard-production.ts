@@ -11,6 +11,10 @@ import { compileImagePrompt, findLookByVersionId } from "@/domain/look/look-regi
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { launchMediaLimits, sniffMediaMagic } from "@/security/media-ingest";
 import {
+  BoundedResponseBodyError,
+  readResponseBodyBounded,
+} from "@/server/bounded-response-body";
+import {
   inspectStillImageContainer,
   inspectStillImageDimensions,
   type StillImageMime,
@@ -35,6 +39,7 @@ import {
 import {
   completeMvpMediaDispatchOutput,
   dispatchMvpFalMedia,
+  fetchMvpFalBilledResultForDispatch,
   MvpMediaDispatchError,
 } from "@/server/mvp-media-dispatch";
 import { fetchMvpFalQueueJson } from "@/server/mvp-media-provider-broker";
@@ -42,6 +47,7 @@ import { fetchMvpFalQueueJson } from "@/server/mvp-media-provider-broker";
 const MEDIA_BUCKET = "workspace-media";
 const MAXIMUM_SHOTS = 80;
 const MAXIMUM_SUBMISSIONS_PER_PASS = 5;
+const STORYBOARD_FRAME_COST_MICROUSD = 122_000;
 const MAXIMUM_POLLS_PER_PASS = 8;
 
 export type MvpSubmissionJob = Readonly<{
@@ -402,8 +408,20 @@ async function pollStoryboardFrame(frame: StoryboardFrame): Promise<boolean> {
     }
     return false;
   }
-  const result = await fetchMvpFalQueueJson(frame.response_url, 60_000);
-  const images = result.images;
+  if (!frame.provider_dispatch_id) {
+    throw new MvpStoryboardProductionError(
+      "The storyboard result is missing provider dispatch evidence.",
+      "PRODUCTION_COST_AUTHORITY_UNAVAILABLE",
+      false,
+    );
+  }
+  const billedResult = await fetchMvpFalBilledResultForDispatch({
+    externalRequestId: frame.external_request_id,
+    providerDispatchId: frame.provider_dispatch_id,
+    responseUrl: frame.response_url,
+    timeoutMs: 60_000,
+  });
+  const images = billedResult.data.images;
   if (!Array.isArray(images) || images.length !== 1) {
     throw new MvpStoryboardProductionError(
       "The storyboard result does not contain exactly one frame.",
@@ -432,17 +450,26 @@ async function pollStoryboardFrame(frame: StoryboardFrame): Promise<boolean> {
     redirect: "error",
     signal: AbortSignal.timeout(120_000),
   });
-  const declared = Number(mediaResponse.headers.get("content-length") ?? "0");
-  if (
-    !mediaResponse.ok ||
-    (declared > 0 && declared > launchMediaLimits.maximumImageBytes)
-  ) {
+  if (!mediaResponse.ok) {
     throw new MvpStoryboardProductionError(
       "The storyboard image could not be downloaded safely.",
       "PROVIDER_MEDIA_UNAVAILABLE",
     );
   }
-  const bytes = Buffer.from(await mediaResponse.arrayBuffer());
+  let bytes: Buffer;
+  try {
+    bytes = await readResponseBodyBounded(
+      mediaResponse,
+      launchMediaLimits.maximumImageBytes,
+    );
+  } catch (caught) {
+    if (!(caught instanceof BoundedResponseBodyError)) throw caught;
+    throw new MvpStoryboardProductionError(
+      "The storyboard image could not be downloaded safely.",
+      "PROVIDER_MEDIA_UNAVAILABLE",
+      false,
+    );
+  }
   const dimensions = inspectStillImageDimensions(bytes, mime as StillImageMime);
   const providerWidth = media.width == null ? null : Number(media.width);
   const providerHeight = media.height == null ? null : Number(media.height);
@@ -566,13 +593,13 @@ async function pollStoryboardFrame(frame: StoryboardFrame): Promise<boolean> {
       );
     }
   }
-  if (frame.provider_dispatch_id) {
-    await completeMvpMediaDispatchOutput({
-      externalRequestId: frame.external_request_id,
-      outputContentSha256: scan.outputSha256,
-      providerDispatchId: frame.provider_dispatch_id,
-    });
-  }
+  await completeMvpMediaDispatchOutput({
+    billingEvidenceSha256: billedResult.billingEvidenceSha256,
+    billableUnits: billedResult.billableUnits,
+    externalRequestId: frame.external_request_id,
+    outputContentSha256: scan.outputSha256,
+    providerDispatchId: frame.provider_dispatch_id,
+  });
   const { error: updateError } = await client
     .from("mvp_storyboard_frame_worker")
     .update({
@@ -815,25 +842,43 @@ export async function advanceMvpStoryboardAndClipSubmission(
     .eq("workspace_id", job.workspace_id)
     .eq("id", job.production_run_id)
     .single();
-  const { data: pricedSlots, error: pricedSlotsError } = run?.production_quote_id
-    ? await client
-        .from("production_quote_lines")
-        .select(
-          "provider_request_slot_id,expected_amount_microusd,high_amount_microusd",
-        )
-        .eq("workspace_id", job.workspace_id)
-        .eq("production_quote_id", run.production_quote_id)
-        .eq("line_kind", "provider_clip")
-        .in(
-          "provider_request_slot_id",
-          slots.map(({ id }) => id),
-        )
-    : { data: null, error: runError };
+  const [pricedSlotResult, storyboardPriceResult] = run?.production_quote_id
+    ? await Promise.all([
+        client
+          .from("production_quote_lines")
+          .select(
+            "provider_request_slot_id,expected_amount_microusd,high_amount_microusd",
+          )
+          .eq("workspace_id", job.workspace_id)
+          .eq("production_quote_id", run.production_quote_id)
+          .eq("line_kind", "provider_clip")
+          .in(
+            "provider_request_slot_id",
+            slots.map(({ id }) => id),
+          ),
+        client
+          .from("production_quote_lines")
+          .select("expected_amount_microusd,high_amount_microusd")
+          .eq("workspace_id", job.workspace_id)
+          .eq("production_quote_id", run.production_quote_id)
+          .eq("line_key", "storyboard_generation")
+          .maybeSingle(),
+      ])
+    : [
+        { data: null, error: runError },
+        { data: null, error: runError },
+      ];
+  const { data: pricedSlots, error: pricedSlotsError } = pricedSlotResult;
+  const { data: storyboardPrice, error: storyboardPriceError } = storyboardPriceResult;
   if (
     runError ||
     pricedSlotsError ||
+    storyboardPriceError ||
     !pricedSlots ||
-    pricedSlots.length !== slots.length
+    pricedSlots.length !== slots.length ||
+    !storyboardPrice ||
+    Number(storyboardPrice.expected_amount_microusd) < STORYBOARD_FRAME_COST_MICROUSD ||
+    Number(storyboardPrice.high_amount_microusd) < STORYBOARD_FRAME_COST_MICROUSD
   ) {
     throw new MvpStoryboardProductionError(
       "The locked provider cost slots are unavailable.",
@@ -1204,7 +1249,7 @@ export async function advanceMvpStoryboardAndClipSubmission(
         dispatchKey: `storyboard:${shot.shot_number}:${frameRole}`,
         endpoint: contract.endpoint,
         episodeId: job.episode_id,
-        expectedCostMicrousd: 120_000,
+        expectedCostMicrousd: STORYBOARD_FRAME_COST_MICROUSD,
         inputManifestSha256: sha256(
           postgresJsonbText({
             bindingManifest,
@@ -1216,7 +1261,7 @@ export async function advanceMvpStoryboardAndClipSubmission(
             systemPrompt: contract.systemPrompt,
           }),
         ),
-        maximumCostMicrousd: 120_000,
+        maximumCostMicrousd: STORYBOARD_FRAME_COST_MICROUSD,
         mediaKind: "storyboard",
         payload,
         productionRunId: job.production_run_id,

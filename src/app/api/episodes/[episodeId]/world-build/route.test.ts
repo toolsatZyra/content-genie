@@ -86,9 +86,14 @@ describe("world-build dispatch route", () => {
         aggregate_version: 7,
         id: configurationCandidateId,
         look_confirmed_at: "2026-07-19T00:00:00Z",
+        narration_source_confirmed_at: null,
+        narration_source_confirmed_by: null,
+        narration_source_kind: "elevenlabs_v3",
+        selected_narration_upload_version_id: null,
         script_revision_id: scriptRevisionId,
         state: "world_design",
         voice_confirmed_at: "2026-07-19T00:00:00Z",
+        voice_confirmed_by: "10000000-0000-4000-8000-000000000016",
       },
       error: null,
     });
@@ -184,9 +189,14 @@ describe("world-build dispatch route", () => {
         aggregate_version: 7,
         id: configurationCandidateId,
         look_confirmed_at: null,
+        narration_source_confirmed_at: null,
+        narration_source_confirmed_by: null,
+        narration_source_kind: "elevenlabs_v3",
+        selected_narration_upload_version_id: null,
         script_revision_id: scriptRevisionId,
         state: "world_design",
         voice_confirmed_at: "2026-07-19T00:00:00Z",
+        voice_confirmed_by: "10000000-0000-4000-8000-000000000016",
       },
       error: null,
     });
@@ -194,6 +204,35 @@ describe("world-build dispatch route", () => {
       params: Promise.resolve({ episodeId }),
     });
     expect(unconfirmed.status).toBe(403);
+  });
+
+  it("accepts confirmed uploaded narration without generated-voice confirmation", async () => {
+    mocks.scopeMaybeSingle.mockResolvedValueOnce({
+      data: {
+        aggregate_version: 7,
+        id: configurationCandidateId,
+        look_confirmed_at: "2026-07-19T00:00:00Z",
+        narration_source_confirmed_at: "2026-07-22T10:00:00Z",
+        narration_source_confirmed_by: "10000000-0000-4000-8000-000000000016",
+        narration_source_kind: "uploaded_audio",
+        script_revision_id: scriptRevisionId,
+        selected_narration_upload_version_id: "10000000-0000-4000-8000-000000000018",
+        state: "world_design",
+        voice_confirmed_at: null,
+        voice_confirmed_by: null,
+      },
+      error: null,
+    });
+
+    const response = await POST(request(), {
+      params: Promise.resolve({ episodeId }),
+    });
+
+    expect(response.status).toBe(202);
+    expect(mocks.adminRpc).toHaveBeenCalledWith(
+      "command_create_preflight_run",
+      expect.objectContaining({ p_script_revision_id: scriptRevisionId }),
+    );
   });
 
   it("fails closed when the bounded World authority is denied", async () => {

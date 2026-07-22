@@ -145,6 +145,29 @@ describe("MVP production commands", () => {
     });
   });
 
+  it("does not fabricate a cultural approval when the owner has not confirmed it", async () => {
+    const response = await POST(
+      request({
+        action: "review",
+        culturalReviewConfirmed: false,
+        decision: "approve",
+        expectedVersion: 4,
+        feedback: "",
+        finalReviewConfirmed: true,
+        masterId,
+        workspaceId,
+      }),
+      { params: Promise.resolve({ episodeId }) },
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "CULTURAL_REVIEW_CONFIRMATION_REQUIRED",
+      ok: false,
+    });
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
   it("rejects extra request fields before a database command", async () => {
     const response = await POST(
       request({

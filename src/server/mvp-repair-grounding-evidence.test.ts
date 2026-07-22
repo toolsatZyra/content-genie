@@ -193,6 +193,50 @@ describe("MVP repair grounding evidence", () => {
     ]);
   });
 
+  it("records an explicit audit-only legacy storyboard migration without false feedback lineage", () => {
+    const legacyShot = {
+      ...shot(1),
+      storyboardCompositionMode: "split_screen_two_state" as const,
+    };
+    const preparation = prepareMvpRepairDirector({
+      clarificationTranscript: [],
+      continuityEdges: [],
+      immutableOwnerFeedback: "At 00:04.000, make the motion in shot 2 faster.",
+      shots: [legacyShot, shot(2), shot(3)],
+      sourceEddHash: "f".repeat(64),
+      totalShots: 3,
+    });
+    const legacyMigration = {
+      ...action(1, "regenerate_storyboard_and_clip", [], [1]),
+      revisedFields: {
+        ...revised(1),
+        storyboardCompositionMode: "single_frame" as const,
+        storyboardEndPromptBlueprint: null,
+      },
+    };
+    const compiled = compileMvpRepairDirectorOutput(preparation, {
+      actions: [
+        legacyMigration,
+        action(2, "regenerate_clip", [1], [2]),
+        action(3, "reuse_all"),
+      ],
+      clarification: null,
+      decision: "repair",
+      overallInterpretation:
+        "Migrate the audit-only legacy board and repair the requested motion.",
+    });
+    const evidence = compileMvpRepairGroundingEvidence(preparation, compiled);
+
+    expect(evidence.actionGrounding).toMatchObject([
+      {
+        feedbackPointIndexes: [],
+        selectedAction: "legacy_storyboard_migration",
+        shotNumber: 1,
+      },
+      { feedbackPointIndexes: [1], selectedAction: "clip_only", shotNumber: 2 },
+    ]);
+  });
+
   it("hashes the exact safe bundle independently of object insertion order", () => {
     const bundle = {
       actionGroundingSha256: "1".repeat(64),

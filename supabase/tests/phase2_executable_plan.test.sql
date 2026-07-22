@@ -970,7 +970,7 @@ select ok(
 select is(
   jsonb_array_length(public.command_ensure_production_allowance_rates(
     'c1100000-0000-4000-8000-000000000001')),
-  7,'the quote compiler registers all seven mandatory allowance rates'
+  8,'the quote compiler registers all eight mandatory allowance rates'
 );
 select is(
   (select jsonb_agg(jsonb_build_array(
@@ -979,7 +979,7 @@ select is(
   ) order by rate.rate_key)
   from private.production_rate_card_versions rate
   where rate.rate_key=any(array[
-    'upscale','narration_master_reuse','score_music','sfx_ambience',
+    'upscale','narration_master_reuse','score_music','sfx_ambience','storyboard_generation',
     'qc_judges','render_export','repair_allowance'
   ])),
   '[
@@ -988,7 +988,8 @@ select is(
     ["render_export","render_minute",500000,1,1500000],
     ["repair_allowance","episode",500000,1,1000000],
     ["score_music","episode",1250000,1,2500000],
-    ["sfx_ambience","episode",500000,1,1000000],
+    ["sfx_ambience","credit",100,0,1000000],
+    ["storyboard_generation","billing_quantum",80000,0,50000000],
     ["upscale","minute",1200000,0,5000000]
   ]'::jsonb,
   'allowance quantities and conservative microusd ceilings are exact'
@@ -996,15 +997,15 @@ select is(
 select is(
   jsonb_array_length(public.command_ensure_production_allowance_rates(
     'c1100000-0000-4000-8000-000000000001')),
-  7,'allowance-rate registration is replay-safe'
+  8,'allowance-rate registration is replay-safe'
 );
 select is(
   (select count(*) from private.production_rate_card_versions rate
     where rate.rate_key=any(array[
-      'upscale','narration_master_reuse','score_music','sfx_ambience',
+      'upscale','narration_master_reuse','score_music','sfx_ambience','storyboard_generation',
       'qc_judges','render_export','repair_allowance'
     ])),
-  7::bigint,'allowance-rate replay does not mint duplicate versions'
+  8::bigint,'allowance-rate replay does not mint duplicate versions'
 );
 select ok(
   not has_function_privilege(
@@ -1020,7 +1021,7 @@ select ok(
   position('state=''qc_passed'''
     in pg_get_functiondef(
       'public.get_production_quote_input(uuid,uuid,uuid[])'::regprocedure))>0
-  and position('jsonb_array_length(coalesce(allowance_value,''[]''::jsonb))<>7'
+  and position('jsonb_array_length(coalesce(allowance_value,''[]''::jsonb))<>8'
     in pg_get_functiondef(
       'public.get_production_quote_input(uuid,uuid,uuid[])'::regprocedure))>0,
   'quote input requires a passed plan and every mandatory allowance'

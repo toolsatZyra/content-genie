@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   admin: vi.fn(),
   rpc: vi.fn(),
+  result: vi.fn(),
   submit: vi.fn(),
 }));
 
@@ -13,11 +14,16 @@ vi.mock("@/lib/supabase/admin", () => ({
 vi.mock("@/server/mvp-media-provider-broker", async (importOriginal) => {
   const original =
     await importOriginal<typeof import("@/server/mvp-media-provider-broker")>();
-  return { ...original, submitMvpFalProvider: mocks.submit };
+  return {
+    ...original,
+    fetchMvpFalQueueResult: mocks.result,
+    submitMvpFalProvider: mocks.submit,
+  };
 });
 
 import {
   dispatchMvpFalMedia,
+  fetchMvpFalBilledResultForDispatch,
   MvpMediaDispatchError,
   reconcileMvpMediaDispatchWebhook,
 } from "./mvp-media-dispatch";
@@ -159,6 +165,55 @@ describe("durable MVP media dispatch", () => {
         p_dispatch_id: ids.dispatch,
         p_external_request_id: control.externalRequestId,
       },
+    );
+  });
+
+  it("returns exact billed output evidence without an extra ledger transition", async () => {
+    const result = {
+      billingEvidenceSha256: "b".repeat(64),
+      billableUnits: 1.525,
+      data: { images: [] },
+    };
+    mocks.result.mockResolvedValue(result);
+
+    await expect(
+      fetchMvpFalBilledResultForDispatch({
+        externalRequestId: control.externalRequestId,
+        providerDispatchId: ids.dispatch,
+        responseUrl: control.responseUrl,
+        timeoutMs: 5_000,
+      }),
+    ).resolves.toEqual(result);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it("records missing provider billing evidence as unreconciled, never zero", async () => {
+    mocks.result.mockRejectedValue(
+      new MvpMediaProviderBrokerError(
+        "The provider result is missing exact billing evidence.",
+        "terminal",
+        "PROVIDER_BILLING_UNRECONCILED",
+      ),
+    );
+    mocks.rpc.mockResolvedValue({ data: dispatchRow("submitted"), error: null });
+
+    await expect(
+      fetchMvpFalBilledResultForDispatch({
+        externalRequestId: control.externalRequestId,
+        providerDispatchId: ids.dispatch,
+        responseUrl: control.responseUrl,
+        timeoutMs: 5_000,
+      }),
+    ).rejects.toMatchObject({
+      retryable: true,
+      safeCode: "PROVIDER_BILLING_UNRECONCILED",
+    });
+    expect(mocks.rpc).toHaveBeenCalledWith(
+      "command_record_mvp_media_billing_unreconciled",
+      expect.objectContaining({
+        p_dispatch_id: ids.dispatch,
+        p_external_request_id: control.externalRequestId,
+      }),
     );
   });
 

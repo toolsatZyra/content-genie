@@ -24,7 +24,8 @@ const allowanceDefinitions = [
   ["render_export", "render_minute", 500_000, 1, 1_500_000],
   ["repair_allowance", "episode", 500_000, 1, 1_000_000],
   ["score_music", "episode", 1_250_000, 1, 2_500_000],
-  ["sfx_ambience", "episode", 500_000, 1, 1_000_000],
+  ["sfx_ambience", "credit", 100, 0, 1_000_000],
+  ["storyboard_generation", "billing_quantum", 80_000, 0, 50_000_000],
   ["upscale", "minute", 1_200_000, 0, 5_000_000],
 ] as const;
 
@@ -71,6 +72,7 @@ function quoteInput(providerUnitPriceMicrousd = 300_000) {
     planQcConsensusId: id("6"),
     rateExpiresAt: expiresAt,
     slots,
+    storyboardBillingQuantumCount: 3.05,
     workspaceId: id("1"),
   };
 }
@@ -87,7 +89,7 @@ describe("exact production quote compiler", () => {
 
   it("prices every immutable provider slot and all seven mandatory allowances", () => {
     const lines = compileProductionQuoteLines(quoteInput());
-    expect(lines).toHaveLength(11);
+    expect(lines).toHaveLength(12);
     expect(
       lines.slice(0, 4).map(({ expectedQuantity, highQuantity, lowQuantity }) => ({
         expectedQuantity,
@@ -100,7 +102,18 @@ describe("exact production quote compiler", () => {
       { expectedQuantity: "1.75", highQuantity: "5", lowQuantity: "0" },
       { expectedQuantity: "0.75", highQuantity: "5", lowQuantity: "0" },
     ]);
-    expect(lines.filter(({ slotId }) => slotId === "")).toHaveLength(7);
+    expect(lines.filter(({ slotId }) => slotId === "")).toHaveLength(8);
+    expect(
+      lines.find(({ lineKey }) => lineKey === "storyboard_generation"),
+    ).toMatchObject({
+      expectedAmountMicrousd: 244_000,
+      expectedQuantity: "3.05",
+      highAmountMicrousd: 244_000,
+    });
+    expect(lines.find(({ lineKey }) => lineKey === "sfx_ambience")).toMatchObject({
+      expectedAmountMicrousd: 500_000,
+      highAmountMicrousd: 1_000_000,
+    });
     expect(lines.find(({ lineKey }) => lineKey === "upscale")).toMatchObject({
       expectedQuantity: "0.25",
       highAmountMicrousd: 300_000,
@@ -158,7 +171,7 @@ describe("exact production quote compiler", () => {
       p_quote_hash: preparedQuoteHash,
       p_workspace_id: id("1"),
     });
-    expect(recordCall[1].p_lines).toHaveLength(11);
+    expect(recordCall[1].p_lines).toHaveLength(12);
     expect(mocks.rpc.mock.calls.some(([name]) => name.includes("authorization"))).toBe(
       false,
     );

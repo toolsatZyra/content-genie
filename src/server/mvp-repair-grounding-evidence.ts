@@ -13,6 +13,8 @@ import { postgresJsonbText } from "@/server/world-anchor-provider";
 export type MvpRepairFeedbackResolution = "clarification" | "deterministic" | "model";
 
 export type MvpRepairSelectedAction = "clip_only" | "re_edit" | "storyboard_and_clip";
+export type MvpRepairGroundingSelectedAction =
+  MvpRepairSelectedAction | "legacy_storyboard_migration";
 
 export type MvpRepairFeedbackPointEvidence = Readonly<{
   evidenceWindows: readonly MvpRepairEvidenceWindow[];
@@ -26,7 +28,7 @@ export type MvpRepairFeedbackPointEvidence = Readonly<{
 export type MvpRepairActionGroundingEvidence = Readonly<{
   actionEvidenceSha256: string;
   feedbackPointIndexes: readonly number[];
-  selectedAction: MvpRepairSelectedAction;
+  selectedAction: MvpRepairGroundingSelectedAction;
   shotNumber: number;
 }>;
 
@@ -149,7 +151,14 @@ export function compileMvpRepairGroundingEvidence(
                 ...(direct?.feedbackPointIndexes ?? []),
                 ...dependencyIndexes,
               ]);
-              if (feedbackPointIndexes.length < 1) {
+              const sourceShot = preparation.sourceShots[action.shotNumber - 1];
+              const revised = compiled.revisedFieldsByShot.get(action.shotNumber);
+              const isLegacyStoryboardMigration =
+                feedbackPointIndexes.length === 0 &&
+                direct?.action === "regenerate_storyboard_and_clip" &&
+                sourceShot?.storyboardCompositionMode === "split_screen_two_state" &&
+                revised !== undefined;
+              if (feedbackPointIndexes.length < 1 && !isLegacyStoryboardMigration) {
                 throw new MvpRepairGroundingEvidenceError(
                   `Repair action ${action.shotNumber} has no feedback-point lineage.`,
                 );
@@ -157,7 +166,9 @@ export function compileMvpRepairGroundingEvidence(
               return withHash(
                 Object.freeze({
                   feedbackPointIndexes,
-                  selectedAction: selectedAction(action.action),
+                  selectedAction: isLegacyStoryboardMigration
+                    ? "legacy_storyboard_migration"
+                    : selectedAction(action.action),
                   shotNumber: action.shotNumber,
                 }),
                 "actionEvidenceSha256",

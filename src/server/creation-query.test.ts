@@ -94,6 +94,10 @@ function successfulResults(
       },
       error: null,
     },
+    episode_narration_upload_versions: {
+      data: null,
+      error: null,
+    },
     voice_version_availability: {
       data: [
         {
@@ -280,6 +284,65 @@ describe("the creation projection query", () => {
         state: "confirmed",
         transcriptionText: "Exact words spoken in the uploaded narration.",
       },
+    });
+  });
+
+  it("projects the latest verified upload before narration-source selection", async () => {
+    const results = successfulResults();
+    results.episode_narration_upload_versions = {
+      data: {
+        script_comparison_json: { matchesLockedScript: false },
+        duration_ms: "81250",
+        id: "10000000-0000-4000-8000-000000000042",
+        promoted_asset_version_id: "10000000-0000-4000-8000-000000000043",
+        display_filename: "pending-owner-narration.wav",
+        state: "verified",
+        transcription_text: "Pending spoken narration.",
+      },
+      error: null,
+    };
+    const { client, from } = fakeClient(results);
+
+    const projection = await loadCreationProjection(client, user, episodeId);
+
+    expect(projection?.configuration).toMatchObject({
+      narrationSourceKind: "elevenlabs_v3",
+      narrationUpload: {
+        assetVersionId: "10000000-0000-4000-8000-000000000043",
+        id: "10000000-0000-4000-8000-000000000042",
+        state: "verified",
+        transcriptionText: "Pending spoken narration.",
+      },
+    });
+    expect(from).toHaveBeenCalledWith("episode_narration_upload_versions");
+  });
+
+  it("projects a prepared upload without inventing transcript or duration evidence", async () => {
+    const results = successfulResults();
+    results.episode_narration_upload_versions = {
+      data: {
+        script_comparison_json: null,
+        duration_ms: null,
+        id: "10000000-0000-4000-8000-000000000044",
+        promoted_asset_version_id: null,
+        display_filename: "still-processing.wav",
+        state: "prepared",
+        transcription_text: null,
+      },
+      error: null,
+    };
+    const { client } = fakeClient(results);
+
+    const projection = await loadCreationProjection(client, user, episodeId);
+
+    expect(projection?.configuration?.narrationUpload).toEqual({
+      assetVersionId: null,
+      comparisonEvidence: {},
+      durationMs: null,
+      id: "10000000-0000-4000-8000-000000000044",
+      originalFilename: "still-processing.wav",
+      state: "prepared",
+      transcriptionText: null,
     });
   });
 
