@@ -47,8 +47,44 @@ import { fetchMvpFalQueueJson } from "@/server/mvp-media-provider-broker";
 const MEDIA_BUCKET = "workspace-media";
 const MAXIMUM_SHOTS = 80;
 const MAXIMUM_SUBMISSIONS_PER_PASS = 5;
-const STORYBOARD_FRAME_COST_MICROUSD = 122_000;
 const MAXIMUM_POLLS_PER_PASS = 8;
+
+export type MvpStoryboardCostAuthority = Readonly<{
+  expectedCostMicrousd: number;
+  maximumCostMicrousd: number;
+  rateCardVersionId: string;
+  source: "immutable_quote" | "legacy_quote_compatibility";
+}>;
+
+export function parseMvpStoryboardCostAuthority(
+  value: unknown,
+): MvpStoryboardCostAuthority {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new MvpStoryboardProductionError(
+      "The storyboard cost authority is malformed.",
+      "PRODUCTION_COST_AUTHORITY_UNAVAILABLE",
+      false,
+    );
+  }
+  const authority = value as Record<string, unknown>;
+  if (
+    typeof authority.rateCardVersionId !== "string" ||
+    !["immutable_quote", "legacy_quote_compatibility"].includes(
+      String(authority.source),
+    ) ||
+    !Number.isSafeInteger(authority.expectedCostMicrousd) ||
+    Number(authority.expectedCostMicrousd) < 0 ||
+    !Number.isSafeInteger(authority.maximumCostMicrousd) ||
+    Number(authority.maximumCostMicrousd) < Number(authority.expectedCostMicrousd)
+  ) {
+    throw new MvpStoryboardProductionError(
+      "The storyboard cost authority is malformed.",
+      "PRODUCTION_COST_AUTHORITY_UNAVAILABLE",
+      false,
+    );
+  }
+  return authority as unknown as MvpStoryboardCostAuthority;
+}
 
 export type MvpSubmissionJob = Readonly<{
   attempt_number: number;
@@ -594,11 +630,11 @@ async function pollStoryboardFrame(frame: StoryboardFrame): Promise<boolean> {
     }
   }
   await completeMvpMediaDispatchOutput({
-    billingEvidenceSha256: billedResult.billingEvidenceSha256,
-    billableUnits: billedResult.billableUnits,
     externalRequestId: frame.external_request_id,
     outputContentSha256: scan.outputSha256,
     providerDispatchId: frame.provider_dispatch_id,
+    providerReportedBillableUnits: billedResult.providerReportedBillableUnits,
+    providerUsageEvidenceSha256: billedResult.providerUsageEvidenceSha256,
   });
   const { error: updateError } = await client
     .from("mvp_storyboard_frame_worker")
@@ -856,13 +892,10 @@ export async function advanceMvpStoryboardAndClipSubmission(
             "provider_request_slot_id",
             slots.map(({ id }) => id),
           ),
-        client
-          .from("production_quote_lines")
-          .select("expected_amount_microusd,high_amount_microusd")
-          .eq("workspace_id", job.workspace_id)
-          .eq("production_quote_id", run.production_quote_id)
-          .eq("line_key", "storyboard_generation")
-          .maybeSingle(),
+        client.rpc("get_mvp_storyboard_cost_authority", {
+          p_production_run_id: job.production_run_id,
+          p_workspace_id: job.workspace_id,
+        }),
       ])
     : [
         { data: null, error: runError },
@@ -870,15 +903,17 @@ export async function advanceMvpStoryboardAndClipSubmission(
       ];
   const { data: pricedSlots, error: pricedSlotsError } = pricedSlotResult;
   const { data: storyboardPrice, error: storyboardPriceError } = storyboardPriceResult;
+  let storyboardCostAuthority: MvpStoryboardCostAuthority | null = null;
+  if (!storyboardPriceError && storyboardPrice) {
+    storyboardCostAuthority = parseMvpStoryboardCostAuthority(storyboardPrice);
+  }
   if (
     runError ||
     pricedSlotsError ||
     storyboardPriceError ||
     !pricedSlots ||
     pricedSlots.length !== slots.length ||
-    !storyboardPrice ||
-    Number(storyboardPrice.expected_amount_microusd) < STORYBOARD_FRAME_COST_MICROUSD ||
-    Number(storyboardPrice.high_amount_microusd) < STORYBOARD_FRAME_COST_MICROUSD
+    !storyboardCostAuthority
   ) {
     throw new MvpStoryboardProductionError(
       "The locked provider cost slots are unavailable.",
@@ -1249,7 +1284,7 @@ export async function advanceMvpStoryboardAndClipSubmission(
         dispatchKey: `storyboard:${shot.shot_number}:${frameRole}`,
         endpoint: contract.endpoint,
         episodeId: job.episode_id,
-        expectedCostMicrousd: STORYBOARD_FRAME_COST_MICROUSD,
+        expectedCostMicrousd: storyboardCostAuthority.expectedCostMicrousd,
         inputManifestSha256: sha256(
           postgresJsonbText({
             bindingManifest,
@@ -1261,7 +1296,7 @@ export async function advanceMvpStoryboardAndClipSubmission(
             systemPrompt: contract.systemPrompt,
           }),
         ),
-        maximumCostMicrousd: STORYBOARD_FRAME_COST_MICROUSD,
+        maximumCostMicrousd: storyboardCostAuthority.maximumCostMicrousd,
         mediaKind: "storyboard",
         payload,
         productionRunId: job.production_run_id,

@@ -325,11 +325,11 @@ async function completeClip(clip: ClipRow): Promise<boolean> {
     }
   }
   await completeMvpMediaDispatchOutput({
-    billingEvidenceSha256: billedResult.billingEvidenceSha256,
-    billableUnits: billedResult.billableUnits,
     externalRequestId: clip.external_request_id,
     outputContentSha256: scan.outputSha256,
     providerDispatchId: clip.provider_dispatch_id,
+    providerReportedBillableUnits: billedResult.providerReportedBillableUnits,
+    providerUsageEvidenceSha256: billedResult.providerUsageEvidenceSha256,
   });
   const { error: updateError } = await client
     .from("mvp_production_clip_worker")

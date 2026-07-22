@@ -2,7 +2,10 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 
+import { readJsonResponseBounded } from "@/server/bounded-response-body";
+
 const QUEUE_ORIGIN = "https://queue.fal.run";
+const MAXIMUM_PROVIDER_JSON_BYTES = 131_072;
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
@@ -79,9 +82,9 @@ export type MvpFalControl = Readonly<{
 }>;
 
 export type MvpFalBilledResult = Readonly<{
-  billingEvidenceSha256: string;
-  billableUnits: number;
   data: Record<string, unknown>;
+  providerReportedBillableUnits: number;
+  providerUsageEvidenceSha256: string;
 }>;
 
 function billableUnits(response: Response): Readonly<{
@@ -173,7 +176,7 @@ export async function submitMvpFalProvider(
   }
   let parsed: unknown;
   try {
-    parsed = await response.json();
+    parsed = await readJsonResponseBounded(response, MAXIMUM_PROVIDER_JSON_BYTES);
   } catch {
     throw new MvpMediaProviderBrokerError(
       "The provider accepted a request but returned an unreadable receipt.",
@@ -244,7 +247,7 @@ async function fetchMvpFalQueueResponse(
   }
   let parsed: unknown;
   try {
-    parsed = await response.json();
+    parsed = await readJsonResponseBounded(response, MAXIMUM_PROVIDER_JSON_BYTES);
   } catch {
     throw new MvpMediaProviderBrokerError(
       "The provider queue response is malformed.",
@@ -280,7 +283,9 @@ export async function fetchMvpFalQueueResult(
   const result = await fetchMvpFalQueueResponse(urlValue, timeoutMs);
   const billing = billableUnits(result.response);
   return Object.freeze({
-    billingEvidenceSha256: createHash("sha256")
+    data: result.data,
+    providerReportedBillableUnits: billing.value,
+    providerUsageEvidenceSha256: createHash("sha256")
       .update(
         JSON.stringify({
           billableUnits: billing.canonical,
@@ -290,7 +295,5 @@ export async function fetchMvpFalQueueResult(
         "utf8",
       )
       .digest("hex"),
-    billableUnits: billing.value,
-    data: result.data,
   });
 }

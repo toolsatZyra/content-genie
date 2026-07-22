@@ -27,6 +27,7 @@ import {
   deterministicNarrationUploadUuid,
   processNarrationUpload,
 } from "@/server/narration-upload-processor";
+import { postgresJsonbText } from "@/server/world-anchor-provider";
 
 const workspaceId = "10000000-0000-4000-8000-000000000001";
 const stableAssetId = "10000000-0000-4000-8000-000000000002";
@@ -36,12 +37,42 @@ const policyVersionId = "10000000-0000-4000-8000-000000000005";
 const originalScriptRevisionId = "10000000-0000-4000-8000-000000000006";
 const sourceBytes = Buffer.from("owner-audio-source");
 const sanitizedBytes = Buffer.from("sanitized-owner-audio");
-const sha256 = (value: Buffer) => createHash("sha256").update(value).digest("hex");
+const sha256 = (value: string | Buffer) =>
+  createHash("sha256").update(value).digest("hex");
 const assetVersionId = deterministicNarrationUploadUuid(
   uploadVersionId,
   "asset-version",
 );
 const attestationId = deterministicNarrationUploadUuid(uploadVersionId, "attestation");
+const transcriptionText = "Spoken owner narration.";
+const alignment = {
+  characterEndTimesSeconds: [0.2],
+  characters: ["S"],
+  characterStartTimesSeconds: [0],
+};
+const comparison = { matchesOriginalScript: false };
+const qualityEvidence = {
+  durationPreserved: true,
+  ownerConfirmationRequired: true,
+  scriptComparisonAdvisoryOnly: true,
+  technicalInspection: {
+    audibleSeamsDetected: false,
+    clippingDetected: false,
+    corruptFramesDetected: false,
+    metadataStripped: true,
+    parserSandboxed: true,
+    longSilenceDetected: false,
+  },
+  transcription: {
+    alignmentSha256: "d".repeat(64),
+    evidenceSha256: "e".repeat(64),
+    language: "hi",
+    model: "whisper-1",
+    providerResponseSha256: "f".repeat(64),
+    wordCount: 3,
+  },
+  schemaVersion: "genie.owner-narration-quality-evidence.v1",
+};
 
 const preparedRow = {
   alignment_hash: null,
@@ -65,10 +96,36 @@ const verifiedRow = {
 
 function processingState(
   retainedAttestationId: string | null,
+  attestationOverrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
-    attestationId: retainedAttestationId,
-    attestationPolicyVersionId: retainedAttestationId ? policyVersionId : null,
+    attestation: retainedAttestationId
+      ? {
+          alignmentHash: sha256(postgresJsonbText(alignment)),
+          alignmentJson: alignment,
+          decompressedBytes: 50_000,
+          durationMs: 81_000,
+          id: retainedAttestationId,
+          policyVersionId,
+          probeSha256: "c".repeat(64),
+          quarantineAssetVersionId,
+          qualityEvidence,
+          qualityEvidenceHash: sha256(postgresJsonbText(qualityEvidence)),
+          sanitizedByteLength: sanitizedBytes.length,
+          sanitizedMime: "audio/mpeg",
+          sanitizedSha256: sha256(sanitizedBytes),
+          scanEngine: "fixture-scanner",
+          scanVersion: "fixture-v1",
+          scriptComparisonHash: sha256(postgresJsonbText(comparison)),
+          scriptComparisonJson: comparison,
+          sourceByteLength: sourceBytes.length,
+          sourceMime: "audio/wav",
+          sourceSha256: sha256(sourceBytes),
+          transcriptionSha256: sha256(transcriptionText),
+          transcriptionText,
+          ...attestationOverrides,
+        }
+      : null,
     promotedAssetVersionId: null,
     state: "prepared",
     stateVersion: 1,
@@ -161,27 +218,20 @@ describe("narration upload interrupted retry recovery", () => {
     });
     mocks.transcribe.mockResolvedValue({
       alignmentSha256: "d".repeat(64),
-      authoritativeText: "Spoken owner narration.",
+      authoritativeText: transcriptionText,
       durationSeconds: 81,
       evidenceSha256: "e".repeat(64),
       language: "hi",
       providerResponseSha256: "f".repeat(64),
-      speechAlignment: {
-        characterEndTimesSeconds: [0.2],
-        characters: ["S"],
-        characterStartTimesSeconds: [0],
-      },
-      transcriptSha256: createHash("sha256")
-        .update("Spoken owner narration.")
-        .digest("hex"),
+      speechAlignment: alignment,
+      transcriptSha256: sha256(transcriptionText),
       wordCount: 3,
     });
-    mocks.compare.mockReturnValue({ matchesOriginalScript: false });
+    mocks.compare.mockReturnValue(comparison);
   });
 
   it("reuses the retained attestation ID after the first response is lost", async () => {
     const { client, remove } = makeClient([
-      { data: preparedRow, error: null },
       { data: preparedRow, error: null },
       { data: preparedRow, error: null },
       { data: preparedRow, error: null },
@@ -229,16 +279,46 @@ describe("narration upload interrupted retry recovery", () => {
       state: "verified",
     });
 
-    expect(attestationCalls).toHaveLength(2);
-    expect(attestationCalls.map((call) => call.p_attestation_id)).toEqual([
-      attestationId,
-      attestationId,
-    ]);
+    expect(attestationCalls).toHaveLength(1);
+    expect(attestationCalls[0]?.p_attestation_id).toBe(attestationId);
+    expect(mocks.transcribe).toHaveBeenCalledTimes(1);
+    expect(mocks.compare).toHaveBeenCalledTimes(1);
     expect(
       mocks.rpc.mock.calls.filter(
         ([name]) => name === "get_active_narration_upload_ingest_policy",
       ),
     ).toHaveLength(1);
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it("fails closed before transcription when retained bytes conflict", async () => {
+    const { client, remove } = makeClient([{ data: preparedRow, error: null }]);
+    mocks.createAdmin.mockReturnValue(client);
+    mocks.rpc.mockImplementation(async (name: string) => {
+      if (name === "get_episode_narration_upload_processing_state") {
+        return {
+          data: processingState(attestationId, {
+            sanitizedSha256: "9".repeat(64),
+          }),
+          error: null,
+        };
+      }
+      return { data: {}, error: null };
+    });
+
+    await expect(processNarrationUpload(input)).rejects.toMatchObject({
+      retryable: false,
+      safeClass: "narration_upload.retained_attestation_conflict",
+    });
+    expect(mocks.transcribe).not.toHaveBeenCalled();
+    expect(mocks.compare).not.toHaveBeenCalled();
+    expect(
+      mocks.rpc.mock.calls.filter(
+        ([name]) =>
+          name === "command_attest_episode_narration_upload" ||
+          name === "command_promote_episode_narration_upload",
+      ),
+    ).toHaveLength(0);
     expect(remove).not.toHaveBeenCalled();
   });
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   BoundedResponseBodyError,
+  readJsonResponseBounded,
   readResponseBodyBounded,
 } from "./bounded-response-body";
 
@@ -55,5 +56,14 @@ describe("bounded response body reader", () => {
         4,
       ),
     ).rejects.toThrow(/length declaration/u);
+  });
+
+  it("parses JSON only after the complete body satisfies the byte contract", async () => {
+    await expect(
+      readJsonResponseBounded(new Response('{"status":"COMPLETED"}'), 64),
+    ).resolves.toEqual({ status: "COMPLETED" });
+    await expect(readJsonResponseBounded(new Response("{"), 64)).rejects.toBeInstanceOf(
+      BoundedResponseBodyError,
+    );
   });
 });

@@ -309,18 +309,18 @@ export async function dispatchMvpFalMedia(
 }
 
 export async function completeMvpMediaDispatchOutput(input: {
-  billingEvidenceSha256: string;
-  billableUnits: number;
   externalRequestId: string;
   outputContentSha256: string;
   providerDispatchId: string;
+  providerReportedBillableUnits: number;
+  providerUsageEvidenceSha256: string;
 }): Promise<void> {
   await rpc("command_complete_mvp_media_dispatch_output", {
-    p_actual_billable_units: input.billableUnits,
-    p_billing_evidence_sha256: input.billingEvidenceSha256,
     p_dispatch_id: input.providerDispatchId,
     p_external_request_id: input.externalRequestId,
     p_output_content_sha256: input.outputContentSha256,
+    p_provider_reported_billable_units: input.providerReportedBillableUnits,
+    p_provider_usage_evidence_sha256: input.providerUsageEvidenceSha256,
   });
 }
 

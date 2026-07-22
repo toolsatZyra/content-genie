@@ -6,6 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { NarrationUploadMime } from "@/domain/narration/narration-upload";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import type { SandboxAudioScanResult } from "@/server/sandbox-media-scanner";
 import { SandboxMediaScannerError } from "@/server/sandbox-media-scanner";
 import { scanAndReencodeNarrationAudio } from "@/server/sandbox-media-scanner";
 import {
@@ -37,9 +38,33 @@ export type ProcessedNarrationUpload = Readonly<{
   uploadVersionId: string;
 }>;
 
+type RetainedNarrationUploadAttestation = Readonly<{
+  alignmentHash: string;
+  alignmentJson: unknown;
+  decompressedBytes: number;
+  durationMs: number;
+  id: string;
+  policyVersionId: string;
+  probeSha256: string;
+  quarantineAssetVersionId: string;
+  qualityEvidence: Readonly<Record<string, unknown>>;
+  qualityEvidenceHash: string;
+  sanitizedByteLength: number;
+  sanitizedMime: string;
+  sanitizedSha256: string;
+  scanEngine: string;
+  scanVersion: string;
+  scriptComparisonHash: string;
+  scriptComparisonJson: Readonly<Record<string, unknown>>;
+  sourceByteLength: number;
+  sourceMime: string;
+  sourceSha256: string;
+  transcriptionSha256: string;
+  transcriptionText: string;
+}>;
+
 type NarrationUploadProcessingState = Readonly<{
-  attestationId: string | null;
-  attestationPolicyVersionId: string | null;
+  attestation: RetainedNarrationUploadAttestation | null;
   promotedAssetVersionId: string | null;
   state: string;
   stateVersion: number;
@@ -120,27 +145,23 @@ export function parseNarrationUploadProcessingState(
   value: unknown,
 ): NarrationUploadProcessingState {
   const keys = [
-    "attestationId",
-    "attestationPolicyVersionId",
+    "attestation",
     "promotedAssetVersionId",
     "state",
     "stateVersion",
     "uploadVersionId",
   ] as const;
   const record = value as Record<string, unknown>;
-  const nullableIds = [
-    record.attestationId,
-    record.attestationPolicyVersionId,
-    record.promotedAssetVersionId,
-  ];
   if (
     !exactObject(value, keys) ||
     typeof record.uploadVersionId !== "string" ||
     typeof record.state !== "string" ||
     !Number.isSafeInteger(record.stateVersion) ||
     (record.stateVersion as number) < 1 ||
-    nullableIds.some((id) => id !== null && typeof id !== "string") ||
-    (record.attestationId === null) !== (record.attestationPolicyVersionId === null)
+    (record.promotedAssetVersionId !== null &&
+      typeof record.promotedAssetVersionId !== "string") ||
+    (record.attestation !== null &&
+      !isRetainedNarrationUploadAttestation(record.attestation))
   ) {
     throw new NarrationUploadProcessingError(
       "Narration upload recovery evidence was malformed.",
@@ -149,6 +170,121 @@ export function parseNarrationUploadProcessingState(
     );
   }
   return value as NarrationUploadProcessingState;
+}
+
+function isJsonObject(value: unknown): value is Readonly<Record<string, unknown>> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isSha256(value: unknown): value is string {
+  return typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+}
+
+function isRetainedNarrationUploadAttestation(
+  value: unknown,
+): value is RetainedNarrationUploadAttestation {
+  const keys = [
+    "alignmentHash",
+    "alignmentJson",
+    "decompressedBytes",
+    "durationMs",
+    "id",
+    "policyVersionId",
+    "probeSha256",
+    "quarantineAssetVersionId",
+    "qualityEvidence",
+    "qualityEvidenceHash",
+    "sanitizedByteLength",
+    "sanitizedMime",
+    "sanitizedSha256",
+    "scanEngine",
+    "scanVersion",
+    "scriptComparisonHash",
+    "scriptComparisonJson",
+    "sourceByteLength",
+    "sourceMime",
+    "sourceSha256",
+    "transcriptionSha256",
+    "transcriptionText",
+  ] as const;
+  if (!exactObject(value, keys)) return false;
+  const record = value as Record<string, unknown>;
+  const integers = [
+    record.decompressedBytes,
+    record.durationMs,
+    record.sanitizedByteLength,
+    record.sourceByteLength,
+  ];
+  const hashes = [
+    record.alignmentHash,
+    record.probeSha256,
+    record.qualityEvidenceHash,
+    record.sanitizedSha256,
+    record.scriptComparisonHash,
+    record.sourceSha256,
+    record.transcriptionSha256,
+  ];
+  if (
+    [
+      record.id,
+      record.policyVersionId,
+      record.quarantineAssetVersionId,
+      record.scanEngine,
+      record.scanVersion,
+    ].some((entry) => typeof entry !== "string" || entry.length < 1) ||
+    !["audio/mpeg", "audio/wav"].includes(String(record.sourceMime)) ||
+    record.sanitizedMime !== "audio/mpeg" ||
+    integers.some((entry) => !Number.isSafeInteger(entry) || Number(entry) < 1) ||
+    hashes.some((entry) => !isSha256(entry)) ||
+    record.alignmentJson === null ||
+    typeof record.alignmentJson !== "object" ||
+    !isJsonObject(record.scriptComparisonJson) ||
+    !isJsonObject(record.qualityEvidence) ||
+    typeof record.transcriptionText !== "string" ||
+    record.transcriptionText.trim().length < 1
+  ) {
+    return false;
+  }
+  return (
+    sha256(record.transcriptionText) === record.transcriptionSha256 &&
+    sha256(postgresJsonbText(record.alignmentJson)) === record.alignmentHash &&
+    sha256(postgresJsonbText(record.scriptComparisonJson)) ===
+      record.scriptComparisonHash &&
+    sha256(postgresJsonbText(record.qualityEvidence)) === record.qualityEvidenceHash
+  );
+}
+
+export function assertRetainedNarrationUploadAttestationMatches(
+  attestation: RetainedNarrationUploadAttestation,
+  input: Readonly<{
+    bytes: Buffer;
+    declaredMime: NarrationUploadMime;
+    preparation: Pick<NarrationUploadPreparation, "quarantineAssetVersionId">;
+    sourceSha256: string;
+  }>,
+  scanned: SandboxAudioScanResult,
+): void {
+  if (
+    sha256(input.bytes) !== input.sourceSha256 ||
+    attestation.quarantineAssetVersionId !==
+      input.preparation.quarantineAssetVersionId ||
+    attestation.sourceMime !== input.declaredMime ||
+    attestation.sourceSha256 !== input.sourceSha256 ||
+    attestation.sourceByteLength !== input.bytes.length ||
+    attestation.sanitizedMime !== "audio/mpeg" ||
+    attestation.sanitizedSha256 !== scanned.outputSha256 ||
+    attestation.sanitizedByteLength !== scanned.outputBytes.length ||
+    attestation.decompressedBytes !== scanned.decompressedBytes ||
+    attestation.durationMs !== scanned.durationMs ||
+    attestation.probeSha256 !== scanned.probeSha256 ||
+    attestation.scanEngine !== scanned.scanEngine ||
+    attestation.scanVersion !== scanned.scanVersion
+  ) {
+    throw new NarrationUploadProcessingError(
+      "Retained narration evidence conflicted with the inspected upload.",
+      "narration_upload.retained_attestation_conflict",
+    );
+  }
 }
 
 async function rpc(
@@ -389,60 +525,6 @@ export async function processNarrationUpload(input: {
       declaredMime: input.declaredMime,
       preserveDuration: true,
     });
-    const transcription = await transcribeSanitizedUploadedNarrationMp3(
-      scanned.outputBytes,
-    );
-    if (Math.abs(transcription.durationSeconds * 1_000 - scanned.durationMs) > 1_500) {
-      throw new NarrationUploadProcessingError(
-        "The narration transcript timing did not bind to the inspected audio.",
-        "narration_upload.transcription_duration_mismatch",
-      );
-    }
-    const current = await uploadRow(
-      client,
-      input.workspaceId,
-      input.preparation.uploadVersionId,
-    );
-    const { data: originalScript, error: scriptError } = await client
-      .from("script_revisions")
-      .select("raw_text")
-      .eq("workspace_id", input.workspaceId)
-      .eq("id", current.original_script_revision_id)
-      .single();
-    if (scriptError || !originalScript?.raw_text) {
-      throw new NarrationUploadProcessingError(
-        "The earlier script is unavailable for advisory comparison.",
-        "narration_upload.original_script_unavailable",
-        true,
-      );
-    }
-    const comparison = compareUploadedNarrationToOriginalScript(
-      originalScript.raw_text,
-      transcription.authoritativeText,
-    );
-    const alignment = alignmentJson(transcription.speechAlignment);
-    const qualityEvidence = Object.freeze({
-      durationPreserved: Math.abs(scanned.timeScale - 1) <= 0.01,
-      ownerConfirmationRequired: true,
-      scriptComparisonAdvisoryOnly: true,
-      technicalInspection: {
-        audibleSeamsDetected: scanned.audibleSeamsDetected,
-        clippingDetected: scanned.clippingDetected,
-        corruptFramesDetected: scanned.corruptFramesDetected,
-        metadataStripped: true,
-        parserSandboxed: true,
-        longSilenceDetected: scanned.unintendedSilenceDetected,
-      },
-      transcription: {
-        alignmentSha256: transcription.alignmentSha256,
-        evidenceSha256: transcription.evidenceSha256,
-        language: transcription.language,
-        model: "whisper-1",
-        providerResponseSha256: transcription.providerResponseSha256,
-        wordCount: transcription.wordCount,
-      },
-      schemaVersion: "genie.owner-narration-quality-evidence.v1",
-    });
     const processingState = parseNarrationUploadProcessingState(
       await rpc(client, "get_episode_narration_upload_processing_state", {
         p_upload_version_id: input.preparation.uploadVersionId,
@@ -455,58 +537,118 @@ export async function processNarrationUpload(input: {
         "narration_upload.recovery_evidence_conflict",
       );
     }
-    const policyVersionId = processingState.attestationPolicyVersionId
-      ? processingState.attestationPolicyVersionId
-      : await (async () => {
-          const policyValue = await rpc(
-            client,
-            "get_active_narration_upload_ingest_policy",
-            {},
-          );
-          if (
-            !exactObject(policyValue, ["id", "policy", "policyHash"]) ||
-            typeof (policyValue as Record<string, unknown>).id !== "string"
-          ) {
-            throw new NarrationUploadProcessingError(
-              "Narration ingest policy evidence is unavailable.",
-              "narration_upload.policy_unavailable",
-              true,
-            );
-          }
-          return (policyValue as Record<string, string>).id;
-        })();
-    const attestationId =
-      processingState.attestationId ??
-      deterministicNarrationUploadUuid(
+    let attestationId: string;
+    if (processingState.attestation) {
+      assertRetainedNarrationUploadAttestationMatches(
+        processingState.attestation,
+        input,
+        scanned,
+      );
+      attestationId = processingState.attestation.id;
+    } else {
+      const transcription = await transcribeSanitizedUploadedNarrationMp3(
+        scanned.outputBytes,
+      );
+      if (
+        Math.abs(transcription.durationSeconds * 1_000 - scanned.durationMs) > 1_500
+      ) {
+        throw new NarrationUploadProcessingError(
+          "The narration transcript timing did not bind to the inspected audio.",
+          "narration_upload.transcription_duration_mismatch",
+        );
+      }
+      const current = await uploadRow(
+        client,
+        input.workspaceId,
+        input.preparation.uploadVersionId,
+      );
+      const { data: originalScript, error: scriptError } = await client
+        .from("script_revisions")
+        .select("raw_text")
+        .eq("workspace_id", input.workspaceId)
+        .eq("id", current.original_script_revision_id)
+        .single();
+      if (scriptError || !originalScript?.raw_text) {
+        throw new NarrationUploadProcessingError(
+          "The earlier script is unavailable for advisory comparison.",
+          "narration_upload.original_script_unavailable",
+          true,
+        );
+      }
+      const comparison = compareUploadedNarrationToOriginalScript(
+        originalScript.raw_text,
+        transcription.authoritativeText,
+      );
+      const alignment = alignmentJson(transcription.speechAlignment);
+      const qualityEvidence = Object.freeze({
+        durationPreserved: Math.abs(scanned.timeScale - 1) <= 0.01,
+        ownerConfirmationRequired: true,
+        scriptComparisonAdvisoryOnly: true,
+        technicalInspection: {
+          audibleSeamsDetected: scanned.audibleSeamsDetected,
+          clippingDetected: scanned.clippingDetected,
+          corruptFramesDetected: scanned.corruptFramesDetected,
+          metadataStripped: true,
+          parserSandboxed: true,
+          longSilenceDetected: scanned.unintendedSilenceDetected,
+        },
+        transcription: {
+          alignmentSha256: transcription.alignmentSha256,
+          evidenceSha256: transcription.evidenceSha256,
+          language: transcription.language,
+          model: "whisper-1",
+          providerResponseSha256: transcription.providerResponseSha256,
+          wordCount: transcription.wordCount,
+        },
+        schemaVersion: "genie.owner-narration-quality-evidence.v1",
+      });
+      const policyValue = await rpc(
+        client,
+        "get_active_narration_upload_ingest_policy",
+        {},
+      );
+      if (
+        !exactObject(policyValue, ["id", "policy", "policyHash"]) ||
+        typeof (policyValue as Record<string, unknown>).id !== "string"
+      ) {
+        throw new NarrationUploadProcessingError(
+          "Narration ingest policy evidence is unavailable.",
+          "narration_upload.policy_unavailable",
+          true,
+        );
+      }
+      const policyVersionId = (policyValue as Record<string, string>).id;
+      attestationId = deterministicNarrationUploadUuid(
         input.preparation.uploadVersionId,
         "attestation",
       );
-    const attested = await rpc(client, "command_attest_episode_narration_upload", {
-      p_alignment_hash: sha256(postgresJsonbText(alignment)),
-      p_alignment_json: alignment,
-      p_attestation_id: attestationId,
-      p_decompressed_bytes: scanned.decompressedBytes,
-      p_duration_ms: scanned.durationMs,
-      p_policy_version_id: policyVersionId,
-      p_probe_sha256: scanned.probeSha256,
-      p_quality_evidence: qualityEvidence,
-      p_quality_evidence_hash: sha256(postgresJsonbText(qualityEvidence)),
-      p_sanitized_byte_length: scanned.outputBytes.length,
-      p_sanitized_sha256: scanned.outputSha256,
-      p_scan_engine: scanned.scanEngine,
-      p_scan_version: scanned.scanVersion,
-      p_script_comparison_hash: sha256(postgresJsonbText(comparison)),
-      p_script_comparison_json: comparison,
-      p_transcription_sha256: transcription.transcriptSha256,
-      p_transcription_text: transcription.authoritativeText,
-      p_upload_version_id: input.preparation.uploadVersionId,
-      p_workspace_id: input.workspaceId,
-    });
-    if (attested !== attestationId) {
-      throw new NarrationUploadProcessingError(
-        "Narration inspection attestation was malformed.",
-        "narration_upload.attestation_malformed",
-      );
+      const attested = await rpc(client, "command_attest_episode_narration_upload", {
+        p_alignment_hash: sha256(postgresJsonbText(alignment)),
+        p_alignment_json: alignment,
+        p_attestation_id: attestationId,
+        p_decompressed_bytes: scanned.decompressedBytes,
+        p_duration_ms: scanned.durationMs,
+        p_policy_version_id: policyVersionId,
+        p_probe_sha256: scanned.probeSha256,
+        p_quality_evidence: qualityEvidence,
+        p_quality_evidence_hash: sha256(postgresJsonbText(qualityEvidence)),
+        p_sanitized_byte_length: scanned.outputBytes.length,
+        p_sanitized_sha256: scanned.outputSha256,
+        p_scan_engine: scanned.scanEngine,
+        p_scan_version: scanned.scanVersion,
+        p_script_comparison_hash: sha256(postgresJsonbText(comparison)),
+        p_script_comparison_json: comparison,
+        p_transcription_sha256: transcription.transcriptSha256,
+        p_transcription_text: transcription.authoritativeText,
+        p_upload_version_id: input.preparation.uploadVersionId,
+        p_workspace_id: input.workspaceId,
+      });
+      if (attested !== attestationId) {
+        throw new NarrationUploadProcessingError(
+          "Narration inspection attestation was malformed.",
+          "narration_upload.attestation_malformed",
+        );
+      }
     }
     const assetVersionId = deterministicNarrationUploadUuid(
       input.preparation.uploadVersionId,

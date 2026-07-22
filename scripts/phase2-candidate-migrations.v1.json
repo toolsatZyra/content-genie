@@ -122,6 +122,12 @@
     "supabase/migrations/20260722191000_mvp_review_confirmation_and_legacy_grounding.sql",
     "supabase/migrations/20260722192000_mvp_media_actual_cost_and_storyboard_quote.sql",
     "supabase/migrations/20260722192001_mvp_sfx_actual_cost_receipts.sql",
-    "supabase/migrations/20260722193000_mvp_review_owner_authority_restoration.sql"
+    "supabase/migrations/20260722193000_mvp_review_owner_authority_restoration.sql",
+    "supabase/migrations/20260722194000_mvp_legacy_quote_and_dispatch_compatibility.sql",
+    "supabase/migrations/20260722194100_owner_uploaded_narration_attestation_evidence_recovery.sql",
+    "supabase/migrations/20260722194200_mvp_cost_evidence_semantics.sql",
+    "supabase/migrations/20260722194250_mvp_legacy_storyboard_dispatch_terms.sql",
+    "supabase/migrations/20260722194300_mvp_legacy_storyboard_cost_comment.sql",
+    "supabase/migrations/20260722194350_mvp_media_completion_acl.sql"
   ]
 }

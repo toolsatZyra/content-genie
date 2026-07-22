@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -6,6 +8,7 @@ import {
   parseNarrationUploadPreparation,
   parseNarrationUploadProcessingState,
 } from "@/server/narration-upload-processor";
+import { postgresJsonbText } from "@/server/world-anchor-provider";
 
 const preparation = {
   ok: true,
@@ -16,6 +19,7 @@ const preparation = {
   uploadVersionId: "10000000-0000-4000-8000-000000000003",
   versionNumber: 1,
 };
+const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 
 describe("narration upload processing authority", () => {
   it("accepts the exact prepared authority envelope", () => {
@@ -54,10 +58,36 @@ describe("narration upload processing authority", () => {
     ).not.toBe(attestation);
   });
 
-  it("accepts only a paired retained attestation and policy identity", () => {
+  it("accepts only a complete, internally bound retained attestation", () => {
+    const alignmentJson = { characters: ["S"] };
+    const scriptComparisonJson = { matchesOriginalScript: false };
+    const qualityEvidence = { schemaVersion: "quality.v1" };
+    const transcriptionText = "Spoken owner narration.";
     const state = {
-      attestationId: "10000000-0000-4000-8000-000000000004",
-      attestationPolicyVersionId: "10000000-0000-4000-8000-000000000005",
+      attestation: {
+        alignmentHash: hash(postgresJsonbText(alignmentJson)),
+        alignmentJson,
+        decompressedBytes: 50_000,
+        durationMs: 81_000,
+        id: "10000000-0000-4000-8000-000000000004",
+        policyVersionId: "10000000-0000-4000-8000-000000000005",
+        probeSha256: "1".repeat(64),
+        quarantineAssetVersionId: "10000000-0000-4000-8000-000000000006",
+        qualityEvidence,
+        qualityEvidenceHash: hash(postgresJsonbText(qualityEvidence)),
+        sanitizedByteLength: 20_000,
+        sanitizedMime: "audio/mpeg",
+        sanitizedSha256: "2".repeat(64),
+        scanEngine: "ClamAV.FFmpeg",
+        scanVersion: "scanner-v1",
+        scriptComparisonHash: hash(postgresJsonbText(scriptComparisonJson)),
+        scriptComparisonJson,
+        sourceByteLength: 21_000,
+        sourceMime: "audio/wav",
+        sourceSha256: "3".repeat(64),
+        transcriptionSha256: hash(transcriptionText),
+        transcriptionText,
+      },
       promotedAssetVersionId: null,
       state: "prepared",
       stateVersion: 1,
@@ -67,7 +97,10 @@ describe("narration upload processing authority", () => {
     expect(() =>
       parseNarrationUploadProcessingState({
         ...state,
-        attestationPolicyVersionId: null,
+        attestation: {
+          ...state.attestation,
+          transcriptionText: "Different transcription.",
+        },
       }),
     ).toThrow(NarrationUploadProcessingError);
   });

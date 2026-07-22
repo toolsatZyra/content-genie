@@ -73,7 +73,7 @@
     {
       "path": "scripts/phase2-candidate-migrations.v1.json",
       "role": "candidate-migration-inventory",
-      "sha256": "bf6b348835164d32a91d7dd8d12b9623f7f861606726f84955bf530fb6450c60"
+      "sha256": "cdca4315af775351a83ec4136bb8ead5157297be21fea4a843b4f8793f157c5d"
     },
     {
       "path": "scripts/phase2-coordinate-upgrade-drill.mjs",
@@ -761,6 +761,36 @@
       "sha256": "6dc903edd90febba066601e80dabef32431ef2241b0541909fc5163390f9b2be"
     },
     {
+      "path": "supabase/migrations/20260722194000_mvp_legacy_quote_and_dispatch_compatibility.sql",
+      "role": "phase2-migration",
+      "sha256": "dbeeb46ce2f4f49cddf14f68092abbb4ff637790073b9ec08522cbfb34e8c37d"
+    },
+    {
+      "path": "supabase/migrations/20260722194100_owner_uploaded_narration_attestation_evidence_recovery.sql",
+      "role": "phase2-migration",
+      "sha256": "7200a835d87f998dc3a2a1f07bd999b0f7b4d3539819acb7cd92d011fed9fb72"
+    },
+    {
+      "path": "supabase/migrations/20260722194200_mvp_cost_evidence_semantics.sql",
+      "role": "phase2-migration",
+      "sha256": "97499f076f576a857757ce7a68a6cafdafe5930b5c84d5f412a642734d4fc194"
+    },
+    {
+      "path": "supabase/migrations/20260722194250_mvp_legacy_storyboard_dispatch_terms.sql",
+      "role": "phase2-migration",
+      "sha256": "59870f375e068c392170ce0210d8b1e53abb3d4a82947443b0271a8e5ac1871a"
+    },
+    {
+      "path": "supabase/migrations/20260722194300_mvp_legacy_storyboard_cost_comment.sql",
+      "role": "phase2-migration",
+      "sha256": "f18956f66a88bfbbed91bb41ad4839c6dc09940979fdf9de74743c336d979da1"
+    },
+    {
+      "path": "supabase/migrations/20260722194350_mvp_media_completion_acl.sql",
+      "role": "phase2-migration",
+      "sha256": "8a77a8e6b683ea1d1cdc9fbce1542e3f7dbe9d7b53ed9e56bb7a2d38a462d17a"
+    },
+    {
       "path": "supabase/tests/fixtures/phase2_coordinate_v1_verifiers.sql",
       "role": "predecessor-fixture",
       "sha256": "2df42a28cd04b193b0eaf97c882a17edfb13688cad7aca9bf8845408e9d7ec1c"
@@ -768,7 +798,7 @@
     {
       "path": "supabase/tests/mvp_cinematic_pipeline.test.sql",
       "role": "pgtap-source",
-      "sha256": "885757c696c8ab2ef260d118eebd643881662ac4354e01af5571ec176cc21961"
+      "sha256": "ac220fccbeadb5824bdb7e304b74fd00ee0838b8aca03089cd43e2df2eaf3658"
     },
     {
       "path": "supabase/tests/mvp_repair_feedback_grounding.test.sql",
@@ -803,7 +833,7 @@
     {
       "path": "supabase/tests/phase2_zero_spend_foundation.test.sql",
       "role": "pgtap-source",
-      "sha256": "cb4c2fe2f38909ae31541b13ea0e53f0a16f4f0a52c3dacc95f73696beaa9815"
+      "sha256": "b93b0cce1ee3d76d0a164d72da530118f887aaa942f7119cbd9b4e880eb2a490"
     },
     {
       "path": "supabase/tests/workspace_authority_profile.test.sql",
@@ -834,9 +864,9 @@
   },
   "pgTapSuites": [
     {
-      "hardenedQuerySha256": "38816fc8b18d0884e7000e1d686b9e7765cf103c2a2b3062b7c6e357d8642c30",
-      "plannedAssertions": 110,
-      "sourceSha256": "885757c696c8ab2ef260d118eebd643881662ac4354e01af5571ec176cc21961",
+      "hardenedQuerySha256": "ea253d6eb4cb3ebbda8b11a4f430cf55540a6b4d481461673d42f8ecbbcd7c4f",
+      "plannedAssertions": 116,
+      "sourceSha256": "ac220fccbeadb5824bdb7e304b74fd00ee0838b8aca03089cd43e2df2eaf3658",
       "testFile": "mvp_cinematic_pipeline.test.sql"
     },
     {
@@ -876,9 +906,9 @@
       "testFile": "phase2_world_cultural.test.sql"
     },
     {
-      "hardenedQuerySha256": "e3093c91f9742a9bee9922b96d2bb2205ab9cce4ef370f571d9660295ce78ae1",
+      "hardenedQuerySha256": "d23b5d41c74e290682cbe282d3bb92d247b934731fd88b5942c34a2aabe96b01",
       "plannedAssertions": 179,
-      "sourceSha256": "cb4c2fe2f38909ae31541b13ea0e53f0a16f4f0a52c3dacc95f73696beaa9815",
+      "sourceSha256": "b93b0cce1ee3d76d0a164d72da530118f887aaa942f7119cbd9b4e880eb2a490",
       "testFile": "phase2_zero_spend_foundation.test.sql"
     },
     {
@@ -1010,7 +1040,13 @@
     "supabase/migrations/20260722191000_mvp_review_confirmation_and_legacy_grounding.sql",
     "supabase/migrations/20260722192000_mvp_media_actual_cost_and_storyboard_quote.sql",
     "supabase/migrations/20260722192001_mvp_sfx_actual_cost_receipts.sql",
-    "supabase/migrations/20260722193000_mvp_review_owner_authority_restoration.sql"
+    "supabase/migrations/20260722193000_mvp_review_owner_authority_restoration.sql",
+    "supabase/migrations/20260722194000_mvp_legacy_quote_and_dispatch_compatibility.sql",
+    "supabase/migrations/20260722194100_owner_uploaded_narration_attestation_evidence_recovery.sql",
+    "supabase/migrations/20260722194200_mvp_cost_evidence_semantics.sql",
+    "supabase/migrations/20260722194250_mvp_legacy_storyboard_dispatch_terms.sql",
+    "supabase/migrations/20260722194300_mvp_legacy_storyboard_cost_comment.sql",
+    "supabase/migrations/20260722194350_mvp_media_completion_acl.sql"
   ],
   "predecessorFixture": {
     "capturedAt": "2026-07-18",

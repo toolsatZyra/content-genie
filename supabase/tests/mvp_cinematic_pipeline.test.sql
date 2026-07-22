@@ -6,7 +6,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions,auth,storage,private,audit,pg_catalog;
 
-select plan(110);
+select plan(116);
 
 create temp table mvp_pipeline_fixture(
   key text primary key,
@@ -1269,20 +1269,21 @@ select ok(
   (select count(*)=8 from information_schema.columns
     where table_schema='private' and table_name='mvp_media_dispatches'
       and column_name=any(array[
-        'rate_card_version_id','billing_state','actual_cost_required',
-        'actual_billable_units','actual_unit_price_microusd',
-        'actual_cost_microusd','billing_evidence_sha256','billing_error_code'
+        'rate_card_version_id','cost_evidence_state','cost_evidence_required',
+        'provider_reported_billable_units','estimated_unit_price_microusd',
+        'estimated_cost_microusd','provider_usage_evidence_sha256',
+        'billing_error_code'
       ]))
   and (select column_default='true' from information_schema.columns
     where table_schema='private' and table_name='mvp_media_dispatches'
-      and column_name='actual_cost_required')
+      and column_name='cost_evidence_required')
   and (select count(*)=4 from information_schema.columns
     where table_schema='private' and table_name='mvp_production_sfx'
       and column_name=any(array[
         'provider_usage_unit_price_microusd','provider_actual_cost_microusd',
         'provider_rate_card_version_id','provider_billing_evidence_sha256'
       ])),
-  'FAL and ElevenLabs ledgers retain provider usage and exact monetary evidence'
+  'FAL usage and estimates are not mislabeled as exact provider charges'
 );
 
 select ok(
@@ -1299,19 +1300,56 @@ select ok(
 );
 
 select ok(
+  to_regclass('private.mvp_storyboard_quote_compatibility_authorities') is not null
+  and to_regclass(
+    'private.mvp_storyboard_quote_compatibility_dispatch_terms'
+  ) is not null
+  and exists(select 1 from information_schema.triggers
+    where event_object_schema='private'
+      and event_object_table='mvp_storyboard_quote_compatibility_authorities'
+      and trigger_name='mvp_storyboard_quote_compatibility_authorities_immutable')
+  and exists(select 1 from information_schema.triggers
+    where event_object_schema='private'
+      and event_object_table='mvp_storyboard_quote_compatibility_dispatch_terms'
+      and trigger_name='mvp_storyboard_quote_compatibility_dispatch_terms_immutable')
+  and not has_table_privilege(
+    'service_role','private.mvp_storyboard_quote_compatibility_authorities','select'
+  ),
+  'legacy storyboard quote compatibility is immutable and not directly exposed'
+);
+
+select ok(
   has_function_privilege(
-    'authenticated','public.get_mvp_episode_actual_costs(uuid)','execute'
+    'service_role','public.get_mvp_storyboard_cost_authority(uuid,uuid)','execute'
+  )
+  and has_function_privilege(
+    'service_role',
+    'public.command_reconcile_legacy_mvp_media_dispatch_rates()','execute'
   )
   and not has_function_privilege(
-    'anon','public.get_mvp_episode_actual_costs(uuid)','execute'
+    'authenticated','public.get_mvp_storyboard_cost_authority(uuid,uuid)','execute'
+  ),
+  'only the worker can read compatibility cost authority or reconcile old dispatches'
+);
+
+select ok(
+  has_function_privilege(
+    'authenticated','public.get_mvp_episode_costs(uuid)','execute'
+  )
+  and not has_function_privilege(
+    'anon','public.get_mvp_episode_costs(uuid)','execute'
   )
   and not has_table_privilege(
     'authenticated','private.mvp_media_dispatches','select'
   )
   and not has_table_privilege(
     'authenticated','private.mvp_production_sfx','select'
-  ),
-  'members can inspect per-Episode actual cost without direct provider-ledger access'
+  )
+  and pg_get_functiondef('public.get_mvp_episode_costs(uuid)'::regprocedure)
+    like '%mvp_repair_feedback_grounding_versions%'
+  and pg_get_functiondef('public.get_mvp_episode_costs(uuid)'::regprocedure)
+    like '%incomplete_uncosted_repair_director%',
+  'members see estimated or incomplete costs including uncosted repair calls'
 );
 
 set local session_replication_role = replica;
@@ -1327,6 +1365,22 @@ insert into private.production_rate_card_versions(
   'c1a80000-0000-4000-8000-000000000002',repeat('8',64),
   '2026-01-01 00:00:00+00','2099-01-01 00:00:00+00','verified'
 );
+
+insert into public.production_quotes(
+  id,workspace_id,configuration_candidate_id,plan_bundle_id,
+  plan_qc_consensus_id,quote_number,quote_hash,rate_snapshot_hash,currency,
+  low_total_microusd,expected_total_microusd,high_total_microusd,
+  hard_ceiling_microusd,target_40usd_breached,expires_at,created_at
+) values(
+  'c1a30000-0000-4000-8000-000000000003',
+  'c1100000-0000-4000-8000-000000000001',
+  'c1500000-0000-4000-8000-000000000001',
+  'c1900000-0000-4000-8000-000000000001',
+  'c1ac0000-0000-4000-8000-000000000003',3,repeat('3',64),repeat('4',64),
+  'USD',1000000,1000000,1000000,1000000,false,
+  '2099-01-01 00:00:00+00','2026-01-01 00:00:00+00'
+);
+
 insert into public.production_quote_lines(
   id,workspace_id,production_quote_id,line_number,line_key,line_kind,
   provider_request_slot_id,rate_card_version_id,low_quantity,expected_quantity,
@@ -1411,6 +1465,54 @@ insert into public.mvp_production_jobs(
   'verified_aal2'
 );
 
+insert into private.mvp_storyboard_quote_compatibility_authorities(
+  id,workspace_id,production_run_id,production_quote_id,plan_bundle_id,
+  quote_hash,source_edd_content_sha256,storyboard_rate_card_version_id,
+  storyboard_billing_quantum_count,per_frame_expected_cost_microusd,
+  authorized_attempt_count,authorized_additional_maximum_microusd,
+  authority_reason,authority_manifest_sha256
+) values(
+  'c1aa0000-0000-4000-8000-000000000001',
+  'c1100000-0000-4000-8000-000000000001',
+  'c1a00000-0000-4000-8000-000000000003',
+  'c1a30000-0000-4000-8000-000000000003',
+  'c1900000-0000-4000-8000-000000000001',
+  repeat('3',64),repeat('e',64),
+  'c1a80000-0000-4000-8000-000000000001',3.05,122000,20,4880000,
+  'legacy_quote_without_storyboard_line',repeat('a',64)
+);
+
+insert into private.mvp_storyboard_quote_compatibility_dispatch_terms(
+  id,compatibility_authority_id,workspace_id,production_run_id,
+  expected_cost_microusd,maximum_cost_microusd,legacy_contract_git_commit,
+  compatibility_reason,terms_manifest_sha256
+) values(
+  'c1aa0000-0000-4000-8000-000000000002',
+  'c1aa0000-0000-4000-8000-000000000001',
+  'c1100000-0000-4000-8000-000000000001',
+  'c1a00000-0000-4000-8000-000000000003',120000,120000,
+  '35ff40f15af820514913fbf19c4ec0a9e7699845',
+  'legacy_storyboard_worker_reservation_replay',repeat('d',64)
+);
+
+insert into private.mvp_media_dispatches(
+  id,workspace_id,production_run_id,episode_id,attempt_number,shot_number,
+  dispatch_key,media_kind,endpoint,input_manifest_sha256,
+  expected_cost_microusd,maximum_cost_microusd,state,version,fencing_token,
+  external_request_id,status_url,response_url,dispatched_at,
+  cost_evidence_state,cost_evidence_required
+) values(
+  'c1ab0000-0000-4000-8000-000000000001',
+  'c1100000-0000-4000-8000-000000000001',
+  'c1a00000-0000-4000-8000-000000000003',
+  'c1400000-0000-4000-8000-000000000001',1,2,
+  'storyboard:2:single','storyboard','fal-ai/nano-banana-2',repeat('b',64),
+  120000,120000,'submitted',2,1,'legacy_request_123456',
+  'https://queue.fal.run/fal-ai/nano-banana-2/requests/legacy_request_123456/status',
+  'https://queue.fal.run/fal-ai/nano-banana-2/requests/legacy_request_123456/response',
+  statement_timestamp(),'pending',false
+);
+
 set local session_replication_role = origin;
 
 select set_config(
@@ -1431,6 +1533,51 @@ reset role;
 select set_config('request.jwt.claims','{"role":"service_role"}',true);
 select set_config('request.jwt.claim.role','service_role',true);
 set local role service_role;
+
+select ok(
+  public.get_mvp_storyboard_cost_authority(
+    'c1100000-0000-4000-8000-000000000001',
+    'c1a00000-0000-4000-8000-000000000003'
+  )->>'source'='legacy_quote_compatibility'
+  and not exists(select 1 from public.production_quote_lines
+    where production_quote_id='c1a30000-0000-4000-8000-000000000003'
+      and line_key='storyboard_generation'),
+  'a legacy run gains separate storyboard authority without changing its quote'
+);
+
+select is(
+  public.command_reconcile_legacy_mvp_media_dispatch_rates(),
+  1,
+  'an in-flight legacy FAL dispatch is reconciled to its compatibility rate'
+);
+
+reset role;
+select ok(
+  (select rate_card_version_id='c1a80000-0000-4000-8000-000000000001'
+      and cost_evidence_required
+    from private.mvp_media_dispatches
+    where id='c1ab0000-0000-4000-8000-000000000001'),
+  'the reconciled FAL dispatch can complete with exact provider usage evidence'
+);
+
+set local role service_role;
+insert into mvp_pipeline_fixture(key,value)
+select 'legacy-storyboard-dispatch',public.command_reserve_mvp_media_dispatch(
+  'c1100000-0000-4000-8000-000000000001',
+  'c1a00000-0000-4000-8000-000000000003',
+  'c1400000-0000-4000-8000-000000000001',1,1,
+  'storyboard:1:single','storyboard','fal-ai/nano-banana-2',repeat('c',64),
+  120000,120000
+);
+
+select ok(
+  (select value->>'state' from mvp_pipeline_fixture
+    where key='legacy-storyboard-dispatch')='reserved'
+  and (select value->>'rate_card_version_id' from mvp_pipeline_fixture
+    where key='legacy-storyboard-dispatch')=
+      'c1a80000-0000-4000-8000-000000000001',
+  'an older locked run can reserve a cost-bound storyboard without rewriting its quote'
+);
 
 insert into mvp_pipeline_fixture(key,value)
 select 'production-claim-1',
@@ -1689,13 +1836,13 @@ select 'dispatch-billing-unreconciled-replay',
   );
 
 select ok(
-  (select value->>'billing_state' from mvp_pipeline_fixture
+  (select value->>'cost_evidence_state' from mvp_pipeline_fixture
     where key='dispatch-billing-unreconciled-replay')='unreconciled'
   and (select value->>'version' from mvp_pipeline_fixture
     where key='dispatch-billing-unreconciled-replay')=
       (select value->>'version' from mvp_pipeline_fixture
         where key='dispatch-billing-unreconciled-1')
-  and (select value->>'actual_cost_microusd' from mvp_pipeline_fixture
+  and (select value->>'estimated_cost_microusd' from mvp_pipeline_fixture
     where key='dispatch-billing-unreconciled-replay') is null,
   'a missing billing header is explicit and an exact retry does not churn or record zero'
 );
@@ -1733,11 +1880,14 @@ select ok(
         where key='dispatch-complete-1')
   and (select value->>'output_content_sha256' from mvp_pipeline_fixture
     where key='dispatch-complete-replay') = repeat('4',64)
-  and (select (value->>'actual_cost_microusd')::bigint
+  and (select value->>'cost_evidence_state'
+    from mvp_pipeline_fixture where key='dispatch-complete-replay')=
+      'estimated_from_provider_reported_units'
+  and (select (value->>'estimated_cost_microusd')::bigint
     from mvp_pipeline_fixture where key='dispatch-complete-replay')=122000
-  and (select value->>'billing_evidence_sha256'
+  and (select value->>'provider_usage_evidence_sha256'
     from mvp_pipeline_fixture where key='dispatch-complete-replay')=repeat('6',64),
-  'provider output completion is costed exactly and idempotent after a lost response'
+  'provider output completion stores a reproducible estimate and is idempotent'
 );
 
 select throws_ok(
@@ -1746,7 +1896,7 @@ select throws_ok(
     (select value->>'id' from mvp_pipeline_fixture where key='dispatch-submit-1'),
     'request_123456',repeat('5',64),repeat('6',64)
   ),
-  '40001','media dispatch billing evidence conflicts with completion',
+  '40001','media dispatch cost evidence conflicts with completion',
   'a completed dispatch cannot be rebound to conflicting output bytes'
 );
 

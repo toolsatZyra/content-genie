@@ -168,9 +168,34 @@ describe("MVP FAL provider broker", () => {
     );
 
     await expect(fetchMvpFalQueueResult(responseUrl, 12_345)).resolves.toEqual({
-      billingEvidenceSha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
-      billableUnits: 1.525,
       data: { images: [{ url: "https://x.fal.media/frame.png" }] },
+      providerReportedBillableUnits: 1.525,
+      providerUsageEvidenceSha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
+    });
+  });
+
+  it("bounds an accepted submission receipt before parsing JSON", async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response("x".repeat(131_073)));
+
+    await expect(
+      submitMvpFalProvider(
+        endpoint,
+        { prompt: "frame" },
+        providerDispatchId,
+        callbackToken,
+      ),
+    ).rejects.toMatchObject({
+      disposition: "unknown",
+      safeCode: "PROVIDER_OUTCOME_UNKNOWN",
+    });
+  });
+
+  it("bounds queue and result JSON before parsing an undeclared body", async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response("x".repeat(131_073)));
+
+    await expect(fetchMvpFalQueueJson(statusUrl, 5_000)).rejects.toMatchObject({
+      disposition: "terminal",
+      safeCode: "PROVIDER_RESPONSE_INVALID",
     });
   });
 

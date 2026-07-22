@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   compileMvpVideoRequest,
   MvpStoryboardProductionError,
+  parseMvpStoryboardCostAuthority,
 } from "./mvp-storyboard-production";
 
 const storyboard = "https://media.example.test/storyboard.png?token=signed";
@@ -11,6 +12,35 @@ const motion =
   "Rama raises the bow while the camera makes one restrained forward move.";
 
 describe("MVP storyboard video request compiler", () => {
+  it.each(["immutable_quote", "legacy_quote_compatibility"] as const)(
+    "accepts an auditable %s storyboard cost authority",
+    (source) => {
+      const expectedCostMicrousd =
+        source === "legacy_quote_compatibility" ? 120_000 : 122_000;
+      expect(
+        parseMvpStoryboardCostAuthority({
+          expectedCostMicrousd,
+          maximumCostMicrousd: expectedCostMicrousd,
+          rateCardVersionId: "10000000-0000-4000-8000-000000000099",
+          source,
+        }),
+      ).toMatchObject({ source, expectedCostMicrousd });
+    },
+  );
+
+  it("rejects compatibility authority without a bounded immutable rate", () => {
+    expect(() =>
+      parseMvpStoryboardCostAuthority({
+        expectedCostMicrousd: 122_000,
+        maximumCostMicrousd: 121_999,
+        rateCardVersionId: "10000000-0000-4000-8000-000000000099",
+        source: "legacy_quote_compatibility",
+      }),
+    ).toThrowError(
+      expect.objectContaining({ safeCode: "PRODUCTION_COST_AUTHORITY_UNAVAILABLE" }),
+    );
+  });
+
   it("uses Kling 2.5 with the next sufficient duration for simple motion", () => {
     const result = compileMvpVideoRequest({
       compositionMode: "single_frame",

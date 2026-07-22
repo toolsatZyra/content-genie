@@ -22,6 +22,7 @@ vi.mock("@/server/mvp-media-provider-broker", async (importOriginal) => {
 });
 
 import {
+  completeMvpMediaDispatchOutput,
   dispatchMvpFalMedia,
   fetchMvpFalBilledResultForDispatch,
   MvpMediaDispatchError,
@@ -61,7 +62,13 @@ const control = {
 const callbackToken = "A".repeat(43);
 
 function dispatchRow(
-  state: "reserved" | "dispatching" | "submitted" | "outcome_unknown" | "failed",
+  state:
+    | "reserved"
+    | "dispatching"
+    | "submitted"
+    | "succeeded"
+    | "outcome_unknown"
+    | "failed",
   overrides: Record<string, unknown> = {},
 ) {
   return {
@@ -170,9 +177,9 @@ describe("durable MVP media dispatch", () => {
 
   it("returns exact billed output evidence without an extra ledger transition", async () => {
     const result = {
-      billingEvidenceSha256: "b".repeat(64),
-      billableUnits: 1.525,
       data: { images: [] },
+      providerReportedBillableUnits: 1.525,
+      providerUsageEvidenceSha256: "b".repeat(64),
     };
     mocks.result.mockResolvedValue(result);
 
@@ -185,6 +192,29 @@ describe("durable MVP media dispatch", () => {
       }),
     ).resolves.toEqual(result);
     expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it("records provider-reported usage and names the locked-rate result as evidence", async () => {
+    mocks.rpc.mockResolvedValue({ data: dispatchRow("succeeded"), error: null });
+
+    await completeMvpMediaDispatchOutput({
+      externalRequestId: control.externalRequestId,
+      outputContentSha256: "c".repeat(64),
+      providerDispatchId: ids.dispatch,
+      providerReportedBillableUnits: 1.525,
+      providerUsageEvidenceSha256: "b".repeat(64),
+    });
+
+    expect(mocks.rpc).toHaveBeenCalledWith(
+      "command_complete_mvp_media_dispatch_output",
+      {
+        p_dispatch_id: ids.dispatch,
+        p_external_request_id: control.externalRequestId,
+        p_output_content_sha256: "c".repeat(64),
+        p_provider_reported_billable_units: 1.525,
+        p_provider_usage_evidence_sha256: "b".repeat(64),
+      },
+    );
   });
 
   it("records missing provider billing evidence as unreconciled, never zero", async () => {

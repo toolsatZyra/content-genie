@@ -57,3 +57,15 @@ export async function readResponseBodyBounded(
   }
   return Buffer.concat(chunks, received);
 }
+
+export async function readJsonResponseBounded(
+  response: Response,
+  maximumBytes: number,
+): Promise<unknown> {
+  const bytes = await readResponseBodyBounded(response, maximumBytes);
+  try {
+    return JSON.parse(bytes.toString("utf8")) as unknown;
+  } catch {
+    throw new BoundedResponseBodyError("The response JSON is invalid.");
+  }
+}
