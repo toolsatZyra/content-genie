@@ -118,6 +118,7 @@ export function deterministicReadyCreationProjection(
             repair: null,
             productionRunId: "30000000-0000-4000-8000-000000000109",
             signedMasterUrl: null,
+            transcript: [],
           }
         : emptyCreationProductionProjection,
     world: {

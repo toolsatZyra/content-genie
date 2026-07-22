@@ -1,6 +1,8 @@
 import "server-only";
 
 const QUEUE_ORIGIN = "https://queue.fal.run";
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 export class MvpMediaProviderBrokerError extends Error {
   override readonly name = "MvpMediaProviderBrokerError";
@@ -77,10 +79,39 @@ export type MvpFalControl = Readonly<{
 export async function submitMvpFalProvider(
   endpoint: string,
   payload: Readonly<Record<string, unknown>>,
+  providerDispatchId: string,
+  callbackToken: string,
 ): Promise<MvpFalControl> {
+  let submitUrl: URL;
+  try {
+    const appUrl = new URL(process.env.NEXT_PUBLIC_APP_URL?.trim() ?? "");
+    if (
+      appUrl.protocol !== "https:" ||
+      appUrl.username ||
+      appUrl.password ||
+      appUrl.hash ||
+      !uuidPattern.test(providerDispatchId) ||
+      !/^[A-Za-z0-9_-]{43}$/u.test(callbackToken)
+    ) {
+      throw new TypeError("invalid callback identity");
+    }
+    const callback = new URL(
+      `/api/internal/provider-webhooks/fal-mvp/${providerDispatchId.toLowerCase()}`,
+      appUrl,
+    );
+    callback.searchParams.set("token", callbackToken);
+    submitUrl = new URL(`${QUEUE_ORIGIN}/${endpoint}`);
+    submitUrl.searchParams.set("fal_webhook", callback.toString());
+  } catch {
+    throw new MvpMediaProviderBrokerError(
+      "FAL generation callback is not configured.",
+      "terminal",
+      "PROVIDER_UNAVAILABLE",
+    );
+  }
   let response: Response;
   try {
-    response = await fetch(`${QUEUE_ORIGIN}/${endpoint}`, {
+    response = await fetch(submitUrl, {
       body: JSON.stringify(payload),
       headers: {
         Authorization: `Key ${falKey()}`,

@@ -66,24 +66,22 @@ describe("MVP storyboard video request compiler", () => {
     });
   });
 
-  it("binds a two-state board explicitly for Seedance and forbids panels in motion", () => {
-    const result = compileMvpVideoRequest({
-      compositionMode: "split_screen_two_state",
-      expectedProviderDurationMs: 6_000,
-      motionClass: "complex_general",
-      prompt: motion,
-      retainedDurationMs: 5_100,
-      storyboardFrameId: frameId,
-      storyboardUrl: storyboard,
-    });
-
-    expect(result.endpoint).toBe("bytedance/seedance-2.0/reference-to-video");
-    expect(result.payload).toMatchObject({
-      duration: "6",
-      image_urls: [storyboard],
-      prompt: expect.stringContaining("@Image1"),
-    });
-    expect(String(result.payload.prompt)).toContain("Never show panels");
+  it("keeps a legacy split board readable but blocks it before provider compilation", () => {
+    expect(() =>
+      compileMvpVideoRequest({
+        compositionMode: "split_screen_two_state",
+        expectedProviderDurationMs: 6_000,
+        motionClass: "complex_general",
+        prompt: motion,
+        retainedDurationMs: 5_100,
+        storyboardFrameId: frameId,
+        storyboardUrl: storyboard,
+      }),
+    ).toThrowError(
+      expect.objectContaining({
+        safeCode: "PRODUCTION_STORYBOARD_MIGRATION_REQUIRED",
+      }),
+    );
   });
 
   it("sends separate clean start and end frames through Seedance image-to-video", () => {

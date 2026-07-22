@@ -20,10 +20,7 @@ import {
   compileKling3ImageToVideoPayload,
   selectKlingProviderDuration,
 } from "@/server/kling-provider-reference-compiler";
-import {
-  compileSeedanceImageToVideo,
-  compileSeedanceReferenceToVideo,
-} from "@/server/seedance-reference-compiler";
+import { compileSeedanceImageToVideo } from "@/server/seedance-reference-compiler";
 import {
   scanAndReencodeWorldImage,
   SandboxMediaScannerError,
@@ -115,6 +112,18 @@ export class MvpStoryboardProductionError extends Error {
     readonly retryable = true,
   ) {
     super(message);
+  }
+}
+
+function assertProductionReadyStoryboardMode(
+  compositionMode: EditorialShot["storyboardCompositionMode"],
+): asserts compositionMode is "single_frame" | "two_state_start_end" {
+  if (compositionMode === "split_screen_two_state") {
+    throw new MvpStoryboardProductionError(
+      "This legacy split-screen storyboard must be migrated to a clean single frame or separate start and end frames before production.",
+      "PRODUCTION_STORYBOARD_MIGRATION_REQUIRED",
+      false,
+    );
   }
 }
 
@@ -605,6 +614,7 @@ export function compileMvpVideoRequest(
   payload: Readonly<Record<string, unknown>>;
   providerDurationMs: number;
 }> {
+  assertProductionReadyStoryboardMode(input.compositionMode);
   const negative =
     "distortion, flicker, morphing, extra limbs, text, watermark, abrupt cuts, speech, lip sync, collage";
   let compiled: {
@@ -640,25 +650,6 @@ export function compileMvpVideoRequest(
         role: "accepted_storyboard_start_frame",
         url: input.storyboardUrl,
       },
-    });
-    compiled = {
-      endpoint: result.endpoint,
-      payload: result.payload,
-      providerDurationMs: result.timing.providerDurationMs,
-    };
-  } else if (input.compositionMode === "split_screen_two_state") {
-    const result = compileSeedanceReferenceToVideo({
-      editorialDurationMs: input.retainedDurationMs,
-      generateAudio: false,
-      imageReferences: [
-        {
-          assetVersionId: input.storyboardFrameId,
-          role: "two_state_storyboard",
-          url: input.storyboardUrl,
-        },
-      ],
-      prompt: `Use @Image1 only as the ordered two-state storyboard guide. Show the first state full-frame, animate the described action continuously, and finish with the second state full-frame. Never show panels, a collage, or a split screen in the video. ${input.prompt}`,
-      resolution: "720p",
     });
     compiled = {
       endpoint: result.endpoint,
@@ -911,6 +902,9 @@ export async function advanceMvpStoryboardAndClipSubmission(
       "PRODUCTION_PLAN_INVALID",
       false,
     );
+  }
+  for (const shot of editorial) {
+    assertProductionReadyStoryboardMode(shot.storyboardCompositionMode);
   }
   const edges = edgesResult.data as ReferenceEdge[];
   const edgesByShot = new Map<number, ReferenceEdge[]>();
@@ -1177,8 +1171,7 @@ export async function advanceMvpStoryboardAndClipSubmission(
         configuration.look_version_id,
       );
       const contract = compileNanoBananaReferenceContract({
-        allowIntentionalSplitScreen:
-          editorialShot.storyboardCompositionMode === "split_screen_two_state",
+        allowIntentionalSplitScreen: false,
         compositionPrompt,
         references,
       });

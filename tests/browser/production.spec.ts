@@ -26,7 +26,22 @@ test("owner watches, confirms and approves the final MVP master", async ({ page 
   await expect(
     page.getByRole("heading", { name: "Your Episode is ready to watch." }),
   ).toBeVisible();
-  await expect(page.locator("video")).toBeVisible();
+  const reviewVideo = page.getByLabel("Edited video for When Shiva Opened His Eyes");
+  await expect(reviewVideo).toBeVisible();
+  await expect(reviewVideo).toHaveAttribute("aria-describedby", /.+/u);
+  const captions = reviewVideo.locator('track[kind="captions"]');
+  await expect(captions).toHaveAttribute("srclang", "hi");
+  await expect(captions).toHaveAttribute("src", /^data:text\/vtt/u);
+  const captionsSource = await captions.getAttribute("src");
+  expect(decodeURIComponent(captionsSource ?? "")).toContain(
+    "00:00:45.000 --> 00:01:31.000",
+  );
+  const transcript = page.getByText("Timed Hindi narration transcript");
+  await expect(transcript).toBeVisible();
+  await transcript.click();
+  await expect(page.getByRole("list", { name: "Narration by shot" })).toContainText(
+    "00:00",
+  );
   await expect(
     page.getByRole("link", { name: "Download current video" }),
   ).toBeVisible();

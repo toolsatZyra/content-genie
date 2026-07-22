@@ -180,14 +180,23 @@ function providerPayload(input: {
     targetAssetId: input.targetAssetId,
     text: input.deliveryText,
     voiceId: input.externalVoiceId,
-    voiceSettings: Object.freeze({
-      similarityBoost: 0.82,
-      stability: 0.5,
-      style: 0,
-      useSpeakerBoost: true,
-    }),
+    voiceSettings: pinnedElevenLabsV3VoiceSettings,
   });
 }
+
+const pinnedElevenLabsV3VoiceSettings = Object.freeze({
+  similarityBoost: 0.82,
+  stability: 0.5,
+  style: 0,
+  useSpeakerBoost: true,
+});
+
+const voiceSettingsKeys = [
+  "similarityBoost",
+  "stability",
+  "style",
+  "useSpeakerBoost",
+] as const;
 
 const providerPayloadKeys = [
   "deliveryMap",
@@ -202,7 +211,7 @@ const providerPayloadKeys = [
   "voiceSettings",
 ] as const;
 
-function validateExistingProviderPayload(
+export function validateExistingNarrationProviderPayload(
   value: unknown,
   expected: Readonly<{
     externalVoiceId: string;
@@ -216,6 +225,7 @@ function validateExistingProviderPayload(
   const payload = value as Record<string, unknown>;
   const deliveryText = payload.text;
   const deliveryMap = payload.deliveryMap;
+  const voiceSettings = payload.voiceSettings;
   if (
     payload.modelId !== "eleven_v3" ||
     payload.outputFormat !== "mp3_44100_128" ||
@@ -225,7 +235,16 @@ function validateExistingProviderPayload(
     payload.voiceId !== expected.externalVoiceId ||
     typeof deliveryText !== "string" ||
     payload.deliveryTextSha256 !== sha256(deliveryText) ||
-    !Array.isArray(deliveryMap)
+    !Array.isArray(deliveryMap) ||
+    !exactObject(voiceSettings, voiceSettingsKeys) ||
+    (voiceSettings as Record<string, unknown>).similarityBoost !==
+      pinnedElevenLabsV3VoiceSettings.similarityBoost ||
+    (voiceSettings as Record<string, unknown>).stability !==
+      pinnedElevenLabsV3VoiceSettings.stability ||
+    (voiceSettings as Record<string, unknown>).style !==
+      pinnedElevenLabsV3VoiceSettings.style ||
+    (voiceSettings as Record<string, unknown>).useSpeakerBoost !==
+      pinnedElevenLabsV3VoiceSettings.useSpeakerBoost
   ) {
     throw new NarrationProviderError("Existing narration delivery conflicts.");
   }
@@ -290,7 +309,7 @@ export async function prepareNarrationProviderDispatches(
           sourceText: input.exactText,
           targetAssetId,
         })
-      : validateExistingProviderPayload(existingPayload, {
+      : validateExistingNarrationProviderPayload(existingPayload, {
           externalVoiceId: capability.externalVoiceId,
           sourceText: input.exactText,
           targetAssetId,

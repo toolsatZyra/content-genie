@@ -468,7 +468,7 @@ export function WorldStudio({
                       {displayedState === "accepted"
                         ? "Accepted"
                         : pendingOperation === "accept"
-                          ? "Acceptingâ€¦"
+                          ? "Accepting…"
                           : "Accept anchor"}
                     </button>
                     <button

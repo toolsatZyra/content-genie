@@ -37,6 +37,7 @@ export function CreationLaunchpad({
         repair={production.repair}
         signedMasterUrl={production.signedMasterUrl}
         stageHeadingRef={stageHeadingRef}
+        transcript={production.transcript}
         workspaceId={workspaceId}
       />
     );

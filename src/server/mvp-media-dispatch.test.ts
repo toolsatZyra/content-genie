@@ -16,7 +16,11 @@ vi.mock("@/server/mvp-media-provider-broker", async (importOriginal) => {
   return { ...original, submitMvpFalProvider: mocks.submit };
 });
 
-import { dispatchMvpFalMedia, MvpMediaDispatchError } from "./mvp-media-dispatch";
+import {
+  dispatchMvpFalMedia,
+  MvpMediaDispatchError,
+  reconcileMvpMediaDispatchWebhook,
+} from "./mvp-media-dispatch";
 import { MvpMediaProviderBrokerError } from "./mvp-media-provider-broker";
 
 const ids = {
@@ -48,12 +52,14 @@ const control = {
   statusUrl:
     "https://queue.fal.run/fal-ai/nano-banana-2/requests/request_123456/status",
 } as const;
+const callbackToken = "A".repeat(43);
 
 function dispatchRow(
   state: "reserved" | "dispatching" | "submitted" | "outcome_unknown" | "failed",
   overrides: Record<string, unknown> = {},
 ) {
   return {
+    callback_token_sha256: null,
     claim_token: state === "dispatching" ? "claim-token" : null,
     external_request_id: state === "submitted" ? control.externalRequestId : null,
     fencing_token: 11,
@@ -74,19 +80,29 @@ describe("durable MVP media dispatch", () => {
 
   it("durably reserves and claims the dispatch before the provider network call", async () => {
     const events: string[] = [];
-    mocks.rpc.mockImplementation(async (name: string) => {
-      events.push(`rpc:${name}`);
-      if (name === "command_reserve_mvp_media_dispatch") {
-        return { data: dispatchRow("reserved"), error: null };
-      }
-      if (name === "command_claim_mvp_media_dispatch") {
-        return { data: dispatchRow("dispatching"), error: null };
-      }
-      if (name === "command_record_mvp_media_dispatch_submission") {
-        return { data: dispatchRow("submitted"), error: null };
-      }
-      throw new Error(`Unexpected test RPC ${name}`);
-    });
+    mocks.rpc.mockImplementation(
+      async (name: string, parameters: Record<string, unknown>) => {
+        events.push(`rpc:${name}`);
+        if (name === "command_reserve_mvp_media_dispatch") {
+          return { data: dispatchRow("reserved"), error: null };
+        }
+        if (name === "command_claim_mvp_media_dispatch") {
+          return { data: dispatchRow("dispatching"), error: null };
+        }
+        if (name === "command_bind_mvp_media_dispatch_callback") {
+          return {
+            data: dispatchRow("dispatching", {
+              callback_token_sha256: parameters.p_callback_token_sha256,
+            }),
+            error: null,
+          };
+        }
+        if (name === "command_record_mvp_media_dispatch_submission") {
+          return { data: dispatchRow("submitted"), error: null };
+        }
+        throw new Error(`Unexpected test RPC ${name}`);
+      },
+    );
     mocks.submit.mockImplementation(async () => {
       events.push("network:submit");
       return control;
@@ -99,9 +115,16 @@ describe("durable MVP media dispatch", () => {
     expect(events).toEqual([
       "rpc:command_reserve_mvp_media_dispatch",
       "rpc:command_claim_mvp_media_dispatch",
+      "rpc:command_bind_mvp_media_dispatch_callback",
       "network:submit",
       "rpc:command_record_mvp_media_dispatch_submission",
     ]);
+    expect(mocks.submit).toHaveBeenCalledWith(
+      input.endpoint,
+      input.payload,
+      ids.dispatch,
+      expect.stringMatching(/^[A-Za-z0-9_-]{43}$/u),
+    );
   });
 
   it("replays a submitted dispatch without claiming or calling the provider", async () => {
@@ -119,68 +142,156 @@ describe("durable MVP media dispatch", () => {
     expect(mocks.submit).not.toHaveBeenCalled();
   });
 
-  it("does not duplicate a provider submit after receipt-persistence ambiguity", async () => {
-    let reserveState: "reserved" | "outcome_unknown" = "reserved";
-    mocks.rpc.mockImplementation(async (name: string, parameters: unknown) => {
-      void parameters;
-      if (name === "command_reserve_mvp_media_dispatch") {
-        return { data: dispatchRow(reserveState), error: null };
-      }
-      if (name === "command_claim_mvp_media_dispatch") {
-        return { data: dispatchRow("dispatching"), error: null };
-      }
-      if (name === "command_record_mvp_media_dispatch_submission") {
-        return { data: null, error: { message: "commit acknowledgement lost" } };
-      }
-      if (name === "command_fail_mvp_media_dispatch") {
-        reserveState = "outcome_unknown";
-        return { data: dispatchRow("outcome_unknown"), error: null };
-      }
-      throw new Error(`Unexpected test RPC ${name}`);
-    });
-    mocks.submit.mockResolvedValue(control);
+  it("records a verified provider callback against the reserved dispatch id", async () => {
+    mocks.rpc.mockResolvedValue({ data: dispatchRow("submitted"), error: null });
 
-    await expect(dispatchMvpFalMedia(input)).rejects.toMatchObject({
-      safeCode: "PRODUCTION_LEDGER_FAILED",
-    });
-    await expect(dispatchMvpFalMedia(input)).rejects.toMatchObject({
-      safeCode: "PROVIDER_OUTCOME_UNKNOWN",
-    });
-    expect(mocks.submit).toHaveBeenCalledOnce();
+    await expect(
+      reconcileMvpMediaDispatchWebhook({
+        callbackToken,
+        externalRequestId: control.externalRequestId,
+        providerDispatchId: ids.dispatch,
+      }),
+    ).resolves.toBeUndefined();
     expect(mocks.rpc).toHaveBeenCalledWith(
-      "command_fail_mvp_media_dispatch",
-      expect.objectContaining({ p_outcome_unknown: true }),
+      "command_reconcile_mvp_media_dispatch_webhook",
+      {
+        p_callback_token: callbackToken,
+        p_dispatch_id: ids.dispatch,
+        p_external_request_id: control.externalRequestId,
+      },
     );
   });
 
-  it("replays a committed receipt when only its persistence acknowledgement was lost", async () => {
-    let reserveState: "reserved" | "submitted" = "reserved";
-    mocks.rpc.mockImplementation(async (name: string) => {
-      if (name === "command_reserve_mvp_media_dispatch") {
-        return { data: dispatchRow(reserveState), error: null };
-      }
-      if (name === "command_claim_mvp_media_dispatch") {
-        return { data: dispatchRow("dispatching"), error: null };
-      }
-      if (name === "command_record_mvp_media_dispatch_submission") {
-        reserveState = "submitted";
-        return { data: null, error: { message: "commit acknowledgement lost" } };
-      }
-      if (name === "command_fail_mvp_media_dispatch") {
-        return { data: null, error: { message: "stale fencing token" } };
-      }
-      throw new Error(`Unexpected test RPC ${name}`);
-    });
+  it("reconciles a known provider receipt after its initial ledger write fails", async () => {
+    let reconcileAttempts = 0;
+    mocks.rpc.mockImplementation(
+      async (name: string, parameters: Record<string, unknown>) => {
+        if (name === "command_reserve_mvp_media_dispatch") {
+          return { data: dispatchRow("reserved"), error: null };
+        }
+        if (name === "command_claim_mvp_media_dispatch") {
+          return { data: dispatchRow("dispatching"), error: null };
+        }
+        if (name === "command_bind_mvp_media_dispatch_callback") {
+          return {
+            data: dispatchRow("dispatching", {
+              callback_token_sha256: parameters.p_callback_token_sha256,
+            }),
+            error: null,
+          };
+        }
+        if (name === "command_record_mvp_media_dispatch_submission") {
+          return { data: null, error: { message: "commit acknowledgement lost" } };
+        }
+        if (name === "command_reconcile_mvp_media_dispatch_submission") {
+          reconcileAttempts += 1;
+          return reconcileAttempts === 1
+            ? { data: null, error: { message: "temporary ledger outage" } }
+            : { data: dispatchRow("submitted"), error: null };
+        }
+        throw new Error(`Unexpected test RPC ${name}`);
+      },
+    );
     mocks.submit.mockResolvedValue(control);
 
-    await expect(dispatchMvpFalMedia(input)).rejects.toMatchObject({
-      safeCode: "PRODUCTION_LEDGER_FAILED",
-    });
     await expect(dispatchMvpFalMedia(input)).resolves.toEqual({
       ...control,
       providerDispatchId: ids.dispatch,
     });
     expect(mocks.submit).toHaveBeenCalledOnce();
+    expect(reconcileAttempts).toBe(2);
+    expect(mocks.rpc).not.toHaveBeenCalledWith(
+      "command_fail_mvp_media_dispatch",
+      expect.anything(),
+    );
+  });
+
+  it("returns a committed receipt through reconciliation when its acknowledgement was lost", async () => {
+    mocks.rpc.mockImplementation(
+      async (name: string, parameters: Record<string, unknown>) => {
+        if (name === "command_reserve_mvp_media_dispatch") {
+          return { data: dispatchRow("reserved"), error: null };
+        }
+        if (name === "command_claim_mvp_media_dispatch") {
+          return { data: dispatchRow("dispatching"), error: null };
+        }
+        if (name === "command_bind_mvp_media_dispatch_callback") {
+          return {
+            data: dispatchRow("dispatching", {
+              callback_token_sha256: parameters.p_callback_token_sha256,
+            }),
+            error: null,
+          };
+        }
+        if (name === "command_record_mvp_media_dispatch_submission") {
+          return { data: null, error: { message: "commit acknowledgement lost" } };
+        }
+        if (name === "command_reconcile_mvp_media_dispatch_submission") {
+          return { data: dispatchRow("submitted"), error: null };
+        }
+        throw new Error(`Unexpected test RPC ${name}`);
+      },
+    );
+    mocks.submit.mockResolvedValue(control);
+
+    await expect(dispatchMvpFalMedia(input)).resolves.toEqual({
+      ...control,
+      providerDispatchId: ids.dispatch,
+    });
+    expect(mocks.submit).toHaveBeenCalledOnce();
+  });
+
+  it("keeps a known receipt pending after bounded reconciliation without failing the slot", async () => {
+    let reserveCalls = 0;
+    mocks.rpc.mockImplementation(
+      async (name: string, parameters: Record<string, unknown>) => {
+        if (name === "command_reserve_mvp_media_dispatch") {
+          reserveCalls += 1;
+          return {
+            data: dispatchRow(reserveCalls === 1 ? "reserved" : "outcome_unknown"),
+            error: null,
+          };
+        }
+        if (name === "command_claim_mvp_media_dispatch") {
+          return { data: dispatchRow("dispatching"), error: null };
+        }
+        if (name === "command_bind_mvp_media_dispatch_callback") {
+          return {
+            data: dispatchRow("dispatching", {
+              callback_token_sha256: parameters.p_callback_token_sha256,
+            }),
+            error: null,
+          };
+        }
+        if (
+          name === "command_record_mvp_media_dispatch_submission" ||
+          name === "command_reconcile_mvp_media_dispatch_submission"
+        ) {
+          return { data: null, error: { message: "ledger unavailable" } };
+        }
+        throw new Error(`Unexpected test RPC ${name}`);
+      },
+    );
+    mocks.submit.mockResolvedValue(control);
+
+    await expect(dispatchMvpFalMedia(input)).rejects.toMatchObject({
+      retryable: true,
+      safeCode: "PROVIDER_RECEIPT_RECONCILIATION_PENDING",
+    } satisfies Partial<MvpMediaDispatchError>);
+    await expect(dispatchMvpFalMedia(input)).rejects.toMatchObject({
+      retryable: false,
+      safeCode: "PROVIDER_OUTCOME_UNKNOWN",
+    } satisfies Partial<MvpMediaDispatchError>);
+    expect(mocks.submit).toHaveBeenCalledOnce();
+    expect(
+      mocks.rpc.mock.calls.filter(
+        ([name]) => name === "command_reconcile_mvp_media_dispatch_submission",
+      ),
+    ).toHaveLength(3);
+    expect(mocks.rpc).not.toHaveBeenCalledWith(
+      "command_fail_mvp_media_dispatch",
+      expect.anything(),
+    );
   });
 
   it.each([
@@ -205,21 +316,31 @@ describe("durable MVP media dispatch", () => {
   ])(
     "records the provider $safeCode transition without retrying in-process",
     async ({ broker, outcomeUnknown, safeCode }) => {
-      mocks.rpc.mockImplementation(async (name: string) => {
-        if (name === "command_reserve_mvp_media_dispatch") {
-          return { data: dispatchRow("reserved"), error: null };
-        }
-        if (name === "command_claim_mvp_media_dispatch") {
-          return { data: dispatchRow("dispatching"), error: null };
-        }
-        if (name === "command_fail_mvp_media_dispatch") {
-          return {
-            data: dispatchRow(outcomeUnknown ? "outcome_unknown" : "failed"),
-            error: null,
-          };
-        }
-        throw new Error(`Unexpected test RPC ${name}`);
-      });
+      mocks.rpc.mockImplementation(
+        async (name: string, parameters: Record<string, unknown>) => {
+          if (name === "command_reserve_mvp_media_dispatch") {
+            return { data: dispatchRow("reserved"), error: null };
+          }
+          if (name === "command_claim_mvp_media_dispatch") {
+            return { data: dispatchRow("dispatching"), error: null };
+          }
+          if (name === "command_bind_mvp_media_dispatch_callback") {
+            return {
+              data: dispatchRow("dispatching", {
+                callback_token_sha256: parameters.p_callback_token_sha256,
+              }),
+              error: null,
+            };
+          }
+          if (name === "command_fail_mvp_media_dispatch") {
+            return {
+              data: dispatchRow(outcomeUnknown ? "outcome_unknown" : "failed"),
+              error: null,
+            };
+          }
+          throw new Error(`Unexpected test RPC ${name}`);
+        },
+      );
       mocks.submit.mockRejectedValue(broker);
 
       await expect(dispatchMvpFalMedia(input)).rejects.toMatchObject({

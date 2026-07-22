@@ -44,7 +44,7 @@ Return decision repair only when every feedback point is sufficiently clear. Set
 - cut, pacing, transition, SFX or edit-only defects => reedit_only;
 - shots requiring no direct repair => reuse_all.
 
-For reuse_all, revisedFields must be null. For every other action, revisedFields must contain the complete revised mutable EDD field set. Copy fields that do not need to change exactly; change only fields permitted by the selected action. A storyboard prompt describes one standalone 9:16 static composition, camera, lighting and mood. If storyboardCompositionMode is two_state_start_end, keep storyboardStartPromptBlueprint and storyboardEndPromptBlueprint as two separate clean full-frame images; never combine them as panels, a split screen, diptych, collage, or contact sheet. A motion prompt describes only how the accepted frame or start/end pair moves within this shot and never refers to another shot. An SFX cue is one isolated non-vocal event, or the exact phrase "deliberate silence" with zero duration and offset. Use only the supported cut types hard_cut, match_cut, cut_on_action, smash_cut, jump_cut, and opening-only fade_from_black.
+For reuse_all, revisedFields must be null. For every other action, revisedFields must contain the complete revised mutable EDD field set. Copy fields that do not need to change exactly; change only fields permitted by the selected action. A storyboard prompt describes one standalone 9:16 static composition, camera, lighting and mood. New work may use only storyboardCompositionMode single_frame or two_state_start_end. A source marked split_screen_two_state is an audit-only legacy record that no media provider may receive: choose regenerate_storyboard_and_clip for that shot and migrate it to a clean single_frame or two_state_start_end. When that migration is independent of the owner's feedback, use an empty feedbackPointIndexes list and only the legacy shot's own evidence window. If storyboardCompositionMode is two_state_start_end, keep storyboardStartPromptBlueprint and storyboardEndPromptBlueprint as two separate clean full-frame images; never combine them as panels, a split screen, diptych, collage, or contact sheet. A motion prompt describes only how the accepted frame or start/end pair moves within this shot and never refers to another shot. An SFX cue is one isolated non-vocal event, or the exact phrase "deliberate silence" with zero duration and offset. Use only the supported cut types hard_cut, match_cut, cut_on_action, smash_cut, jump_cut, and opening-only fade_from_black.
 
 Continuity closure is server-owned. Do not predict or add downstream continuity repairs. For a cut/edit boundary, include an immediate neighboring shot only when it truly needs re-editing and set that neighbor's dependencyReason to a concise explanation; direct findings use dependencyReason null.
 
@@ -86,7 +86,7 @@ export type MvpRepairDirectorShotSummary = Readonly<{
   visualIntent: string;
 }>;
 
-export type MvpRepairRevisedFields = Omit<
+type MvpRepairSourceMutableFields = Omit<
   MvpRepairDirectorShotSummary,
   | "durationMs"
   | "endMs"
@@ -94,8 +94,15 @@ export type MvpRepairRevisedFields = Omit<
   | "shotNumber"
   | "startMs"
   | "sourceStoryboardAvailable"
-  | "storyboardCompositionMode"
 >;
+
+export type MvpRepairRevisedFields = Omit<
+  MvpRepairSourceMutableFields,
+  "storyboardCompositionMode"
+> &
+  Readonly<{
+    storyboardCompositionMode: "single_frame" | "two_state_start_end";
+  }>;
 
 export type MvpRepairDirectorInput = Readonly<{
   clarificationTranscript: readonly MvpRepairClarificationRound[];
@@ -869,6 +876,10 @@ function responseSchema(
       sfxDurationMs: { maximum: 5_000, minimum: 0, type: "integer" },
       sfxGainDb: { maximum: -9, minimum: -30, type: "number" },
       sfxStartOffsetMs: { maximum: 14_999, minimum: 0, type: "integer" },
+      storyboardCompositionMode: {
+        enum: ["single_frame", "two_state_start_end"],
+        type: "string",
+      },
       storyboardPromptBlueprint: {
         maxLength: MAXIMUM_SUMMARY_FIELD_LENGTH,
         minLength: 1,
@@ -910,6 +921,7 @@ function responseSchema(
       "sfxDurationMs",
       "sfxGainDb",
       "sfxStartOffsetMs",
+      "storyboardCompositionMode",
       "storyboardEndPromptBlueprint",
       "storyboardPromptBlueprint",
       "storyboardStartPromptBlueprint",
@@ -1151,6 +1163,7 @@ const revisedFieldKeys = Object.freeze([
   "sfxDurationMs",
   "sfxGainDb",
   "sfxStartOffsetMs",
+  "storyboardCompositionMode",
   "storyboardEndPromptBlueprint",
   "storyboardPromptBlueprint",
   "storyboardStartPromptBlueprint",
@@ -1250,6 +1263,17 @@ function parsedRevisedFields(
       0,
       14_999,
     ),
+    storyboardCompositionMode: ((): "single_frame" | "two_state_start_end" => {
+      if (
+        fields.storyboardCompositionMode !== "single_frame" &&
+        fields.storyboardCompositionMode !== "two_state_start_end"
+      ) {
+        throw new MvpRepairDirectorError(
+          `Shot ${shotNumber} revised storyboard mode is invalid.`,
+        );
+      }
+      return fields.storyboardCompositionMode;
+    })(),
     storyboardPromptBlueprint: boundedText(
       fields.storyboardPromptBlueprint,
       `Shot ${shotNumber} revised storyboard prompt`,
@@ -1565,6 +1589,7 @@ function groundingIssues(
   const resolvedByPoint = new Map<number, readonly number[]>();
   const coveredPoints = new Set<number>();
   for (const action of actions) {
+    const sourceShot = sourceShots[action.shotNumber - 1]!;
     const expectedWindows = evidenceWindowsForShots(
       action.resolvedShotNumbers,
       sourceShots,
@@ -1588,6 +1613,18 @@ function groundingIssues(
           `Reuse action ${action.shotNumber} does not carry only its own immutable evidence window.`,
         );
       }
+      continue;
+    }
+    const auditOnlyLegacyMigration =
+      sourceShot.storyboardCompositionMode === "split_screen_two_state" &&
+      action.action === "regenerate_storyboard_and_clip" &&
+      action.revisedFields?.storyboardCompositionMode !== undefined;
+    if (
+      auditOnlyLegacyMigration &&
+      action.feedbackPointIndexes.length === 0 &&
+      postgresJsonbText(action.resolvedShotNumbers) ===
+        postgresJsonbText([action.shotNumber])
+    ) {
       continue;
     }
     if (
@@ -1819,7 +1856,21 @@ export function compileMvpRepairDirectorOutput(
       }),
     );
   }
-  const mutableSource = (shot: MvpRepairDirectorShotSummary): MvpRepairRevisedFields =>
+  for (const action of actions) {
+    const sourceShot = sourceShots[action.shotNumber - 1]!;
+    if (
+      sourceShot.storyboardCompositionMode === "split_screen_two_state" &&
+      (action.action !== "regenerate_storyboard_and_clip" ||
+        action.revisedFields === null)
+    ) {
+      throw new MvpRepairDirectorError(
+        `Shot ${action.shotNumber} must migrate its legacy split-screen storyboard before provider work.`,
+      );
+    }
+  }
+  const mutableSource = (
+    shot: MvpRepairDirectorShotSummary,
+  ): MvpRepairSourceMutableFields =>
     Object.freeze({
       action: shot.action,
       cameraAngleAndDistance: shot.cameraAngleAndDistance,
@@ -1835,13 +1886,14 @@ export function compileMvpRepairDirectorOutput(
       sfxDurationMs: shot.sfxDurationMs,
       sfxGainDb: shot.sfxGainDb,
       sfxStartOffsetMs: shot.sfxStartOffsetMs,
+      storyboardCompositionMode: shot.storyboardCompositionMode,
       storyboardPromptBlueprint: shot.storyboardPromptBlueprint,
       storyboardStartPromptBlueprint: shot.storyboardStartPromptBlueprint,
       storyboardEndPromptBlueprint: shot.storyboardEndPromptBlueprint,
       visualIntent: shot.visualIntent,
     });
   const unchanged = (
-    source: MvpRepairRevisedFields,
+    source: MvpRepairSourceMutableFields,
     revised: MvpRepairRevisedFields,
     keys: readonly (keyof MvpRepairRevisedFields)[],
   ) =>
@@ -1855,6 +1907,7 @@ export function compileMvpRepairDirectorOutput(
     "narrativeFunction",
     "promptBlueprint",
     "sceneComposition",
+    "storyboardCompositionMode",
     "storyboardPromptBlueprint",
     "storyboardStartPromptBlueprint",
     "storyboardEndPromptBlueprint",
@@ -1875,9 +1928,9 @@ export function compileMvpRepairDirectorOutput(
       );
     }
     if (
-      (sourceShot.storyboardCompositionMode === "two_state_start_end" &&
+      (action.revisedFields.storyboardCompositionMode === "two_state_start_end" &&
         action.revisedFields.storyboardEndPromptBlueprint === null) ||
-      (sourceShot.storyboardCompositionMode !== "two_state_start_end" &&
+      (action.revisedFields.storyboardCompositionMode !== "two_state_start_end" &&
         action.revisedFields.storyboardEndPromptBlueprint !== null)
     ) {
       throw new MvpRepairDirectorError(
@@ -1930,10 +1983,23 @@ export function compileMvpRepairDirectorOutput(
   const revisedFieldsByShot = new Map<number, MvpRepairRevisedFields>();
   for (const action of plan.actions) {
     if (action.action === "reuse_all") continue;
+    const revised = parsedByShot.get(action.shotNumber)?.revisedFields;
+    if (revised) {
+      revisedFieldsByShot.set(action.shotNumber, revised);
+      continue;
+    }
+    const inherited = mutableSource(sourceShots[action.shotNumber - 1]!);
+    if (inherited.storyboardCompositionMode === "split_screen_two_state") {
+      throw new MvpRepairDirectorError(
+        `Shot ${action.shotNumber} has no clean storyboard migration fields.`,
+      );
+    }
     revisedFieldsByShot.set(
       action.shotNumber,
-      parsedByShot.get(action.shotNumber)?.revisedFields ??
-        mutableSource(sourceShots[action.shotNumber - 1]!),
+      Object.freeze({
+        ...inherited,
+        storyboardCompositionMode: inherited.storyboardCompositionMode,
+      }),
     );
   }
   return Object.freeze({

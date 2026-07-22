@@ -220,6 +220,7 @@ describe("the creation projection query", () => {
         repair: null,
         productionRunId: null,
         signedMasterUrl: null,
+        transcript: [],
       },
       world: { characters: [], locations: [], progress: [], referencePack: null },
     });
@@ -297,6 +298,89 @@ describe("the creation projection query", () => {
       LOOKS.map((look) => look.versionId).sort(),
     );
     expect(availability?.[lookVersionId]).toBe("active");
+  });
+
+  it("projects the exact shot-timed narration transcript for Edit", async () => {
+    const results = successfulResults();
+    results.mvp_production_jobs = {
+      data: {
+        attempt_number: 1,
+        completed_clips: 2,
+        completed_sfx: 2,
+        completed_storyboards: 2,
+        last_error_code: null,
+        last_error_summary: null,
+        plan_bundle_id: "10000000-0000-4000-8000-000000000020",
+        production_run_id: "10000000-0000-4000-8000-000000000021",
+        state: "review_ready",
+        total_clips: 2,
+        total_sfx: 2,
+        total_storyboards: 2,
+        version: 4,
+      },
+      error: null,
+    };
+    results.mvp_episode_masters = {
+      data: {
+        attempt_number: 1,
+        duration_ms: 6_000,
+        height: 1920,
+        id: "10000000-0000-4000-8000-000000000022",
+        object_name: `${workspaceId}/mvp-masters/master.mp4`,
+        state: "pending_review",
+        version: 1,
+        width: 1080,
+      },
+      error: null,
+    };
+    results.preflight_plan_bundles = {
+      data: { edd_version_id: "10000000-0000-4000-8000-000000000023" },
+      error: null,
+    };
+    results.preflight_plan_component_versions = {
+      data: {
+        payload: {
+          shots: [
+            {
+              endMs: 2_750,
+              exactNarration:
+                "\u0936\u093f\u0935 \u0928\u0947\u0924\u094d\u0930 \u0916\u0941\u0932\u0947\u0964",
+              shotNumber: 1,
+              startMs: 0,
+            },
+            {
+              endMs: 6_000,
+              exactNarration:
+                "\u092a\u094d\u0930\u0915\u093e\u0936 \u092b\u0948\u0932 \u0917\u092f\u093e\u0964",
+              shotNumber: 2,
+              startMs: 2_750,
+            },
+          ],
+        },
+      },
+      error: null,
+    };
+    const { client } = fakeClient(results);
+
+    const projection = await loadCreationProjection(client, user, episodeId);
+
+    expect(projection?.production.transcript).toEqual([
+      {
+        endMs: 2_750,
+        exactNarration:
+          "\u0936\u093f\u0935 \u0928\u0947\u0924\u094d\u0930 \u0916\u0941\u0932\u0947\u0964",
+        shotNumber: 1,
+        startMs: 0,
+      },
+      {
+        endMs: 6_000,
+        exactNarration:
+          "\u092a\u094d\u0930\u0915\u093e\u0936 \u092b\u0948\u0932 \u0917\u092f\u093e\u0964",
+        shotNumber: 2,
+        startMs: 2_750,
+      },
+    ]);
+    expect(projection?.production.job).not.toHaveProperty("plan_bundle_id");
   });
 
   it("suppresses a terminal failure superseded by a newer run of the same kind", async () => {

@@ -348,9 +348,10 @@ function elevenLabsPayload(manifest: ProviderDispatchManifest): {
     ? deliveryScalars.filter((_, index) => deliveryMap[index] === null).join("")
     : "";
   if (
-    typeof settings.useSpeakerBoost !== "boolean" ||
+    settings.similarityBoost !== 0.82 ||
     settings.stability !== 0.5 ||
     settings.style !== 0 ||
+    settings.useSpeakerBoost !== true ||
     payload.sourceTextSha256 !== sourceHash ||
     payload.deliveryTextSha256 !== deliveryHash ||
     /^\s*\[thoughtful\]/iu.test(deliveryText) ||

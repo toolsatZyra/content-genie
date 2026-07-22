@@ -1,12 +1,12 @@
 -- Focused database contract for the autonomous MVP cinematic pipeline.
--- Run after migrations through 20260721183000.
+-- Run after migrations through 20260722115341.
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions,auth,storage,private,audit,pg_catalog;
 
-select plan(87);
+select plan(91);
 
 create temp table mvp_pipeline_fixture(
   key text primary key,
@@ -1158,6 +1158,15 @@ select ok(
     'public.command_record_mvp_media_dispatch_submission(uuid,bigint,uuid,bigint,text,text,text)'
   ) is not null
   and to_regprocedure(
+    'public.command_reconcile_mvp_media_dispatch_submission(uuid,bigint,uuid,bigint,uuid,integer,text,text,text,text,text,text)'
+  ) is not null
+  and to_regprocedure(
+    'public.command_bind_mvp_media_dispatch_callback(uuid,bigint,uuid,bigint,text)'
+  ) is not null
+  and to_regprocedure(
+    'public.command_reconcile_mvp_media_dispatch_webhook(uuid,text,text)'
+  ) is not null
+  and to_regprocedure(
     'public.command_fail_mvp_media_dispatch(uuid,bigint,uuid,bigint,boolean,text,text)'
   ) is not null
   and to_regprocedure(
@@ -1182,6 +1191,21 @@ select ok(
   and not has_function_privilege(
     'authenticated',
     'public.command_reserve_mvp_media_dispatch(uuid,uuid,uuid,integer,integer,text,text,text,text,bigint,bigint)',
+    'execute'
+  )
+  and not has_function_privilege(
+    'authenticated',
+    'public.command_reconcile_mvp_media_dispatch_submission(uuid,bigint,uuid,bigint,uuid,integer,text,text,text,text,text,text)',
+    'execute'
+  )
+  and not has_function_privilege(
+    'authenticated',
+    'public.command_bind_mvp_media_dispatch_callback(uuid,bigint,uuid,bigint,text)',
+    'execute'
+  )
+  and not has_function_privilege(
+    'authenticated',
+    'public.command_reconcile_mvp_media_dispatch_webhook(uuid,text,text)',
     'execute'
   ),
   'dispatch intent is command-only and provider receipts remain service-private'
@@ -1494,23 +1518,45 @@ select throws_ok(
   'a queue URL cannot be bound to a different provider request'
 );
 
+select throws_ok(
+  format(
+    'select public.command_reconcile_mvp_media_dispatch_submission(%L,2,%L,1,%L,1,%L,%L,%L,%L,%L,%L)',
+    (select value->>'id' from mvp_pipeline_fixture where key='dispatch-claim-1'),
+    (select value->>'claim_token' from mvp_pipeline_fixture
+      where key='dispatch-claim-1'),
+    'c1a00000-0000-4000-8000-000000000002',
+    'storyboard:1:single','fal-ai/nano-banana-2/edit',repeat('3',64),
+    'request_123456',
+    'https://queue.fal.run/fal-ai/nano-banana-2/requests/request_123456/status',
+    'https://queue.fal.run/fal-ai/nano-banana-2/requests/request_123456/response'
+  ),
+  '40001','media dispatch reconciliation conflicts with immutable intent',
+  'a known provider receipt cannot be attached to different immutable input'
+);
+
 insert into mvp_pipeline_fixture(key,value)
-select 'dispatch-submit-1', public.command_record_mvp_media_dispatch_submission(
+select 'dispatch-submit-1', public.command_reconcile_mvp_media_dispatch_submission(
   (select (value->>'id')::uuid from mvp_pipeline_fixture
     where key='dispatch-claim-1'),
   (select (value->>'version')::bigint from mvp_pipeline_fixture
     where key='dispatch-claim-1'),
   (select (value->>'claim_token')::uuid from mvp_pipeline_fixture
-    where key='dispatch-claim-1'),1,'request_123456',
+    where key='dispatch-claim-1'),1,
+  'c1a00000-0000-4000-8000-000000000002',1,
+  'storyboard:1:single','fal-ai/nano-banana-2',repeat('3',64),
+  'request_123456',
   'https://queue.fal.run/fal-ai/nano-banana-2/requests/request_123456/status',
   'https://queue.fal.run/fal-ai/nano-banana-2/requests/request_123456/response'
 );
 
 insert into mvp_pipeline_fixture(key,value)
-select 'dispatch-submit-replay', public.command_record_mvp_media_dispatch_submission(
+select 'dispatch-submit-replay', public.command_reconcile_mvp_media_dispatch_submission(
   (select (value->>'id')::uuid from mvp_pipeline_fixture
     where key='dispatch-claim-1'),2,
-  'c1a70000-0000-4000-8000-000000000099',99,'request_123456',
+  'c1a70000-0000-4000-8000-000000000099',99,
+  'c1a00000-0000-4000-8000-000000000002',1,
+  'storyboard:1:single','fal-ai/nano-banana-2',repeat('3',64),
+  'request_123456',
   'https://queue.fal.run/fal-ai/nano-banana-2/requests/request_123456/status',
   'https://queue.fal.run/fal-ai/nano-banana-2/requests/request_123456/response'
 );
@@ -1587,6 +1633,27 @@ select 'dispatch-expiring-claim', public.command_claim_mvp_media_dispatch(
     where key='dispatch-expiring-reserve'),1,120
 );
 
+insert into mvp_pipeline_fixture(key,value)
+select 'dispatch-expiring-callback-bind',
+  public.command_bind_mvp_media_dispatch_callback(
+    (select (value->>'id')::uuid from mvp_pipeline_fixture
+      where key='dispatch-expiring-claim'),
+    (select (value->>'version')::bigint from mvp_pipeline_fixture
+      where key='dispatch-expiring-claim'),
+    (select (value->>'claim_token')::uuid from mvp_pipeline_fixture
+      where key='dispatch-expiring-claim'),
+    (select (value->>'fencing_token')::bigint from mvp_pipeline_fixture
+      where key='dispatch-expiring-claim'),
+    encode(extensions.digest(repeat('A',43),'sha256'),'hex')
+  );
+
+select ok(
+  (select value->>'callback_token_sha256' from mvp_pipeline_fixture
+    where key='dispatch-expiring-callback-bind') =
+      encode(extensions.digest(repeat('A',43),'sha256'),'hex'),
+  'the opaque callback token is hash-bound before provider submission'
+);
+
 reset role;
 update private.mvp_media_dispatches
 set lease_expires_at = statement_timestamp() - interval '1 second'
@@ -1626,6 +1693,38 @@ select ok(
   and (select value->>'claim_token' from mvp_pipeline_fixture
     where key='dispatch-expired-replay') is null,
   'an expired network-bound lease becomes outcome unknown and cannot resubmit'
+);
+
+select throws_ok(
+  format(
+    'select public.command_reconcile_mvp_media_dispatch_webhook(%L,%L,%L)',
+    (select value->>'id' from mvp_pipeline_fixture
+      where key='dispatch-expired-replay'),
+    'request_654322',repeat('B',43)
+  ),
+  '40001','media dispatch callback binding does not match',
+  'a signed provider receipt cannot be replayed into another media slot'
+);
+
+insert into mvp_pipeline_fixture(key,value)
+select 'dispatch-webhook-reconcile',
+  public.command_reconcile_mvp_media_dispatch_webhook(
+    (select (value->>'id')::uuid from mvp_pipeline_fixture
+      where key='dispatch-expired-replay'),
+    'request_654322',repeat('A',43)
+  );
+
+select ok(
+  (select value->>'state' from mvp_pipeline_fixture
+    where key='dispatch-webhook-reconcile') = 'submitted'
+  and (select value->>'external_request_id' from mvp_pipeline_fixture
+    where key='dispatch-webhook-reconcile') = 'request_654322'
+  and (select value->>'status_url' from mvp_pipeline_fixture
+    where key='dispatch-webhook-reconcile') =
+      'https://queue.fal.run/fal-ai/nano-banana-2/requests/request_654322/status'
+  and (select value->>'last_error_code' from mvp_pipeline_fixture
+    where key='dispatch-webhook-reconcile') is null,
+  'a signed provider callback recovers the exact expired dispatch without resubmission'
 );
 
 select lives_ok(

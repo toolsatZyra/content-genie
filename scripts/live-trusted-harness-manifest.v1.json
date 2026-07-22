@@ -718,7 +718,7 @@
     {
       "path": "supabase/tests/mvp_cinematic_pipeline.test.sql",
       "role": "pgtap-source",
-      "sha256": "0f8da2f5c3322b0d9c34156eda2a7764fff9f0ff9f72ba5cde75ae0d5c6cd3c2"
+      "sha256": "053117942a4cb90d0616262a9dc8236731ba29396890ea7807c8083952d9e97c"
     },
     {
       "path": "supabase/tests/mvp_repair_feedback_grounding.test.sql",
@@ -784,9 +784,9 @@
   },
   "pgTapSuites": [
     {
-      "hardenedQuerySha256": "317ebcd63bae9c75fe135b78fb53c164e93930ff3dc03a5461066b30ed1ce9da",
-      "plannedAssertions": 87,
-      "sourceSha256": "0f8da2f5c3322b0d9c34156eda2a7764fff9f0ff9f72ba5cde75ae0d5c6cd3c2",
+      "hardenedQuerySha256": "ee83760772f07c15cb9b2a3093af46ed9d6a30a365554dcf97065a4847983c80",
+      "plannedAssertions": 91,
+      "sourceSha256": "053117942a4cb90d0616262a9dc8236731ba29396890ea7807c8083952d9e97c",
       "testFile": "mvp_cinematic_pipeline.test.sql"
     },
     {

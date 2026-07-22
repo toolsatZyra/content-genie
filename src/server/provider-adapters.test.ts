@@ -157,6 +157,15 @@ describe("narrow provider adapters", () => {
       expect(result.alignment.characters.join("")).toBe(narrationSource);
     }
     expect(String(fetchMock.mock.calls[0]![0])).toContain("/with-timestamps?");
+    expect(JSON.parse(String(fetchMock.mock.calls[0]![1]?.body))).toMatchObject({
+      model_id: "eleven_v3",
+      voice_settings: {
+        similarity_boost: 0.82,
+        stability: 0.5,
+        style: 0,
+        use_speaker_boost: true,
+      },
+    });
 
     const base = manifest("elevenlabs");
     const replacedWord = narrationDelivery.replace("SHIVA", "XHIVA");
@@ -190,6 +199,46 @@ describe("narrow provider adapters", () => {
         vi.fn<typeof fetch>(),
       ),
     ).rejects.toThrow(/delivery policy/u);
+
+    for (const voiceSettings of [
+      {
+        similarityBoost: 0.8,
+        stability: 0.5,
+        style: 0,
+        useSpeakerBoost: true,
+      },
+      {
+        similarityBoost: 0.82,
+        stability: 0.49,
+        style: 0,
+        useSpeakerBoost: true,
+      },
+      {
+        similarityBoost: 0.82,
+        stability: 0.5,
+        style: 0.01,
+        useSpeakerBoost: true,
+      },
+      {
+        similarityBoost: 0.82,
+        stability: 0.5,
+        style: 0,
+        useSpeakerBoost: false,
+      },
+    ]) {
+      const driftedFetch = vi.fn<typeof fetch>();
+      await expect(
+        submitProviderAdapter(
+          {
+            ...base,
+            payload: { ...base.payload, voiceSettings },
+          },
+          secrets,
+          driftedFetch,
+        ),
+      ).rejects.toThrow(/delivery policy/u);
+      expect(driftedFetch).not.toHaveBeenCalled();
+    }
   });
 
   it("submits a bounded Nano Banana edit only from promoted signed references", async () => {

@@ -375,8 +375,7 @@ test("Phase 1 fixture organizes concurrent Episodes, Series and review work", as
   await expect(activity.getByText(/theological framing/i)).toBeVisible();
   await activity.getByRole("button", { name: "Close activity" }).click();
 
-  await page.getByRole("button", { name: "Library" }).click();
-  await expect(page.getByText(/intentionally disabled/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Library" })).toHaveCount(0);
 });
 
 test("Phase 1 Series selection shows only compact Episodes and preselects Episode creation", async ({

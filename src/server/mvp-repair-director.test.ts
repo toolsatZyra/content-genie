@@ -43,7 +43,6 @@ const revised = (shotNumber: number) => {
     shotNumber: _shotNumber,
     startMs: _startMs,
     sourceStoryboardAvailable: _sourceStoryboardAvailable,
-    storyboardCompositionMode: _storyboardCompositionMode,
     ...fields
   } = shot(shotNumber);
   void [
@@ -53,7 +52,6 @@ const revised = (shotNumber: number) => {
     _shotNumber,
     _startMs,
     _sourceStoryboardAvailable,
-    _storyboardCompositionMode,
   ];
   return fields;
 };
@@ -164,6 +162,85 @@ describe("MVP repair director boundary", () => {
       "regenerate_storyboard_and_clip",
     ]);
     expect(compiled.plan.counts.regeneratedStoryboards).toBe(2);
+  });
+
+  it("migrates an audit-only legacy split board before any further media work", () => {
+    const legacy = {
+      ...shot(1),
+      storyboardCompositionMode: "split_screen_two_state" as const,
+    };
+    const prepared = prepareMvpRepairDirector({
+      clarificationTranscript: [],
+      continuityEdges: [],
+      immutableOwnerFeedback: "The motion in shot 2 is lifeless.",
+      shots: [legacy, shot(2), shot(3)],
+      sourceEddHash,
+      totalShots: 3,
+    });
+    const legacyMigration = {
+      ...proposed(1, "regenerate_storyboard_and_clip", null, [1], []),
+      revisedFields: {
+        ...revised(1),
+        storyboardCompositionMode: "single_frame" as const,
+        storyboardEndPromptBlueprint: null,
+      },
+    };
+    const compiled = compileMvpRepairDirectorOutput(prepared, {
+      actions: [
+        legacyMigration,
+        proposed(2, "regenerate_clip"),
+        proposed(3, "reuse_all"),
+      ],
+      clarification: null,
+      decision: "repair",
+      overallInterpretation:
+        "Migrate the legacy board and repair only the requested motion defect.",
+    });
+
+    if (compiled.decision !== "repair") throw new Error("Expected a repair plan.");
+    expect(compiled.plan.actions[0]).toMatchObject({
+      action: "regenerate_storyboard_and_clip",
+      shotNumber: 1,
+    });
+    expect(compiled.revisedFieldsByShot.get(1)).toMatchObject({
+      storyboardCompositionMode: "single_frame",
+      storyboardEndPromptBlueprint: null,
+    });
+    expect(prepared.openAiRequest.instructions).toContain("audit-only legacy record");
+    expect(JSON.stringify(prepared.openAiRequest.schema)).not.toContain(
+      '"split_screen_two_state"',
+    );
+  });
+
+  it("rejects repair output that tries to reuse a legacy split board", () => {
+    const prepared = prepareMvpRepairDirector({
+      clarificationTranscript: [],
+      continuityEdges: [],
+      immutableOwnerFeedback: "The motion in shot 2 is lifeless.",
+      shots: [
+        {
+          ...shot(1),
+          storyboardCompositionMode: "split_screen_two_state" as const,
+        },
+        shot(2),
+        shot(3),
+      ],
+      sourceEddHash,
+      totalShots: 3,
+    });
+
+    expect(() =>
+      compileMvpRepairDirectorOutput(prepared, {
+        actions: [
+          proposed(1, "reuse_all"),
+          proposed(2, "regenerate_clip"),
+          proposed(3, "reuse_all"),
+        ],
+        clarification: null,
+        decision: "repair",
+        overallInterpretation: "The legacy board was incorrectly reused.",
+      }),
+    ).toThrow("must migrate its legacy split-screen storyboard");
   });
 
   it("compiles an explicitly dependency-marked immediate edit neighbor", () => {

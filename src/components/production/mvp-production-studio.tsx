@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type RefObject } from "react";
 
 import type {
   MvpEditPackageView,
@@ -9,6 +9,7 @@ import type {
   MvpProductionJobState,
   MvpProductionJobView,
   MvpRepairProgressView,
+  MvpTimedTranscriptCue,
 } from "@/domain/mvp-production";
 
 interface StudioProps {
@@ -21,6 +22,7 @@ interface StudioProps {
   readonly repair: MvpRepairProgressView | null;
   readonly signedMasterUrl: string | null;
   readonly stageHeadingRef: RefObject<HTMLHeadingElement | null>;
+  readonly transcript: readonly MvpTimedTranscriptCue[];
   readonly workspaceId: string;
 }
 
@@ -37,6 +39,33 @@ const activeStates: readonly MvpProductionJobState[] = [
   "rendering",
   "needs_repair",
 ];
+
+function vttTimestamp(milliseconds: number): string {
+  const hours = Math.floor(milliseconds / 3_600_000);
+  const minutes = Math.floor((milliseconds % 3_600_000) / 60_000);
+  const seconds = Math.floor((milliseconds % 60_000) / 1_000);
+  const millis = milliseconds % 1_000;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(millis).padStart(3, "0")}`;
+}
+
+function readableTimestamp(milliseconds: number): string {
+  const minutes = Math.floor(milliseconds / 60_000);
+  const seconds = Math.floor((milliseconds % 60_000) / 1_000);
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+export function createHindiNarrationVtt(
+  transcript: readonly MvpTimedTranscriptCue[],
+): string {
+  const cues = transcript.map((cue) =>
+    [
+      `shot-${cue.shotNumber}`,
+      `${vttTimestamp(cue.startMs)} --> ${vttTimestamp(cue.endMs)}`,
+      cue.exactNarration.replace(/\s+/gu, " ").trim(),
+    ].join("\n"),
+  );
+  return `WEBVTT\n\n${cues.join("\n\n")}\n`;
+}
 
 function repairActionLabel(
   action: MvpRepairProgressView["feedback_points"][number]["actions"][number]["selectedAction"],
@@ -238,9 +267,11 @@ export function MvpProductionStudio({
   repair,
   signedMasterUrl,
   stageHeadingRef,
+  transcript,
   workspaceId,
 }: StudioProps) {
   const router = useRouter();
+  const transcriptId = useId();
   const startAttempted = useRef<string | null>(null);
   const repairAttempted = useRef<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -268,6 +299,10 @@ export function MvpProductionStudio({
   const packageUrl =
     signedPackageAsset?.objectName === editPackage?.object_name
       ? (signedPackageAsset?.url ?? null)
+      : null;
+  const narrationTrackUrl =
+    transcript.length > 0
+      ? `data:text/vtt;charset=utf-8,${encodeURIComponent(createHindiNarrationVtt(transcript))}`
       : null;
 
   useEffect(() => {
@@ -648,7 +683,39 @@ export function MvpProductionStudio({
 
       {masterUrl ? (
         <section className="master-review-player">
-          <video controls playsInline preload="metadata" src={masterUrl} />
+          <video
+            aria-describedby={transcript.length > 0 ? transcriptId : undefined}
+            aria-label={`Edited video for ${episodeTitle}`}
+            controls
+            playsInline
+            preload="metadata"
+            src={masterUrl}
+          >
+            {narrationTrackUrl ? (
+              <track
+                default
+                kind="captions"
+                label="Hindi narration"
+                src={narrationTrackUrl}
+                srcLang="hi"
+              />
+            ) : null}
+          </video>
+          {transcript.length > 0 ? (
+            <details className="master-review-transcript" id={transcriptId}>
+              <summary>Timed Hindi narration transcript</summary>
+              <ol aria-label="Narration by shot">
+                {transcript.map((cue) => (
+                  <li key={cue.shotNumber}>
+                    <time dateTime={`PT${cue.startMs / 1_000}S`}>
+                      {readableTimestamp(cue.startMs)}
+                    </time>
+                    <span>{cue.exactNarration}</span>
+                  </li>
+                ))}
+              </ol>
+            </details>
+          ) : null}
           <div className="master-download-row">
             <button onClick={() => setPreviewNonce((value) => value + 1)} type="button">
               Refresh private preview

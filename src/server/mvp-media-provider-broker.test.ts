@@ -9,6 +9,8 @@ import {
 } from "./mvp-media-provider-broker";
 
 const endpoint = "fal-ai/nano-banana-2/edit";
+const providerDispatchId = "10000000-0000-4000-8000-000000000001";
+const callbackToken = "A".repeat(43);
 const requestId = "request_123456";
 const statusUrl = `https://queue.fal.run/fal-ai/nano-banana-2/requests/${requestId}/status`;
 const responseUrl = `https://queue.fal.run/fal-ai/nano-banana-2/requests/${requestId}/response`;
@@ -23,11 +25,13 @@ function jsonResponse(body: unknown, status = 200): Response {
 describe("MVP FAL provider broker", () => {
   beforeEach(() => {
     process.env.FAL_KEY = "test-fal-key-at-least-16-characters";
+    process.env.NEXT_PUBLIC_APP_URL = "https://genie.example";
     vi.stubGlobal("fetch", vi.fn());
   });
 
   afterEach(() => {
     delete process.env.FAL_KEY;
+    delete process.env.NEXT_PUBLIC_APP_URL;
     vi.unstubAllGlobals();
   });
 
@@ -40,13 +44,21 @@ describe("MVP FAL provider broker", () => {
       }),
     );
 
-    await expect(submitMvpFalProvider(endpoint, { prompt: "frame" })).resolves.toEqual({
-      externalRequestId: requestId,
-      responseUrl,
-      statusUrl,
-    });
+    await expect(
+      submitMvpFalProvider(
+        endpoint,
+        { prompt: "frame" },
+        providerDispatchId,
+        callbackToken,
+      ),
+    ).resolves.toEqual({ externalRequestId: requestId, responseUrl, statusUrl });
+    const submitUrl = new URL(`https://queue.fal.run/${endpoint}`);
+    submitUrl.searchParams.set(
+      "fal_webhook",
+      `https://genie.example/api/internal/provider-webhooks/fal-mvp/${providerDispatchId}?token=${callbackToken}`,
+    );
     expect(fetch).toHaveBeenCalledWith(
-      `https://queue.fal.run/${endpoint}`,
+      submitUrl,
       expect.objectContaining({
         headers: expect.objectContaining({
           Authorization: expect.stringMatching(/^Key /u),
@@ -85,7 +97,14 @@ describe("MVP FAL provider broker", () => {
   ])("treats $label after provider acceptance as outcome unknown", async ({ body }) => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse(body));
 
-    await expect(submitMvpFalProvider(endpoint, { prompt: "frame" })).rejects.toEqual(
+    await expect(
+      submitMvpFalProvider(
+        endpoint,
+        { prompt: "frame" },
+        providerDispatchId,
+        callbackToken,
+      ),
+    ).rejects.toEqual(
       expect.objectContaining({
         disposition: "unknown",
         safeCode: "PROVIDER_OUTCOME_UNKNOWN",
@@ -103,9 +122,9 @@ describe("MVP FAL provider broker", () => {
     async ({ disposition, status }) => {
       vi.mocked(fetch).mockResolvedValue(jsonResponse({ error: "rejected" }, status));
 
-      await expect(submitMvpFalProvider(endpoint, {})).rejects.toMatchObject({
-        disposition,
-      });
+      await expect(
+        submitMvpFalProvider(endpoint, {}, providerDispatchId, callbackToken),
+      ).rejects.toMatchObject({ disposition });
     },
   );
 

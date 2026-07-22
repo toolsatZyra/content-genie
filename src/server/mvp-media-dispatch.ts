@@ -1,5 +1,8 @@
 import "server-only";
 
+import { createHash, randomBytes } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
+
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import {
   MvpMediaProviderBrokerError,
@@ -11,6 +14,7 @@ type DispatchState =
   "reserved" | "dispatching" | "submitted" | "succeeded" | "failed" | "outcome_unknown";
 
 type DispatchRow = Readonly<{
+  callback_token_sha256: string | null;
   claim_token: string | null;
   external_request_id: string | null;
   fencing_token: number;
@@ -85,6 +89,98 @@ function existingControl(dispatch: DispatchRow): MvpFalControl | null {
   });
 }
 
+const RECEIPT_RECONCILIATION_ATTEMPTS = 3;
+const RECEIPT_RECONCILIATION_BACKOFF_MS = [50, 150] as const;
+
+async function bindMediaCallback(
+  dispatch: DispatchRow & Readonly<{ claim_token: string }>,
+): Promise<Readonly<{ dispatch: DispatchRow; token: string }>> {
+  const token = randomBytes(32).toString("base64url");
+  const tokenSha256 = createHash("sha256").update(token).digest("hex");
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= RECEIPT_RECONCILIATION_ATTEMPTS; attempt += 1) {
+    try {
+      const bound = row(
+        await rpc("command_bind_mvp_media_dispatch_callback", {
+          p_callback_token_sha256: tokenSha256,
+          p_claim_token: dispatch.claim_token,
+          p_dispatch_id: dispatch.id,
+          p_expected_version: dispatch.version,
+          p_fencing_token: dispatch.fencing_token,
+        }),
+        "The provider callback binding is malformed.",
+      );
+      if (bound.callback_token_sha256 !== tokenSha256) {
+        throw new MvpMediaDispatchError(
+          "The provider callback binding was not committed.",
+          "PRODUCTION_LEDGER_FAILED",
+          false,
+        );
+      }
+      return Object.freeze({ dispatch: bound, token });
+    } catch (caught) {
+      lastError = caught;
+      if (attempt < RECEIPT_RECONCILIATION_ATTEMPTS) {
+        await delay(RECEIPT_RECONCILIATION_BACKOFF_MS[attempt - 1]);
+      }
+    }
+  }
+  throw new MvpMediaDispatchError(
+    lastError instanceof Error
+      ? `The provider callback binding is pending: ${lastError.message}`
+      : "The provider callback binding is pending.",
+    "PRODUCTION_LEDGER_FAILED",
+    true,
+  );
+}
+
+async function reconcileKnownSubmission(
+  dispatch: DispatchRow & Readonly<{ claim_token: string }>,
+  input: Readonly<{
+    attemptNumber: number;
+    dispatchKey: string;
+    endpoint: string;
+    inputManifestSha256: string;
+    productionRunId: string;
+  }>,
+  submitted: MvpFalControl,
+): Promise<DispatchRow> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= RECEIPT_RECONCILIATION_ATTEMPTS; attempt += 1) {
+    try {
+      return row(
+        await rpc("command_reconcile_mvp_media_dispatch_submission", {
+          p_attempt_number: input.attemptNumber,
+          p_claim_token: dispatch.claim_token,
+          p_dispatch_id: dispatch.id,
+          p_dispatch_key: input.dispatchKey,
+          p_endpoint: input.endpoint,
+          p_expected_version: dispatch.version,
+          p_external_request_id: submitted.externalRequestId,
+          p_fencing_token: dispatch.fencing_token,
+          p_input_manifest_sha256: input.inputManifestSha256,
+          p_production_run_id: input.productionRunId,
+          p_response_url: submitted.responseUrl,
+          p_status_url: submitted.statusUrl,
+        }),
+        "The provider dispatch receipt reconciliation is malformed.",
+      );
+    } catch (caught) {
+      lastError = caught;
+      if (attempt < RECEIPT_RECONCILIATION_ATTEMPTS) {
+        await delay(RECEIPT_RECONCILIATION_BACKOFF_MS[attempt - 1]);
+      }
+    }
+  }
+  throw new MvpMediaDispatchError(
+    lastError instanceof Error
+      ? `The known provider receipt is awaiting ledger reconciliation: ${lastError.message}`
+      : "The known provider receipt is awaiting ledger reconciliation.",
+    "PROVIDER_RECEIPT_RECONCILIATION_PENDING",
+    true,
+  );
+}
+
 export async function dispatchMvpFalMedia(
   input: Readonly<{
     attemptNumber: number;
@@ -145,29 +241,18 @@ export async function dispatchMvpFalMedia(
       false,
     );
   }
+  const callback = await bindMediaCallback(
+    dispatch as DispatchRow & Readonly<{ claim_token: string }>,
+  );
+  dispatch = callback.dispatch;
+  let submitted: MvpFalControl;
   try {
-    const submitted = await submitMvpFalProvider(input.endpoint, input.payload);
-    const recorded = row(
-      await rpc("command_record_mvp_media_dispatch_submission", {
-        p_claim_token: dispatch.claim_token,
-        p_dispatch_id: dispatch.id,
-        p_expected_version: dispatch.version,
-        p_external_request_id: submitted.externalRequestId,
-        p_fencing_token: dispatch.fencing_token,
-        p_response_url: submitted.responseUrl,
-        p_status_url: submitted.statusUrl,
-      }),
-      "The provider dispatch receipt is malformed.",
+    submitted = await submitMvpFalProvider(
+      input.endpoint,
+      input.payload,
+      dispatch.id,
+      callback.token,
     );
-    const control = existingControl(recorded);
-    if (!control) {
-      throw new MvpMediaDispatchError(
-        "The provider dispatch receipt was not committed.",
-        "PRODUCTION_LEDGER_FAILED",
-        false,
-      );
-    }
-    return Object.freeze({ ...control, providerDispatchId: recorded.id });
   } catch (caught) {
     const broker = caught instanceof MvpMediaProviderBrokerError ? caught : undefined;
     await rpc("command_fail_mvp_media_dispatch", {
@@ -182,13 +267,43 @@ export async function dispatchMvpFalMedia(
       p_fencing_token: dispatch.fencing_token,
       p_outcome_unknown: !broker || broker.disposition === "unknown",
     }).catch(() => undefined);
-    if (caught instanceof MvpMediaDispatchError) throw caught;
     throw new MvpMediaDispatchError(
       caught instanceof Error ? caught.message : "The provider dispatch failed.",
       broker?.safeCode ?? "PROVIDER_OUTCOME_UNKNOWN",
       false,
     );
   }
+
+  let recorded: DispatchRow;
+  try {
+    recorded = row(
+      await rpc("command_record_mvp_media_dispatch_submission", {
+        p_claim_token: dispatch.claim_token,
+        p_dispatch_id: dispatch.id,
+        p_expected_version: dispatch.version,
+        p_external_request_id: submitted.externalRequestId,
+        p_fencing_token: dispatch.fencing_token,
+        p_response_url: submitted.responseUrl,
+        p_status_url: submitted.statusUrl,
+      }),
+      "The provider dispatch receipt is malformed.",
+    );
+  } catch {
+    recorded = await reconcileKnownSubmission(
+      dispatch as DispatchRow & Readonly<{ claim_token: string }>,
+      input,
+      submitted,
+    );
+  }
+  const recordedControl = existingControl(recorded);
+  if (!recordedControl) {
+    throw new MvpMediaDispatchError(
+      "The known provider receipt was not committed.",
+      "PROVIDER_RECEIPT_RECONCILIATION_PENDING",
+      true,
+    );
+  }
+  return Object.freeze({ ...recordedControl, providerDispatchId: recorded.id });
 }
 
 export async function completeMvpMediaDispatchOutput(input: {
@@ -200,5 +315,17 @@ export async function completeMvpMediaDispatchOutput(input: {
     p_dispatch_id: input.providerDispatchId,
     p_external_request_id: input.externalRequestId,
     p_output_content_sha256: input.outputContentSha256,
+  });
+}
+
+export async function reconcileMvpMediaDispatchWebhook(input: {
+  callbackToken: string;
+  externalRequestId: string;
+  providerDispatchId: string;
+}): Promise<void> {
+  await rpc("command_reconcile_mvp_media_dispatch_webhook", {
+    p_callback_token: input.callbackToken,
+    p_dispatch_id: input.providerDispatchId,
+    p_external_request_id: input.externalRequestId,
   });
 }

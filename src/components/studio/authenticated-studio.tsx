@@ -30,7 +30,7 @@ import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { AccountPanel } from "@/components/studio/account-panel";
 import { useStudioSearch } from "@/components/studio/use-studio-search";
 
-type StudioView = "atrium" | "series" | "library";
+type StudioView = "atrium" | "series";
 type ComposerMode = "episode" | "series";
 const subscribeToHydration = (): (() => void) => () => {};
 
@@ -439,7 +439,6 @@ export function AuthenticatedStudio({
           [
             ["atrium", "✦", "Atrium"],
             ["series", "◫", "Series"],
-            ["library", "◇", "Library"],
           ] as const
         ).map(([id, symbol, label]) => (
           <button
@@ -459,25 +458,17 @@ export function AuthenticatedStudio({
         <div className="live-heading">
           <div>
             <span className="eyebrow">
-              {view === "atrium"
-                ? "The studio in motion"
-                : view === "series"
-                  ? "Creative worlds"
-                  : "Finished artefacts"}
+              {view === "atrium" ? "The studio in motion" : "Creative worlds"}
             </span>
             <h1>
               {view === "atrium"
                 ? "Your films are in motion."
-                : view === "series"
-                  ? "Every story has a world."
-                  : "The film vault."}
+                : "Every story has a world."}
             </h1>
             <p>
               {view === "atrium"
                 ? "Move between Episodes while Genie’s agentic AI crew works in parallel."
-                : view === "series"
-                  ? "Inspect the exact active release and pins before creating the next Episode."
-                  : "Approved masters and exports will appear here once production is enabled."}
+                : "Inspect the exact active release and pins before creating the next Episode."}
             </p>
           </div>
           {view === "atrium" ? (
@@ -500,7 +491,7 @@ export function AuthenticatedStudio({
                 Create Episode
               </button>
             </div>
-          ) : view === "series" ? (
+          ) : (
             <button
               className="create-button"
               onClick={() => openComposer("series")}
@@ -509,7 +500,7 @@ export function AuthenticatedStudio({
               <span aria-hidden="true">＋</span>
               Create Series
             </button>
-          ) : null}
+          )}
         </div>
 
         {commandStatus ? (
@@ -569,24 +560,6 @@ export function AuthenticatedStudio({
             selectedId={selectedSeries?.id ?? ""}
             series={allSeries}
           />
-        ) : null}
-
-        {view === "library" ? (
-          <section className="future-surface">
-            <span aria-hidden="true">◇</span>
-            <h2>No approved masters yet</h2>
-            <p>
-              Export and download remain intentionally disabled until production, Monica
-              and release gates are implemented and verified.
-            </p>
-            <button
-              className="quiet-button"
-              onClick={() => setView("atrium")}
-              type="button"
-            >
-              Return to active Episodes
-            </button>
-          </section>
         ) : null}
       </section>
 

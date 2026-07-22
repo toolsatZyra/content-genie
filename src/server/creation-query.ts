@@ -20,6 +20,7 @@ import type {
   MvpMasterView,
   MvpProductionJobView,
   MvpRepairProgressView,
+  MvpTimedTranscriptCue,
 } from "@/domain/mvp-production";
 import { parseEpisodeWorkflowState, type EpisodeWorkflowState } from "@/domain/studio";
 
@@ -82,6 +83,98 @@ interface PreflightRunRow {
 
 interface ProductionRunRow {
   id: string;
+}
+
+interface ProductionJobRow extends MvpProductionJobView {
+  readonly plan_bundle_id: string;
+}
+
+function projectProductionJob(row: ProductionJobRow): MvpProductionJobView {
+  return {
+    attempt_number: row.attempt_number,
+    completed_clips: row.completed_clips,
+    completed_sfx: row.completed_sfx,
+    completed_storyboards: row.completed_storyboards,
+    last_error_code: row.last_error_code,
+    last_error_summary: row.last_error_summary,
+    production_run_id: row.production_run_id,
+    state: row.state,
+    total_clips: row.total_clips,
+    total_sfx: row.total_sfx,
+    total_storyboards: row.total_storyboards,
+    version: row.version,
+  };
+}
+
+function projectTimedTranscript(
+  payload: unknown,
+  expectedDurationMs: number | null,
+): readonly MvpTimedTranscriptCue[] {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("The Edit transcript source is unavailable.");
+  }
+  const shots = (payload as Record<string, unknown>).shots;
+  if (!Array.isArray(shots) || shots.length < 1) {
+    throw new Error("The Edit transcript source is incomplete.");
+  }
+  let expectedStartMs = 0;
+  const transcript = shots.map((value, index) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error("The Edit transcript source is malformed.");
+    }
+    const shot = value as Record<string, unknown>;
+    const cue = {
+      endMs: Number(shot.endMs),
+      exactNarration: shot.exactNarration,
+      shotNumber: Number(shot.shotNumber),
+      startMs: Number(shot.startMs),
+    };
+    if (
+      cue.shotNumber !== index + 1 ||
+      !Number.isSafeInteger(cue.startMs) ||
+      !Number.isSafeInteger(cue.endMs) ||
+      cue.startMs !== expectedStartMs ||
+      cue.endMs <= cue.startMs ||
+      typeof cue.exactNarration !== "string" ||
+      cue.exactNarration.trim().length < 1
+    ) {
+      throw new Error("The Edit transcript windows are invalid.");
+    }
+    expectedStartMs = cue.endMs;
+    return Object.freeze(cue as MvpTimedTranscriptCue);
+  });
+  if (expectedDurationMs !== null && expectedStartMs !== expectedDurationMs) {
+    throw new Error("The Edit transcript does not match the current master clock.");
+  }
+  return Object.freeze(transcript);
+}
+
+async function loadTimedTranscript(
+  client: SupabaseClient,
+  workspaceId: string,
+  planBundleId: string,
+  expectedDurationMs: number | null,
+): Promise<readonly MvpTimedTranscriptCue[]> {
+  const { data: bundle, error: bundleError } = await client
+    .from("preflight_plan_bundles")
+    .select("edd_version_id")
+    .eq("workspace_id", workspaceId)
+    .eq("id", planBundleId)
+    .maybeSingle();
+  if (bundleError || !bundle?.edd_version_id) {
+    throw new Error("The Edit transcript binding is unavailable.");
+  }
+  const { data: edd, error: eddError } = await client
+    .from("preflight_plan_component_versions")
+    .select("payload")
+    .eq("workspace_id", workspaceId)
+    .eq("id", bundle.edd_version_id)
+    .eq("component_kind", "edd")
+    .maybeSingle();
+  if (eddError || !edd?.payload) {
+    throw new Error("The Edit transcript source is unavailable.");
+  }
+  return projectTimedTranscript(edd.payload, expectedDurationMs);
 }
 
 function projectWorldProgress(
@@ -153,7 +246,7 @@ export async function loadCreationProjection(
       client
         .from("mvp_production_jobs")
         .select(
-          "production_run_id,state,version,attempt_number,total_storyboards,completed_storyboards,total_clips,completed_clips,total_sfx,completed_sfx,last_error_code,last_error_summary",
+          "production_run_id,plan_bundle_id,state,version,attempt_number,total_storyboards,completed_storyboards,total_clips,completed_clips,total_sfx,completed_sfx,last_error_code,last_error_summary",
         )
         .eq("workspace_id", episode.workspace_id)
         .eq("episode_id", episode.id)
@@ -176,7 +269,10 @@ export async function loadCreationProjection(
 
   const script = scriptResult.data as ScriptRow | null;
   const configuration = configurationResult.data as ConfigurationRow | null;
-  const productionJob = productionJobResult.data as MvpProductionJobView | null;
+  const productionJobRow = productionJobResult.data as ProductionJobRow | null;
+  const productionJob = productionJobRow
+    ? projectProductionJob(productionJobRow)
+    : null;
   const productionRun = productionRunResult.data as ProductionRunRow | null;
   const productionMasterResult = productionJob
     ? await client
@@ -190,6 +286,14 @@ export async function loadCreationProjection(
     : { data: null, error: null };
   if (productionMasterResult.error) throw productionMasterResult.error;
   const productionMaster = productionMasterResult.data as MvpMasterView | null;
+  const productionTranscript = productionJobRow
+    ? await loadTimedTranscript(
+        client,
+        episode.workspace_id,
+        productionJobRow.plan_bundle_id,
+        productionMaster?.duration_ms ?? null,
+      )
+    : Object.freeze([] as MvpTimedTranscriptCue[]);
   const productionPackageResult = productionMaster
     ? await client
         .from("mvp_edit_packages")
@@ -398,6 +502,7 @@ export async function loadCreationProjection(
       repair: productionRepair,
       productionRunId: productionJob?.production_run_id ?? productionRun?.id ?? null,
       signedMasterUrl: null,
+      transcript: productionTranscript,
     },
     world: readiness.world,
   };

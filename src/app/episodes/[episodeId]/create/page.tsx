@@ -358,6 +358,22 @@ export default async function CreationPage({
             : null,
           productionRunId: "53000000-0000-4000-8000-000000000001",
           signedMasterUrl: "data:video/mp4;base64,AAAA",
+          transcript: [
+            {
+              endMs: 45_000,
+              exactNarration:
+                "\u0936\u094d\u0930\u0940 \u0930\u093e\u092e \u0928\u0947 \u0936\u093f\u0935 \u0927\u0928\u0941\u0937 \u0915\u0940 \u0913\u0930 \u0926\u0947\u0916\u093e\u0964",
+              shotNumber: 1,
+              startMs: 0,
+            },
+            {
+              endMs: 91_000,
+              exactNarration:
+                "\u0938\u092d\u093e \u092e\u0947\u0902 \u090f\u0915 \u0926\u093f\u0935\u094d\u092f \u0915\u094d\u0937\u0923 \u0909\u0926\u093f\u0924 \u0939\u0941\u0906\u0964",
+              shotNumber: 2,
+              startMs: 45_000,
+            },
+          ],
         },
       };
     } else if (query.fixture === "phase2-canceled") {

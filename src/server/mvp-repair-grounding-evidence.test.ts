@@ -45,7 +45,6 @@ const revised = (shotNumber: number) => {
     shotNumber: _shotNumber,
     startMs: _startMs,
     sourceStoryboardAvailable: _sourceStoryboardAvailable,
-    storyboardCompositionMode: _storyboardCompositionMode,
     ...fields
   } = shot(shotNumber);
   void [
@@ -55,7 +54,6 @@ const revised = (shotNumber: number) => {
     _shotNumber,
     _startMs,
     _sourceStoryboardAvailable,
-    _storyboardCompositionMode,
   ];
   return fields;
 };

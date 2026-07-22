@@ -48,6 +48,13 @@ export interface MvpEditPackageView {
   readonly version: number;
 }
 
+export interface MvpTimedTranscriptCue {
+  readonly endMs: number;
+  readonly exactNarration: string;
+  readonly shotNumber: number;
+  readonly startMs: number;
+}
+
 export interface MvpRepairFeedbackPointView {
   readonly actions: readonly {
     readonly assetStatus: "planned" | "selected_complete_assets";
@@ -101,6 +108,7 @@ export interface CreationProductionProjection {
   readonly productionRunId: string | null;
   /** Test-only fixture override. Live media is signed through the storage broker. */
   readonly signedMasterUrl: string | null;
+  readonly transcript: readonly MvpTimedTranscriptCue[];
 }
 
 export const emptyCreationProductionProjection: CreationProductionProjection = {
@@ -110,4 +118,5 @@ export const emptyCreationProductionProjection: CreationProductionProjection = {
   repair: null,
   productionRunId: null,
   signedMasterUrl: null,
+  transcript: [],
 };
