@@ -112,6 +112,10 @@
     "supabase/migrations/20260721220248_phase2_character_identity_manifest_precedence_correction.sql",
     "supabase/migrations/20260721220500_phase2_p2_09_cultural_claim_contract.sql",
     "supabase/migrations/20260721220600_phase2_p2_09_cultural_claim_runtime_correction.sql",
-    "supabase/migrations/20260721220700_phase2_p2_09_service_grant_authority_correction.sql"
+    "supabase/migrations/20260721220700_phase2_p2_09_service_grant_authority_correction.sql",
+    "supabase/migrations/20260722125600_owner_uploaded_narration_source_enum.sql",
+    "supabase/migrations/20260722125603_owner_uploaded_narration_source.sql",
+    "supabase/migrations/20260722125830_owner_uploaded_narration_qc_authority.sql",
+    "supabase/migrations/20260722184000_owner_uploaded_narration_release_inheritance.sql"
   ]
 }

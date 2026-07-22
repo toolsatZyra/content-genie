@@ -38,6 +38,15 @@ function creationProjectionKey(projection: CreationProjection): string {
           ).sort(([left], [right]) => left.localeCompare(right)),
           lookAvailabilityStatus: configuration.lookAvailabilityStatus,
           lookVersionId: configuration.lookVersionId,
+          narrationSourceConfirmation: configuration.narrationSourceConfirmation,
+          narrationSourceKind: configuration.narrationSourceKind,
+          narrationUpload: configuration.narrationUpload
+            ? {
+                assetVersionId: configuration.narrationUpload.assetVersionId,
+                id: configuration.narrationUpload.id,
+                state: configuration.narrationUpload.state,
+              }
+            : null,
           narratorGender: configuration.narratorGender,
           voiceAvailabilityByVersionId: Object.entries(
             configuration.voiceAvailabilityByVersionId,
@@ -62,6 +71,14 @@ function creationProjectionKey(projection: CreationProjection): string {
 function canResumeCreationInLook(projection: CreationProjection): boolean {
   const configuration = projection.configuration;
   if (!projection.script || !configuration) return false;
+
+  if (configuration.narrationSourceKind === "uploaded_audio") {
+    return Boolean(
+      configuration.narrationSourceConfirmation.origin === "human_confirmed" &&
+      configuration.narrationUpload?.state === "confirmed" &&
+      configuration.narrationUpload.assetVersionId,
+    );
+  }
 
   const pinnedVoice = findVoiceByVersionId(configuration.voiceVersionId);
   const availability =
@@ -96,7 +113,8 @@ function preferredInitialChamber(
     look &&
     configuration.lookAvailabilityByVersionId[look.versionId] === "active" &&
     configuration.lookConfirmation.origin === "human_confirmed" &&
-    configuration.voiceConfirmation.origin === "human_confirmed",
+    (configuration.narrationSourceKind === "uploaded_audio" ||
+      configuration.voiceConfirmation.origin === "human_confirmed"),
   );
   const worldReady =
     projection.world.characters.length + projection.world.locations.length > 0 &&
@@ -150,7 +168,8 @@ function preferredInitialChamber(
   if (lookReady) return "world";
   if (
     allowed.look &&
-    projection.configuration?.voiceConfirmation.origin === "human_confirmed"
+    (projection.configuration?.narrationSourceKind === "uploaded_audio" ||
+      projection.configuration?.voiceConfirmation.origin === "human_confirmed")
   ) {
     return "look";
   }

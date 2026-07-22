@@ -1026,6 +1026,114 @@ test.describe("Living Cinema creation flow", () => {
     }
   });
 
+  test("uses uploaded MP3 or WAV narration as the explicit final audio authority", async ({
+    page,
+  }) => {
+    const commands: string[] = [];
+    await page.route("**/api/commands", async (route) => {
+      const body = route.request().postDataJSON() as { commandType: string };
+      commands.push(body.commandType);
+      await route.fulfill({
+        json: {
+          ok: true,
+          result: { configurationVersion: 4, episodeVersion: 5 },
+        },
+        status: 200,
+      });
+    });
+    await page.route(
+      `**/api/episodes/${episodeId}/narration-upload/upload-version-1/confirm`,
+      async (route) => {
+        expect(route.request().headers()["x-idempotency-key"]).toBeTruthy();
+        expect(route.request().postDataJSON()).toMatchObject({
+          configurationCandidateId: "10000000-0000-4000-8000-000000000120",
+          expectedConfigurationVersion: 1,
+          workspaceId: "10000000-0000-4000-8000-000000000101",
+        });
+        await route.fulfill({
+          json: {
+            ok: true,
+            result: {
+              configurationVersion: 2,
+              episodeVersion: 3,
+              scriptRevisionId: "spoken-revision-2",
+            },
+          },
+          status: 200,
+        });
+      },
+    );
+    await page.route(`**/api/episodes/${episodeId}/narration-upload`, async (route) => {
+      const headers = route.request().headers();
+      expect(headers["content-type"]).toBe("audio/wav");
+      expect(headers["x-genie-display-filename"]).toBe(
+        encodeURIComponent("owner narration.wav"),
+      );
+      expect(headers["x-idempotency-key"]).toBeTruthy();
+      await route.fulfill({
+        json: {
+          ok: true,
+          result: {
+            assetVersionId: "asset-version-1",
+            comparisonEvidence: {
+              matchesLockedScript: false,
+              summary:
+                "The final spoken narration differs in two phrases from the earlier script.",
+            },
+            durationMs: 81_250,
+            originalFilename: "owner narration.wav",
+            signedUrl: "data:audio/wav;base64,UklGRg==",
+            state: "verified",
+            transcriptionText: "यह अंतिम बोला गया और स्वीकृत वर्णन है।",
+            uploadVersionId: "upload-version-1",
+          },
+        },
+        status: 200,
+      });
+    });
+    await page.goto(`/episodes/${episodeId}/create?fixture=phase2-script`);
+
+    await expect(
+      page.getByRole("button", { name: /Upload your own audio/ }),
+    ).toBeVisible();
+    const fileInput = page.getByLabel("Upload narration MP3 or WAV");
+    await expect(fileInput).toHaveAttribute(
+      "accept",
+      ".mp3,.wav,audio/mpeg,audio/wav,audio/x-wav",
+    );
+    await fileInput.setInputFiles({
+      buffer: Buffer.from("RIFF-owner-narration"),
+      mimeType: "audio/wav",
+      name: "owner narration.wav",
+    });
+
+    const review = page.getByRole("region", { name: "Uploaded narration review" });
+    await expect(review).toContainText(
+      "The final spoken narration differs in two phrases from the earlier script.",
+    );
+    await expect(review).toContainText("यह अंतिम बोला गया और स्वीकृत वर्णन है।");
+    await expect(
+      review.getByRole("button", { name: "Use this audio and transcript" }),
+    ).toBeEnabled();
+    await expect(nextStageButton(page, "Look")).toBeDisabled();
+
+    await review.getByRole("button", { name: "Use this audio and transcript" }).click();
+    await expect(review).toContainText(
+      "Uploaded audio and this transcription are final for this Episode.",
+    );
+    await expect(nextStageButton(page, "Look")).toBeEnabled();
+
+    const female = page.getByRole("button", {
+      name: /Female Target: expressive Hindi/,
+    });
+    await female.click();
+    await expect(female).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page.getByRole("button", { name: /Upload your own audio/ }),
+    ).toHaveAttribute("aria-pressed", "false");
+    expect(commands).toEqual(["episode.voice.select"]);
+  });
+
   test("requires explicit human confirmation for system-default voice and look", async ({
     page,
   }) => {

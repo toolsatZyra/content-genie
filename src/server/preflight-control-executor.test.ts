@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { PreflightPlanAgentError } from "@/server/preflight-plan-agent";
 import { ProductionQuoteError } from "@/server/production-quote";
+import { UploadedNarrationClockError } from "@/server/uploaded-narration-clock";
 
 import { classifyPreflightControlFailure } from "./preflight-control-executor";
 
@@ -44,5 +45,20 @@ describe("preflight control failure classification", () => {
       ),
     ).toEqual({ retryable: true, safeErrorClass: "plan-ledger-rejected" });
     expect(classifyPreflightControlFailure(new Error("network"))).toBeNull();
+  });
+
+  it("classifies uploaded narration clock failures without leaking provider text", () => {
+    expect(
+      classifyPreflightControlFailure(
+        new UploadedNarrationClockError(
+          "private detail",
+          "uploaded_narration.clock_ledger_rejected",
+          true,
+        ),
+      ),
+    ).toEqual({
+      retryable: true,
+      safeErrorClass: "uploaded-narration.clock-ledger-rejected",
+    });
   });
 });

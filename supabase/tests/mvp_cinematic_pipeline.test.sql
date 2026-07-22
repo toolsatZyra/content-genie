@@ -6,7 +6,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions,auth,storage,private,audit,pg_catalog;
 
-select plan(91);
+select plan(102);
 
 create temp table mvp_pipeline_fixture(
   key text primary key,
@@ -1809,6 +1809,529 @@ select ok(
       and dispatch.state = 'succeeded'
   ),
   'persisted storyboard evidence retains the exact dispatch receipt and bytes'
+);
+
+select ok(
+  (select count(*) from public.voice_versions) = 2
+  and enum_range(null::public.narrator_gender)::text = '{male,female}'
+  and exists (
+    select 1
+    from pg_enum value
+    join pg_type enum_type on enum_type.oid = value.enumtypid
+    join pg_namespace enum_schema on enum_schema.oid = enum_type.typnamespace
+    where enum_schema.nspname = 'public'
+      and enum_type.typname = 'script_source_kind'
+      and value.enumlabel = 'uploaded_audio_transcript'
+  ),
+  'uploaded narration preserves the exact two-voice registry and adds one script source kind'
+);
+
+select ok(
+  not exists (
+    select required.column_name
+    from (values
+      ('narration_source_kind'),
+      ('selected_narration_upload_version_id'),
+      ('narration_source_confirmed_by'),
+      ('narration_source_confirmed_at')
+    ) as required(column_name)
+    where not exists (
+      select 1
+      from information_schema.columns actual
+      where actual.table_schema = 'public'
+        and actual.table_name = 'episode_configuration_candidates'
+        and actual.column_name = required.column_name
+    )
+  )
+  and to_regclass('public.episode_narration_upload_versions') is not null,
+  'Episode configuration and public upload versions expose the authoritative narration source'
+);
+
+select ok(
+  to_regprocedure(
+    'public.command_prepare_episode_narration_upload(uuid,uuid,uuid,bigint,uuid,uuid,uuid,text,bigint,text,text,uuid,text,text,uuid)'
+  ) is not null
+  and to_regprocedure(
+    'public.command_confirm_episode_narration_upload(uuid,uuid,uuid,uuid,bigint,bigint,uuid,text,bytea,text,text,text,text,jsonb,jsonb,integer,integer,integer,integer,integer,integer,boolean,uuid,text,text,uuid)'
+  ) is not null
+  and to_regprocedure(
+    'public.command_record_uploaded_narration_master_clock(uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,jsonb,jsonb)'
+  ) is not null
+  and to_regprocedure(
+    'public.get_active_narration_upload_ingest_policy()'
+  ) is not null
+  and to_regprocedure(
+    'public.command_reject_episode_narration_upload(uuid,uuid,text)'
+  ) is not null,
+  'uploaded narration exposes exact prepare, confirm and master-clock commands'
+);
+
+select ok(
+  has_table_privilege(
+    'authenticated','public.episode_narration_upload_versions','select'
+  )
+  and has_table_privilege(
+    'service_role','public.episode_narration_upload_versions','select'
+  )
+  and not has_table_privilege(
+    'authenticated','public.episode_narration_upload_versions','insert'
+  )
+  and not has_table_privilege(
+    'anon','public.episode_narration_upload_versions','select'
+  )
+  and (select relrowsecurity and relforcerowsecurity
+       from pg_class
+       where oid = 'public.episode_narration_upload_versions'::regclass)
+  and has_function_privilege(
+    'authenticated',
+    'public.command_confirm_episode_narration_upload(uuid,uuid,uuid,uuid,bigint,bigint,uuid,text,bytea,text,text,text,text,jsonb,jsonb,integer,integer,integer,integer,integer,integer,boolean,uuid,text,text,uuid)',
+    'execute'
+  )
+  and not has_function_privilege(
+    'authenticated',
+    'public.command_record_uploaded_narration_master_clock(uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,jsonb,jsonb)',
+    'execute'
+  )
+  and has_function_privilege(
+    'service_role',
+    'public.command_record_uploaded_narration_master_clock(uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,jsonb,jsonb)',
+    'execute'
+  ),
+  'upload rows are member-readable while write and master-clock authority remain scoped'
+);
+
+-- A compact executable upload fixture exercises revision replacement, exact
+-- replay/reuse, the closed World boundary, generated-voice restoration and
+-- the provider-free uploaded-audio master clock.
+reset role;
+set local session_replication_role = replica;
+
+insert into public.episodes (
+  id,workspace_id,series_id,episode_number,title,owner_user_id,created_by,
+  workflow_state
+) values (
+  'd1400000-0000-4000-8000-000000000001',
+  'c1100000-0000-4000-8000-000000000001',
+  'c1300000-0000-4000-8000-000000000001',2,'Uploaded narration fixture',
+  'c1200000-0000-4000-8000-000000000002',
+  'c1200000-0000-4000-8000-000000000002','world_setup'
+);
+insert into private.aggregate_versions (
+  workspace_id,aggregate_type,aggregate_id,current_version
+) values (
+  'c1100000-0000-4000-8000-000000000001','episode',
+  'd1400000-0000-4000-8000-000000000001',1
+);
+insert into public.script_revisions (
+  id,workspace_id,episode_id,revision_number,source_kind,raw_text,raw_utf8,
+  raw_utf8_sha256,processing_text,processing_utf8_sha256,processing_profile,
+  coordinate_map,runtime_evidence,source_encoding_evidence,
+  raw_utf16_code_units,raw_scalar_count,raw_grapheme_count,
+  processing_utf16_code_units,processing_scalar_count,
+  processing_grapheme_count,estimated_duration_seconds,duration_out_of_band,
+  duration_acknowledged,created_by
+) values (
+  'd1510000-0000-4000-8000-000000000001',
+  'c1100000-0000-4000-8000-000000000001',
+  'd1400000-0000-4000-8000-000000000001',1,'browser_text','abcde',
+  convert_to('abcde','UTF8'),
+  encode(extensions.digest(convert_to('abcde','UTF8'),'sha256'),'hex'),
+  'abcde',encode(extensions.digest(convert_to('abcde','UTF8'),'sha256'),'hex'),
+  'genie-script-processing.v1',
+  '{"v":2,"c":"zero-based-half-open","r":[[0,1,2,3,4,5],[0,1,2,3,4,5],[1,2,3,4,5]],"p":[[0,1,2,3,4,5],[0,1,2,3,4,5],[1,2,3,4,5]],"s":[[0,0,5,0,5]]}',
+  '{"nodeVersion":"22.14.0","icuVersion":"76.1","unicodeVersion":"17.0.0","graphemeSegmenterProfile":"unicode-segmenter@0.17.0:Unicode-17.0.0:UAX29-revision-47","graphemeProbeSha256":"472911620e8d642248b9e0204b31b347ef80653af0eb128d6a76cb217b5e5096"}',
+  '{"kind":"browser-utf16"}',5,5,5,5,5,5,2,true,true,
+  'c1200000-0000-4000-8000-000000000002'
+);
+insert into public.episode_configuration_candidates (
+  id,workspace_id,episode_id,candidate_number,script_revision_id,
+  narrator_gender,voice_version_id,look_version_id,voice_confirmed_by,
+  voice_confirmed_at,look_confirmed_by,look_confirmed_at,state,selected_by
+) values (
+  'd1500000-0000-4000-8000-000000000001',
+  'c1100000-0000-4000-8000-000000000001',
+  'd1400000-0000-4000-8000-000000000001',1,
+  'd1510000-0000-4000-8000-000000000001','male',
+  (select id from public.voice_versions where gender='male' limit 1),
+  (select id from public.look_versions where look_key='glowing-divine-realism' limit 1),
+  'c1200000-0000-4000-8000-000000000002',statement_timestamp(),
+  'c1200000-0000-4000-8000-000000000002',statement_timestamp(),'world_design',
+  'c1200000-0000-4000-8000-000000000002'
+);
+insert into public.assets(id,workspace_id,asset_kind) values
+('d1a61000-0000-4000-8000-000000000001','c1100000-0000-4000-8000-000000000001','narration'),
+('d1a61000-0000-4000-8000-000000000002','c1100000-0000-4000-8000-000000000001','narration'),
+('d1a61000-0000-4000-8000-000000000003','c1100000-0000-4000-8000-000000000001','narration');
+insert into public.asset_versions (
+  id,workspace_id,asset_id,version_number,source_quarantine_version_id,
+  bucket_id,object_name,storage_version,content_sha256,media_mime,byte_length,
+  policy_version_id,provenance_hash
+) values
+(
+  'd1a60000-0000-4000-8000-000000000001',
+  'c1100000-0000-4000-8000-000000000001',
+  'd1a61000-0000-4000-8000-000000000001',1,
+  'd1a62000-0000-4000-8000-000000000001','workspace-media',
+  'c1100000-0000-4000-8000-000000000001/narration/d1a61000-0000-4000-8000-000000000001/d1a60000-0000-4000-8000-000000000001/source',
+  'upload-v1',repeat('a',64),'audio/mpeg',4096,
+  'a4d82e59-bd43-5f15-90fe-07f68ec9356c',repeat('b',64)
+),
+(
+  'd1a60000-0000-4000-8000-000000000002',
+  'c1100000-0000-4000-8000-000000000001',
+  'd1a61000-0000-4000-8000-000000000002',1,
+  'd1a62000-0000-4000-8000-000000000002','workspace-media',
+  'c1100000-0000-4000-8000-000000000001/narration/d1a61000-0000-4000-8000-000000000002/d1a60000-0000-4000-8000-000000000002/source',
+  'upload-v2',repeat('c',64),'audio/mpeg',4096,
+  'a4d82e59-bd43-5f15-90fe-07f68ec9356c',repeat('d',64)
+),
+(
+  'd1a60000-0000-4000-8000-000000000003',
+  'c1100000-0000-4000-8000-000000000001',
+  'd1a61000-0000-4000-8000-000000000003',1,
+  'd1a62000-0000-4000-8000-000000000003','workspace-media',
+  'c1100000-0000-4000-8000-000000000001/narration/d1a61000-0000-4000-8000-000000000003/d1a60000-0000-4000-8000-000000000003/source',
+  'upload-v3',repeat('e',64),'audio/mpeg',4096,
+  'a4d82e59-bd43-5f15-90fe-07f68ec9356c',repeat('f',64)
+);
+insert into public.media_probes(
+  workspace_id,asset_version_id,probe_version,probe_sha256,duration_ms,streams
+) values
+('c1100000-0000-4000-8000-000000000001','d1a60000-0000-4000-8000-000000000001','fixture-v1',repeat('1',64),60000,'[{"mime":"audio/mpeg"}]'),
+('c1100000-0000-4000-8000-000000000001','d1a60000-0000-4000-8000-000000000002','fixture-v1',repeat('2',64),60000,'[{"mime":"audio/mpeg"}]'),
+('c1100000-0000-4000-8000-000000000001','d1a60000-0000-4000-8000-000000000003','fixture-v1',repeat('3',64),60000,'[{"mime":"audio/mpeg"}]');
+insert into public.episode_narration_upload_versions (
+  id,workspace_id,episode_id,configuration_candidate_id,
+  original_script_revision_id,stable_asset_id,quarantine_asset_version_id,
+  promoted_asset_version_id,version_number,state,state_version,
+  display_filename,declared_mime,source_sha256,sanitized_sha256,byte_length,
+  sanitized_byte_length,duration_ms,transcription_text,transcription_sha256,
+  alignment_json,alignment_hash,script_comparison_json,script_comparison_hash,
+  quality_evidence,quality_evidence_hash,uploaded_by,command_id,
+  idempotency_key,request_hash
+) values
+(
+  'd1b00000-0000-4000-8000-000000000001',
+  'c1100000-0000-4000-8000-000000000001',
+  'd1400000-0000-4000-8000-000000000001',
+  'd1500000-0000-4000-8000-000000000001',
+  'd1510000-0000-4000-8000-000000000001',
+  'd1a61000-0000-4000-8000-000000000001',
+  'd1a62000-0000-4000-8000-000000000001',
+  'd1a60000-0000-4000-8000-000000000001',1,'verified',2,
+  'owner-1.wav','audio/wav',repeat('4',64),repeat('a',64),5000,4096,60000,
+  'fghij',encode(extensions.digest(convert_to('fghij','UTF8'),'sha256'),'hex'),
+  '{"segments":[]}',encode(extensions.digest(convert_to('{"segments":[]}'::jsonb::text,'UTF8'),'sha256'),'hex'),
+  '{"matchesOriginalScript":false}',encode(extensions.digest(convert_to('{"matchesOriginalScript":false}'::jsonb::text,'UTF8'),'sha256'),'hex'),
+  '{"schemaVersion":"genie.owner-narration-quality-evidence.v1","ownerConfirmationRequired":true,"scriptComparisonAdvisoryOnly":true}',
+  encode(extensions.digest(convert_to('{"schemaVersion":"genie.owner-narration-quality-evidence.v1","ownerConfirmationRequired":true,"scriptComparisonAdvisoryOnly":true}'::jsonb::text,'UTF8'),'sha256'),'hex'),
+  'c1200000-0000-4000-8000-000000000002',
+  'd1b10000-0000-4000-8000-000000000001','owner-audio-0001',repeat('5',64)
+),
+(
+  'd1b00000-0000-4000-8000-000000000002',
+  'c1100000-0000-4000-8000-000000000001',
+  'd1400000-0000-4000-8000-000000000001',
+  'd1500000-0000-4000-8000-000000000001',
+  'd1510000-0000-4000-8000-000000000001',
+  'd1a61000-0000-4000-8000-000000000002',
+  'd1a62000-0000-4000-8000-000000000002',
+  'd1a60000-0000-4000-8000-000000000002',2,'verified',2,
+  'owner-2.mp3','audio/mpeg',repeat('6',64),repeat('c',64),5000,4096,60000,
+  'fghij',encode(extensions.digest(convert_to('fghij','UTF8'),'sha256'),'hex'),
+  '{"segments":[]}',encode(extensions.digest(convert_to('{"segments":[]}'::jsonb::text,'UTF8'),'sha256'),'hex'),
+  '{"matchesOriginalScript":true}',encode(extensions.digest(convert_to('{"matchesOriginalScript":true}'::jsonb::text,'UTF8'),'sha256'),'hex'),
+  '{"schemaVersion":"genie.owner-narration-quality-evidence.v1","ownerConfirmationRequired":true,"scriptComparisonAdvisoryOnly":true}',
+  encode(extensions.digest(convert_to('{"schemaVersion":"genie.owner-narration-quality-evidence.v1","ownerConfirmationRequired":true,"scriptComparisonAdvisoryOnly":true}'::jsonb::text,'UTF8'),'sha256'),'hex'),
+  'c1200000-0000-4000-8000-000000000002',
+  'd1b10000-0000-4000-8000-000000000002','owner-audio-0002',repeat('7',64)
+),
+(
+  'd1b00000-0000-4000-8000-000000000003',
+  'c1100000-0000-4000-8000-000000000001',
+  'd1400000-0000-4000-8000-000000000001',
+  'd1500000-0000-4000-8000-000000000001',
+  'd1510000-0000-4000-8000-000000000001',
+  'd1a61000-0000-4000-8000-000000000003',
+  'd1a62000-0000-4000-8000-000000000003',
+  'd1a60000-0000-4000-8000-000000000003',3,'verified',2,
+  'owner-3.mp3','audio/mpeg',repeat('8',64),repeat('e',64),5000,4096,60000,
+  'fghij',encode(extensions.digest(convert_to('fghij','UTF8'),'sha256'),'hex'),
+  '{"segments":[]}',encode(extensions.digest(convert_to('{"segments":[]}'::jsonb::text,'UTF8'),'sha256'),'hex'),
+  '{"matchesOriginalScript":true}',encode(extensions.digest(convert_to('{"matchesOriginalScript":true}'::jsonb::text,'UTF8'),'sha256'),'hex'),
+  '{"schemaVersion":"genie.owner-narration-quality-evidence.v1","ownerConfirmationRequired":true,"scriptComparisonAdvisoryOnly":true}',
+  encode(extensions.digest(convert_to('{"schemaVersion":"genie.owner-narration-quality-evidence.v1","ownerConfirmationRequired":true,"scriptComparisonAdvisoryOnly":true}'::jsonb::text,'UTF8'),'sha256'),'hex'),
+  'c1200000-0000-4000-8000-000000000002',
+  'd1b10000-0000-4000-8000-000000000003','owner-audio-0003',repeat('9',64)
+);
+
+set local session_replication_role = origin;
+
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
+select set_config('request.jwt.claim.role','service_role',true);
+set local role service_role;
+select public.attest_script_coordinate_map(
+  'd2a00000-0000-4000-8000-000000000001',
+  'c1100000-0000-4000-8000-000000000001',
+  'd1400000-0000-4000-8000-000000000001',
+  'c1200000-0000-4000-8000-000000000002',repeat('a',64),
+  encode(extensions.digest(convert_to('fghij','UTF8'),'sha256'),'hex'),
+  encode(extensions.digest(convert_to('fghij','UTF8'),'sha256'),'hex'),
+  '{"v":2,"c":"zero-based-half-open","r":[[0,1,2,3,4,5],[0,1,2,3,4,5],[1,2,3,4,5]],"p":[[0,1,2,3,4,5],[0,1,2,3,4,5],[1,2,3,4,5]],"s":[[0,0,5,0,5]]}',
+  '{"nodeVersion":"22.14.0","icuVersion":"76.1","unicodeVersion":"17.0.0","graphemeSegmenterProfile":"unicode-segmenter@0.17.0:Unicode-17.0.0:UAX29-revision-47","graphemeProbeSha256":"472911620e8d642248b9e0204b31b347ef80653af0eb128d6a76cb217b5e5096"}'
+);
+
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"c1200000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal2","session_id":"c1210000-0000-4000-8000-000000000002"}',
+  true
+);
+select set_config('request.jwt.claim.sub','c1200000-0000-4000-8000-000000000002',true);
+select set_config('request.jwt.claim.role','authenticated',true);
+set local role authenticated;
+select public.command_confirm_episode_narration_upload(
+  'c1100000-0000-4000-8000-000000000001',
+  'd1400000-0000-4000-8000-000000000001',
+  'd1500000-0000-4000-8000-000000000001',
+  'd1b00000-0000-4000-8000-000000000001',1,2,
+  'd2a00000-0000-4000-8000-000000000001','fghij',convert_to('fghij','UTF8'),
+  encode(extensions.digest(convert_to('fghij','UTF8'),'sha256'),'hex'),
+  'fghij',encode(extensions.digest(convert_to('fghij','UTF8'),'sha256'),'hex'),
+  'genie-script-processing.v1',
+  '{"v":2,"c":"zero-based-half-open","r":[[0,1,2,3,4,5],[0,1,2,3,4,5],[1,2,3,4,5]],"p":[[0,1,2,3,4,5],[0,1,2,3,4,5],[1,2,3,4,5]],"s":[[0,0,5,0,5]]}',
+  '{"nodeVersion":"22.14.0","icuVersion":"76.1","unicodeVersion":"17.0.0","graphemeSegmenterProfile":"unicode-segmenter@0.17.0:Unicode-17.0.0:UAX29-revision-47","graphemeProbeSha256":"472911620e8d642248b9e0204b31b347ef80653af0eb128d6a76cb217b5e5096"}',
+  5,5,5,5,5,5,true,'d2b00000-0000-4000-8000-000000000001',
+  'confirm-owner-audio-0001',repeat('a',64),'d2c00000-0000-4000-8000-000000000001'
+);
+
+select ok(
+  exists (
+    select 1 from public.script_revisions revision
+    where revision.episode_id='d1400000-0000-4000-8000-000000000001'
+      and revision.revision_number=2
+      and revision.source_kind='uploaded_audio_transcript'
+      and revision.raw_text='fghij'
+      and revision.uploaded_asset_version_id='d1a60000-0000-4000-8000-000000000001'
+  )
+  and exists (
+    select 1 from public.script_lock_events lock_event
+    join public.script_revisions revision
+      on revision.id=lock_event.script_revision_id
+    where revision.episode_id='d1400000-0000-4000-8000-000000000001'
+      and revision.revision_number=2
+  ),
+  'confirming a differing gold transcript creates a new immutable audio-transcript revision'
+);
+
+select ok(
+  exists (
+    select 1 from public.script_revisions revision
+    where revision.id='d1510000-0000-4000-8000-000000000001'
+      and revision.raw_text='abcde'
+  )
+  and (select count(*) from public.script_revisions
+       where episode_id='d1400000-0000-4000-8000-000000000001')=2,
+  'the earlier user script revision remains preserved after transcript confirmation'
+);
+
+reset role;
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
+select set_config('request.jwt.claim.role','service_role',true);
+set local role service_role;
+select public.attest_script_coordinate_map(
+  'd2a00000-0000-4000-8000-000000000002',
+  'c1100000-0000-4000-8000-000000000001',
+  'd1400000-0000-4000-8000-000000000001',
+  'c1200000-0000-4000-8000-000000000002',repeat('b',64),
+  encode(extensions.digest(convert_to('fghij','UTF8'),'sha256'),'hex'),
+  encode(extensions.digest(convert_to('fghij','UTF8'),'sha256'),'hex'),
+  '{"v":2,"c":"zero-based-half-open","r":[[0,1,2,3,4,5],[0,1,2,3,4,5],[1,2,3,4,5]],"p":[[0,1,2,3,4,5],[0,1,2,3,4,5],[1,2,3,4,5]],"s":[[0,0,5,0,5]]}',
+  '{"nodeVersion":"22.14.0","icuVersion":"76.1","unicodeVersion":"17.0.0","graphemeSegmenterProfile":"unicode-segmenter@0.17.0:Unicode-17.0.0:UAX29-revision-47","graphemeProbeSha256":"472911620e8d642248b9e0204b31b347ef80653af0eb128d6a76cb217b5e5096"}'
+);
+reset role;
+select set_config('request.jwt.claims','{"sub":"c1200000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal2","session_id":"c1210000-0000-4000-8000-000000000002"}',true);
+select set_config('request.jwt.claim.sub','c1200000-0000-4000-8000-000000000002',true);
+select set_config('request.jwt.claim.role','authenticated',true);
+set local role authenticated;
+select public.command_confirm_episode_narration_upload(
+  'c1100000-0000-4000-8000-000000000001','d1400000-0000-4000-8000-000000000001',
+  'd1500000-0000-4000-8000-000000000001','d1b00000-0000-4000-8000-000000000002',
+  2,2,'d2a00000-0000-4000-8000-000000000002','fghij',convert_to('fghij','UTF8'),
+  encode(extensions.digest(convert_to('fghij','UTF8'),'sha256'),'hex'),'fghij',
+  encode(extensions.digest(convert_to('fghij','UTF8'),'sha256'),'hex'),
+  'genie-script-processing.v1',
+  '{"v":2,"c":"zero-based-half-open","r":[[0,1,2,3,4,5],[0,1,2,3,4,5],[1,2,3,4,5]],"p":[[0,1,2,3,4,5],[0,1,2,3,4,5],[1,2,3,4,5]],"s":[[0,0,5,0,5]]}',
+  '{"nodeVersion":"22.14.0","icuVersion":"76.1","unicodeVersion":"17.0.0","graphemeSegmenterProfile":"unicode-segmenter@0.17.0:Unicode-17.0.0:UAX29-revision-47","graphemeProbeSha256":"472911620e8d642248b9e0204b31b347ef80653af0eb128d6a76cb217b5e5096"}',
+  5,5,5,5,5,5,true,'d2b00000-0000-4000-8000-000000000002',
+  'confirm-owner-audio-0002',repeat('b',64),'d2c00000-0000-4000-8000-000000000002'
+);
+
+select ok(
+  (select count(*) from public.script_revisions
+   where episode_id='d1400000-0000-4000-8000-000000000001')=2
+  and (select confirmed_transcript_revision_id
+       from public.episode_narration_upload_versions
+       where id='d1b00000-0000-4000-8000-000000000002') =
+      (select script_revision_id from public.episode_configuration_candidates
+       where id='d1500000-0000-4000-8000-000000000001'),
+  'confirming an identical transcript reuses the current immutable revision'
+);
+
+select public.command_select_episode_voice(
+  'c1100000-0000-4000-8000-000000000001',
+  'd1400000-0000-4000-8000-000000000001',
+  'd1500000-0000-4000-8000-000000000001',3,'male',
+  (select voice_version_id from public.episode_configuration_candidates
+   where id='d1500000-0000-4000-8000-000000000001'),
+  'd2b00000-0000-4000-8000-000000000003','restore-generated-0001',
+  repeat('c',64),'d2c00000-0000-4000-8000-000000000003'
+);
+
+select ok(
+  (select narration_source_kind='elevenlabs_v3'
+      and selected_narration_upload_version_id is null
+   from public.episode_configuration_candidates
+   where id='d1500000-0000-4000-8000-000000000001')
+  and (select state='superseded'
+       from public.episode_narration_upload_versions
+       where id='d1b00000-0000-4000-8000-000000000002'),
+  'an explicit generated voice selection clears the active upload and preserves it as superseded'
+);
+
+reset role;
+set local session_replication_role = replica;
+insert into public.preflight_runs(
+  id,workspace_id,episode_id,configuration_candidate_id,script_revision_id,
+  kind,run_number,authority_epoch,state,requires_micro_authority,trigger_run_id,
+  started_at
+) values(
+  'd3100000-0000-4000-8000-000000000001',
+  'c1100000-0000-4000-8000-000000000001',
+  'd1400000-0000-4000-8000-000000000001',
+  'd1500000-0000-4000-8000-000000000001',
+  (select script_revision_id from public.episode_configuration_candidates
+   where id='d1500000-0000-4000-8000-000000000001'),
+  'narration_clock',1,1,'running',false,'uploaded-audio-fixture',statement_timestamp()
+);
+set local session_replication_role = origin;
+
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
+select set_config('request.jwt.claim.role','service_role',true);
+set local role service_role;
+select public.attest_script_coordinate_map(
+  'd2a00000-0000-4000-8000-000000000003',
+  'c1100000-0000-4000-8000-000000000001',
+  'd1400000-0000-4000-8000-000000000001',
+  'c1200000-0000-4000-8000-000000000002',repeat('d',64),
+  encode(extensions.digest(convert_to('fghij','UTF8'),'sha256'),'hex'),
+  encode(extensions.digest(convert_to('fghij','UTF8'),'sha256'),'hex'),
+  '{"v":2,"c":"zero-based-half-open","r":[[0,1,2,3,4,5],[0,1,2,3,4,5],[1,2,3,4,5]],"p":[[0,1,2,3,4,5],[0,1,2,3,4,5],[1,2,3,4,5]],"s":[[0,0,5,0,5]]}',
+  '{"nodeVersion":"22.14.0","icuVersion":"76.1","unicodeVersion":"17.0.0","graphemeSegmenterProfile":"unicode-segmenter@0.17.0:Unicode-17.0.0:UAX29-revision-47","graphemeProbeSha256":"472911620e8d642248b9e0204b31b347ef80653af0eb128d6a76cb217b5e5096"}'
+);
+reset role;
+select set_config('request.jwt.claims','{"sub":"c1200000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal2","session_id":"c1210000-0000-4000-8000-000000000002"}',true);
+select set_config('request.jwt.claim.sub','c1200000-0000-4000-8000-000000000002',true);
+select set_config('request.jwt.claim.role','authenticated',true);
+set local role authenticated;
+select throws_ok(
+  $sql$
+  select public.command_confirm_episode_narration_upload(
+    'c1100000-0000-4000-8000-000000000001','d1400000-0000-4000-8000-000000000001',
+    'd1500000-0000-4000-8000-000000000001','d1b00000-0000-4000-8000-000000000003',
+    4,2,'d2a00000-0000-4000-8000-000000000003','fghij',convert_to('fghij','UTF8'),
+    encode(extensions.digest(convert_to('fghij','UTF8'),'sha256'),'hex'),'fghij',
+    encode(extensions.digest(convert_to('fghij','UTF8'),'sha256'),'hex'),
+    'genie-script-processing.v1',
+    '{"v":2,"c":"zero-based-half-open","r":[[0,1,2,3,4,5],[0,1,2,3,4,5],[1,2,3,4,5]],"p":[[0,1,2,3,4,5],[0,1,2,3,4,5],[1,2,3,4,5]],"s":[[0,0,5,0,5]]}',
+    '{"nodeVersion":"22.14.0","icuVersion":"76.1","unicodeVersion":"17.0.0","graphemeSegmenterProfile":"unicode-segmenter@0.17.0:Unicode-17.0.0:UAX29-revision-47","graphemeProbeSha256":"472911620e8d642248b9e0204b31b347ef80653af0eb128d6a76cb217b5e5096"}',
+    5,5,5,5,5,5,true,'d2b00000-0000-4000-8000-000000000004',
+    'confirm-owner-audio-0003',repeat('d',64),'d2c00000-0000-4000-8000-000000000004'
+  )
+  $sql$,
+  '55000','narration upload window has closed',
+  'uploaded narration cannot be confirmed after World or Preflight work begins'
+);
+
+reset role;
+set local session_replication_role = replica;
+update public.episode_narration_upload_versions
+set state='confirmed',state_version=3,
+  confirmed_transcript_revision_id=(
+    select script_revision_id from public.episode_configuration_candidates
+    where id='d1500000-0000-4000-8000-000000000001'
+  ),confirmed_by='c1200000-0000-4000-8000-000000000002',
+  confirmed_at=statement_timestamp()
+where id='d1b00000-0000-4000-8000-000000000003';
+update public.episode_configuration_candidates
+set state='preflight',narration_source_kind='uploaded_audio',
+  selected_narration_upload_version_id='d1b00000-0000-4000-8000-000000000003',
+  narration_source_confirmed_by='c1200000-0000-4000-8000-000000000002',
+  narration_source_confirmed_at=statement_timestamp()
+where id='d1500000-0000-4000-8000-000000000001';
+insert into public.preflight_audio_identity_selections(
+  id,workspace_id,configuration_candidate_id,voice_version_id,
+  pronunciation_lexicon_version_id,score_identity_version_id,
+  sound_identity_version_id,selection_hash,state
+) values(
+  'd3200000-0000-4000-8000-000000000001',
+  'c1100000-0000-4000-8000-000000000001',
+  'd1500000-0000-4000-8000-000000000001',
+  (select voice_version_id from public.episode_configuration_candidates
+   where id='d1500000-0000-4000-8000-000000000001'),
+  'd3210000-0000-4000-8000-000000000001',
+  'd3220000-0000-4000-8000-000000000001',
+  'd3230000-0000-4000-8000-000000000001',repeat('e',64),'verified'
+);
+set local session_replication_role = origin;
+
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
+select set_config('request.jwt.claim.role','service_role',true);
+set local role service_role;
+select public.command_record_uploaded_narration_master_clock(
+  'd3300000-0000-4000-8000-000000000001',
+  'c1100000-0000-4000-8000-000000000001',
+  'd1500000-0000-4000-8000-000000000001',
+  'd3100000-0000-4000-8000-000000000001',
+  'd1b00000-0000-4000-8000-000000000003',
+  'd3200000-0000-4000-8000-000000000001',
+  encode(extensions.digest(convert_to('fghij','UTF8'),'sha256'),'hex'),
+  encode(extensions.digest(convert_to('[{"kind":"spoken","startScalar":0,"endScalar":5,"exactText":"fghij","startMs":0,"endMs":60000,"pronunciationEntryIds":[]}]'::jsonb::text,'UTF8'),'sha256'),'hex'),
+  encode(extensions.digest(convert_to('{"schemaVersion":"genie.owner-narration-quality-evidence.v1","ownerConfirmationRequired":true,"scriptComparisonAdvisoryOnly":true}'::jsonb::text,'UTF8'),'sha256'),'hex'),
+  repeat('f',64),
+  '{"schemaVersion":"genie.owner-narration-quality-evidence.v1","ownerConfirmationRequired":true,"scriptComparisonAdvisoryOnly":true}',
+  '[{"kind":"spoken","startScalar":0,"endScalar":5,"exactText":"fghij","startMs":0,"endMs":60000,"pronunciationEntryIds":[]}]'
+);
+
+reset role;
+
+select ok(
+  exists (
+    select 1 from public.narration_master_clock_versions clock
+    where clock.id='d3300000-0000-4000-8000-000000000001'
+      and clock.source_kind='uploaded_audio'
+      and clock.narration_upload_version_id='d1b00000-0000-4000-8000-000000000003'
+      and clock.narration_asset_version_id='d1a60000-0000-4000-8000-000000000003'
+  ),
+  'the uploaded gold narration creates the verified master clock and exact segment coverage'
+);
+
+select ok(
+  not exists (
+    select 1 from private.narration_generation_jobs job
+    where job.preflight_run_id='d3100000-0000-4000-8000-000000000001'
+  )
+  and not exists (
+    select 1 from private.provider_requests request
+    where request.preflight_run_id='d3100000-0000-4000-8000-000000000001'
+      and request.operation='gen_speech'
+  )
+  and not exists (
+    select 1 from private.micro_quotes quote
+    where quote.configuration_candidate_id='d1500000-0000-4000-8000-000000000001'
+      and quote.preflight_kind='narration_clock'
+  ),
+  'uploaded narration creates no ElevenLabs request, grant, quote or reservation state'
 );
 
 select * from finish();

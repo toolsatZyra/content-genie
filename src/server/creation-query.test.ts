@@ -83,7 +83,11 @@ function successfulResults(
         look_confirmed_by: actorId,
         look_version_id: lookVersionId,
         narrator_gender: "male",
+        narration_source_confirmed_at: null,
+        narration_source_confirmed_by: null,
+        narration_source_kind: "elevenlabs_v3",
         performance_profile_id: performanceProfileId,
+        selected_narration_upload_version_id: null,
         voice_confirmed_at: "2026-07-19T10:00:00.000Z",
         voice_confirmed_by: actorId,
         voice_version_id: voiceVersionId,
@@ -175,6 +179,13 @@ describe("the creation projection query", () => {
         },
         lookVersionId,
         narratorGender: "male",
+        narrationSourceConfirmation: {
+          confirmedAt: null,
+          confirmedBy: null,
+          origin: "system_default",
+        },
+        narrationSourceKind: "elevenlabs_v3",
+        narrationUpload: null,
         performanceProfileId,
         voiceAvailabilityByVersionId: {
           [voiceVersionId]: "pending_authenticated_canary",
@@ -223,6 +234,52 @@ describe("the creation projection query", () => {
         transcript: [],
       },
       world: { characters: [], locations: [], progress: [], referencePack: null },
+    });
+  });
+
+  it("projects the confirmed authoritative uploaded narration", async () => {
+    const results = successfulResults();
+    const configuration = results.episode_configuration_candidates!.data as Record<
+      string,
+      unknown
+    >;
+    configuration.narration_source_kind = "uploaded_audio";
+    configuration.selected_narration_upload_version_id =
+      "10000000-0000-4000-8000-000000000040";
+    configuration.narration_source_confirmed_at = "2026-07-22T10:00:00.000Z";
+    configuration.narration_source_confirmed_by = actorId;
+    results.episode_narration_upload_versions = {
+      data: {
+        script_comparison_json: { matchesLockedScript: false },
+        duration_ms: "81250",
+        id: "10000000-0000-4000-8000-000000000040",
+        promoted_asset_version_id: "10000000-0000-4000-8000-000000000041",
+        display_filename: "final-narration.wav",
+        state: "confirmed",
+        transcription_text: "Exact words spoken in the uploaded narration.",
+      },
+      error: null,
+    };
+    const { client } = fakeClient(results);
+
+    const projection = await loadCreationProjection(client, user, episodeId);
+
+    expect(projection?.configuration).toMatchObject({
+      narrationSourceConfirmation: {
+        confirmedAt: "2026-07-22T10:00:00.000Z",
+        confirmedBy: actorId,
+        origin: "human_confirmed",
+      },
+      narrationSourceKind: "uploaded_audio",
+      narrationUpload: {
+        assetVersionId: "10000000-0000-4000-8000-000000000041",
+        comparisonEvidence: { matchesLockedScript: false },
+        durationMs: 81250,
+        id: "10000000-0000-4000-8000-000000000040",
+        originalFilename: "final-narration.wav",
+        state: "confirmed",
+        transcriptionText: "Exact words spoken in the uploaded narration.",
+      },
     });
   });
 

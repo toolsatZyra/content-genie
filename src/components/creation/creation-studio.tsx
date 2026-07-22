@@ -103,6 +103,28 @@ interface PendingUploadedScript {
   readonly sourceByteLength: number;
 }
 
+interface NarrationUploadView {
+  readonly assetVersionId: string | null;
+  readonly comparisonEvidence: Readonly<Record<string, unknown>>;
+  readonly durationMs: number;
+  readonly id: string;
+  readonly originalFilename: string;
+  readonly signedUrl: string | null;
+  readonly state: string;
+  readonly transcriptionText: string;
+}
+
+interface NarrationUploadMutationResult {
+  readonly assetVersionId: string;
+  readonly comparisonEvidence: Readonly<Record<string, unknown>>;
+  readonly durationMs: number;
+  readonly originalFilename: string;
+  readonly signedUrl: string;
+  readonly state: "verified";
+  readonly transcriptionText: string;
+  readonly uploadVersionId: string;
+}
+
 type SaveState = "idle" | "rejected" | "saved" | "saving" | "unconfirmed";
 type DraftStorageState = "available" | "checking" | "unavailable";
 const LOOK_PAGE_SIZE = 24;
@@ -117,6 +139,26 @@ function voiceAvailabilityCanBeSelected(
   status: "pending_authenticated_canary" | "verified" | "withdrawn" | undefined,
 ): boolean {
   return status === "pending_authenticated_canary" || status === "verified";
+}
+
+function narrationComparisonSummary(
+  evidence: Readonly<Record<string, unknown>>,
+): string {
+  if (typeof evidence.summary === "string" && evidence.summary.trim()) {
+    return evidence.summary;
+  }
+  const matchValues = [
+    evidence.matchesLockedScript,
+    evidence.matchesScript,
+    evidence.exactMatch,
+  ].filter((value): value is boolean => typeof value === "boolean");
+  if (matchValues.includes(false)) {
+    return "The spoken words differ from the earlier script. This is advisory; you may still make this audio and transcript final.";
+  }
+  if (matchValues.includes(true)) {
+    return "The spoken words match the earlier script.";
+  }
+  return "Comparison complete. Review the transcript before making this narration final.";
 }
 
 function decodeUploadedScriptPreview(bytes: Uint8Array): string {
@@ -396,6 +438,7 @@ export function CreationStudio({
     : undefined;
   const voicePinValid =
     !projection.configuration ||
+    projection.configuration.narrationSourceKind === "uploaded_audio" ||
     (Boolean(pinnedVoice) &&
       pinnedVoice?.gender === projection.configuration.narratorGender &&
       voiceAvailabilityCanBeSelected(
@@ -437,6 +480,11 @@ export function CreationStudio({
   const exactTextHistory = useRef(emptyExactTextareaHistory());
   const historyBeforeInput = useRef<"historyRedo" | "historyUndo" | null>(null);
   const voiceIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
+  const narrationUploadInputRef = useRef<HTMLInputElement>(null);
+  const narrationUploadIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
+  const narrationConfirmIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(
+    null,
+  );
   const lookIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
   const worldBuildIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
   const worldFinalizeIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
@@ -480,6 +528,20 @@ export function CreationStudio({
   const [voiceHumanConfirmed, setVoiceHumanConfirmed] = useState(
     !initialConfirmationGate?.blockers.includes("voice_human_confirmation_required"),
   );
+  const [narrationSourceKind, setNarrationSourceKind] = useState(
+    projection.configuration?.narrationSourceKind ?? "elevenlabs_v3",
+  );
+  const [narrationSourceConfirmed, setNarrationSourceConfirmed] = useState(
+    !initialConfirmationGate?.blockers.includes(
+      "narration_source_confirmation_required",
+    ),
+  );
+  const [narrationUpload, setNarrationUpload] = useState<NarrationUploadView | null>(
+    projection.configuration?.narrationUpload
+      ? { ...projection.configuration.narrationUpload, signedUrl: null }
+      : null,
+  );
+  const [narrationUploadProgress, setNarrationUploadProgress] = useState("");
   const [selectedLookId, setSelectedLookId] = useState(initialLookId);
   const [pendingLookId, setPendingLookId] = useState(selectedLookId);
   const [lookPinReconciled, setLookPinReconciled] = useState(lookPinValid);
@@ -540,6 +602,18 @@ export function CreationStudio({
     Boolean(selectedVoice) &&
     selectedVoice?.gender === narratorGender &&
     voiceAvailabilityCanBeSelected(selectedVoiceAvailability);
+  const uploadedNarrationReady =
+    narrationSourceKind === "uploaded_audio" &&
+    narrationSourceConfirmed &&
+    Boolean(narrationUpload?.assetVersionId) &&
+    narrationUpload?.state !== "rejected";
+  const narrationUploadAwaitingConfirmation =
+    narrationUpload !== null && !uploadedNarrationReady;
+  const narrationChoiceReady = narrationUploadAwaitingConfirmation
+    ? false
+    : narrationSourceKind === "uploaded_audio"
+      ? uploadedNarrationReady
+      : effectiveVoicePinReconciled && voiceHumanConfirmed;
   const effectiveLookPinReconciled =
     lookPinReconciled &&
     Boolean(findLook(selectedLookId)) &&
@@ -547,9 +621,9 @@ export function CreationStudio({
   const worldConfigurationReady =
     configurationReady &&
     effectiveLookPinReconciled &&
-    effectiveVoicePinReconciled &&
+    narrationChoiceReady &&
     lookHumanConfirmed &&
-    voiceHumanConfirmed;
+    (narrationSourceKind === "uploaded_audio" || voiceHumanConfirmed);
   const worldEntities = [...projection.world.characters, ...projection.world.locations];
   const allWorldAnchorsAccepted =
     worldEntities.length > 0 &&
@@ -699,6 +773,36 @@ export function CreationStudio({
       requestAnimationFrame(() => worldActionRef.current?.focus()),
     );
   }, []);
+
+  useEffect(() => {
+    const assetVersionId = narrationUpload?.assetVersionId;
+    if (!assetVersionId || narrationUpload.signedUrl) return;
+    const abortController = new AbortController();
+    void fetch(`/api/assets/${encodeURIComponent(assetVersionId)}/sign`, {
+      cache: "no-store",
+      method: "POST",
+      signal: abortController.signal,
+    })
+      .then(async (response) => {
+        const body = (await response.json()) as {
+          ok?: boolean;
+          signedUrl?: string;
+        };
+        if (!response.ok || body.ok !== true || typeof body.signedUrl !== "string") {
+          throw new Error("Audio preview unavailable");
+        }
+        setNarrationUpload((current) =>
+          current?.assetVersionId === assetVersionId
+            ? { ...current, signedUrl: body.signedUrl ?? null }
+            : current,
+        );
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setNotice("The narration is safe, but its preview could not be opened.");
+      });
+    return () => abortController.abort();
+  }, [narrationUpload?.assetVersionId, narrationUpload?.signedUrl]);
 
   useEffect(() => {
     if (
@@ -1318,6 +1422,8 @@ export function CreationStudio({
       return;
     }
     if (
+      narrationSourceKind === "elevenlabs_v3" &&
+      narrationUpload === null &&
       voice.versionId === selectedVoiceVersionId &&
       gender === narratorGender &&
       effectiveVoicePinReconciled &&
@@ -1352,6 +1458,9 @@ export function CreationStudio({
       setSelectedVoiceVersionId(voice.versionId);
       setVoicePinReconciled(true);
       setVoiceHumanConfirmed(true);
+      setNarrationSourceKind("elevenlabs_v3");
+      setNarrationSourceConfirmed(false);
+      setNarrationUpload(null);
       setConfigurationVersion(result.configurationVersion ?? configurationVersion + 1);
       setEpisodeVersion(result.episodeVersion ?? episodeVersion + 1);
       setNotice(`${gender === "male" ? "Male" : "Female"} narrator pinned exactly.`);
@@ -1371,6 +1480,175 @@ export function CreationStudio({
         setSaveState("unconfirmed");
       }
       refreshIntoChamber("voice");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function uploadNarration(file: File): Promise<void> {
+    if (
+      !canEditCreation ||
+      projection.episode.workflowState !== "world_setup" ||
+      !projection.configuration
+    ) {
+      return;
+    }
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    const supported =
+      file.type === "audio/mpeg" ||
+      file.type === "audio/wav" ||
+      file.type === "audio/x-wav" ||
+      extension === "mp3" ||
+      extension === "wav";
+    if (!supported || file.size < 1) {
+      setNotice("Choose a non-empty MP3 or WAV narration file.");
+      setSaveState("rejected");
+      return;
+    }
+    const declaredMime =
+      extension === "wav" || file.type === "audio/wav" || file.type === "audio/x-wav"
+        ? "audio/wav"
+        : "audio/mpeg";
+    const fingerprint = JSON.stringify({
+      configurationCandidateId: projection.configuration.id,
+      fileLastModified: file.lastModified,
+      fileName: file.name,
+      fileSize: file.size,
+    });
+    const attempt = retainIdempotencyAttempt(
+      narrationUploadIdempotencyKey.current,
+      fingerprint,
+    );
+    narrationUploadIdempotencyKey.current = attempt;
+    const progressSteps = [
+      "Inspecting your audio",
+      "Transcribing the spoken narration",
+      "Preparing exact word timing",
+    ] as const;
+    let progressIndex = 0;
+    setNarrationUploadProgress(progressSteps[progressIndex] ?? progressSteps[0]);
+    const progressTimer = window.setInterval(() => {
+      progressIndex = Math.min(progressIndex + 1, progressSteps.length - 1);
+      setNarrationUploadProgress(progressSteps[progressIndex] ?? progressSteps[0]);
+    }, 900);
+    setWorking(true);
+    setSaveState("saving");
+    setNotice("");
+    try {
+      const response = await fetch(
+        `/api/episodes/${encodeURIComponent(projection.episode.id)}/narration-upload`,
+        {
+          body: file,
+          headers: {
+            "content-type": declaredMime,
+            "x-genie-configuration-candidate-id": projection.configuration.id,
+            "x-genie-display-filename": encodeURIComponent(file.name),
+            "x-genie-expected-configuration-version": String(configurationVersion),
+            "x-genie-workspace-id": projection.episode.workspaceId,
+            "x-idempotency-key": attempt.key,
+          },
+          method: "POST",
+        },
+      );
+      const body = (await response.json()) as {
+        message?: string;
+        ok?: boolean;
+        result?: NarrationUploadMutationResult;
+      };
+      if (!response.ok || body.ok !== true || !body.result) {
+        if (response.status < 500) narrationUploadIdempotencyKey.current = null;
+        throw new Error(body.message || "The narration upload could not be prepared.");
+      }
+      narrationUploadIdempotencyKey.current = null;
+      setNarrationUpload({
+        assetVersionId: body.result.assetVersionId,
+        comparisonEvidence: body.result.comparisonEvidence,
+        durationMs: body.result.durationMs,
+        id: body.result.uploadVersionId,
+        originalFilename: body.result.originalFilename,
+        signedUrl: body.result.signedUrl,
+        state: body.result.state,
+        transcriptionText: body.result.transcriptionText,
+      });
+      setNarrationSourceConfirmed(false);
+      setNotice("Audio and transcript are ready for your confirmation.");
+      setSaveState("saved");
+    } catch (error) {
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : "The narration upload could not be prepared. You can retry safely.",
+      );
+      setSaveState("rejected");
+    } finally {
+      window.clearInterval(progressTimer);
+      setNarrationUploadProgress("");
+      setWorking(false);
+      if (narrationUploadInputRef.current) narrationUploadInputRef.current.value = "";
+    }
+  }
+
+  async function confirmUploadedNarration(): Promise<void> {
+    if (!projection.configuration || !narrationUpload || working) return;
+    const payload = {
+      configurationCandidateId: projection.configuration.id,
+      expectedConfigurationVersion: configurationVersion,
+      workspaceId: projection.episode.workspaceId,
+    };
+    const fingerprint = JSON.stringify({
+      payload,
+      uploadVersionId: narrationUpload.id,
+    });
+    const attempt = retainIdempotencyAttempt(
+      narrationConfirmIdempotencyKey.current,
+      fingerprint,
+    );
+    narrationConfirmIdempotencyKey.current = attempt;
+    setWorking(true);
+    setSaveState("saving");
+    setNotice("");
+    try {
+      const response = await fetch(
+        `/api/episodes/${encodeURIComponent(projection.episode.id)}/narration-upload/${encodeURIComponent(narrationUpload.id)}/confirm`,
+        {
+          body: JSON.stringify(payload),
+          headers: {
+            "content-type": "application/json",
+            "x-idempotency-key": attempt.key,
+          },
+          method: "POST",
+        },
+      );
+      const body = (await response.json()) as {
+        message?: string;
+        ok?: boolean;
+        result?: MutationResult & { scriptRevisionId?: string };
+      };
+      if (!response.ok || body.ok !== true || !body.result) {
+        if (response.status < 500) narrationConfirmIdempotencyKey.current = null;
+        throw new Error(body.message || "This narration could not be confirmed.");
+      }
+      narrationConfirmIdempotencyKey.current = null;
+      setNarrationSourceKind("uploaded_audio");
+      setNarrationSourceConfirmed(true);
+      setNarrationUpload((current) =>
+        current ? { ...current, state: "confirmed" } : null,
+      );
+      setConfigurationVersion(
+        body.result.configurationVersion ?? configurationVersion + 1,
+      );
+      setEpisodeVersion(body.result.episodeVersion ?? episodeVersion + 1);
+      setNotice(
+        "Uploaded narration and its transcript are now final for this Episode.",
+      );
+      setSaveState("saved");
+    } catch (error) {
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : "This narration could not be confirmed. You can retry safely.",
+      );
+      setSaveState("rejected");
     } finally {
       setWorking(false);
     }
@@ -2141,7 +2419,7 @@ export function CreationStudio({
         {chambers.map((item, index) => {
           const reachable =
             item.id === "look"
-              ? configurationReady && effectiveVoicePinReconciled
+              ? configurationReady && narrationChoiceReady
               : item.id === "world"
                 ? worldConfigurationReady
                 : item.id === "preflight"
@@ -2341,19 +2619,21 @@ export function CreationStudio({
                 Who carries the story?
               </h1>
               <p>
-                Choose the persistent narrator identity. Delhi-accented, expressive
-                Hindi and Sanskrit-aware performance are the target direction; the
-                authenticated voice canary must pass before World Lock.
+                Choose a persistent AI narrator or upload the final narration you
+                already trust. Uploaded audio and its transcript become the timing
+                authority only after you confirm them.
               </p>
             </header>
             <div className="voice-orbits">
               {VOICE_VERSIONS.map((voice) => (
                 <button
                   aria-pressed={
+                    narrationSourceKind === "elevenlabs_v3" &&
                     effectiveVoicePinReconciled &&
                     selectedVoiceVersionId === voice.versionId
                   }
                   className={
+                    narrationSourceKind === "elevenlabs_v3" &&
                     effectiveVoicePinReconciled &&
                     selectedVoiceVersionId === voice.versionId
                       ? "voice-orbit is-selected"
@@ -2401,7 +2681,8 @@ export function CreationStudio({
                           : "Availability evidence missing · unavailable"}
                   </span>
                   <em>
-                    {effectiveVoicePinReconciled &&
+                    {narrationSourceKind === "elevenlabs_v3" &&
+                    effectiveVoicePinReconciled &&
                     selectedVoiceVersionId === voice.versionId
                       ? voiceHumanConfirmed
                         ? "Selection confirmed"
@@ -2410,7 +2691,99 @@ export function CreationStudio({
                   </em>
                 </button>
               ))}
+              <button
+                aria-pressed={narrationSourceKind === "uploaded_audio"}
+                className={
+                  narrationSourceKind === "uploaded_audio"
+                    ? "voice-orbit narration-upload-card is-selected"
+                    : narrationUpload
+                      ? "voice-orbit narration-upload-card is-pending"
+                      : "voice-orbit narration-upload-card"
+                }
+                disabled={!canEditCreation || !configurationReady || working}
+                onClick={() => narrationUploadInputRef.current?.click()}
+                type="button"
+              >
+                <span className="upload-audio-mark" aria-hidden="true">
+                  +
+                </span>
+                <small>Your finished performance</small>
+                <strong>Upload your own audio</strong>
+                <p>MP3 or WAV · spoken narration becomes the final script and clock</p>
+                <span className="voice-validation">
+                  {narrationUploadProgress ||
+                    (narrationUpload
+                      ? `${narrationUpload.originalFilename} · ${Math.round(narrationUpload.durationMs / 1000)} sec`
+                      : "ElevenLabs generation will be skipped")}
+                </span>
+                <em>
+                  {narrationSourceKind === "uploaded_audio"
+                    ? "Audio confirmed"
+                    : narrationUpload
+                      ? "Replace audio"
+                      : "Choose audio file"}
+                </em>
+              </button>
+              <input
+                accept=".mp3,.wav,audio/mpeg,audio/wav,audio/x-wav"
+                aria-label="Upload narration MP3 or WAV"
+                className="sr-only"
+                disabled={!canEditCreation || !configurationReady || working}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void uploadNarration(file);
+                }}
+                ref={narrationUploadInputRef}
+                type="file"
+              />
             </div>
+            {narrationUpload ? (
+              <section
+                aria-label="Uploaded narration review"
+                className="narration-upload-review"
+              >
+                <div className="narration-upload-review-heading">
+                  <div>
+                    <span className="eyebrow">Transcript comparison</span>
+                    <h2>{narrationUpload.originalFilename}</h2>
+                  </div>
+                  <span>{Math.round(narrationUpload.durationMs / 1000)} sec</span>
+                </div>
+                {narrationUpload.signedUrl ? (
+                  <audio
+                    aria-label={`Preview ${narrationUpload.originalFilename}`}
+                    controls
+                    preload="metadata"
+                    src={narrationUpload.signedUrl}
+                  />
+                ) : (
+                  <p role="status">Opening the secure audio preview...</p>
+                )}
+                <p className="narration-comparison" role="status">
+                  {narrationComparisonSummary(narrationUpload.comparisonEvidence)}
+                </p>
+                <div className="narration-transcript">
+                  <strong>Transcribed narration</strong>
+                  <p lang="hi">{narrationUpload.transcriptionText}</p>
+                </div>
+                {narrationSourceKind === "uploaded_audio" &&
+                narrationSourceConfirmed ? (
+                  <p className="narration-final-note">
+                    Uploaded audio and this transcription are final for this Episode.
+                    The earlier script revision remains preserved in its history.
+                  </p>
+                ) : (
+                  <button
+                    className="creation-secondary narration-confirm"
+                    disabled={working}
+                    onClick={() => void confirmUploadedNarration()}
+                    type="button"
+                  >
+                    Use this audio and transcript
+                  </button>
+                )}
+              </section>
+            ) : null}
             {projection.configuration ? (
               <p className="profile-binding">
                 Fixed performance profile{" "}
@@ -2437,7 +2810,9 @@ export function CreationStudio({
                 ) : null}
               </div>
             ) : null}
-            {configurationReady && !effectiveVoicePinReconciled ? (
+            {configurationReady &&
+            narrationSourceKind === "elevenlabs_v3" &&
+            !effectiveVoicePinReconciled ? (
               <p className="configuration-blocker" role="alert">
                 The stored narrator version is missing, mismatched, or withdrawn. Genie
                 has not substituted another voice; choose an available exact narrator
@@ -2445,6 +2820,7 @@ export function CreationStudio({
               </p>
             ) : null}
             {configurationReady &&
+            narrationSourceKind === "elevenlabs_v3" &&
             effectiveVoicePinReconciled &&
             !voiceHumanConfirmed ? (
               <p className="confirmation-required" role="status">
@@ -2458,7 +2834,7 @@ export function CreationStudio({
                 !canEditCreation ||
                 !configurationReady ||
                 working ||
-                !effectiveVoicePinReconciled
+                !narrationChoiceReady
               }
               onClick={() => setChamber("look")}
               type="button"

@@ -1,0 +1,519 @@
+import "server-only";
+
+import { createHash, randomUUID } from "node:crypto";
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import type { NarrationUploadMime } from "@/domain/narration/narration-upload";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { SandboxMediaScannerError } from "@/server/sandbox-media-scanner";
+import { scanAndReencodeNarrationAudio } from "@/server/sandbox-media-scanner";
+import {
+  compareUploadedNarrationToOriginalScript,
+  transcribeSanitizedUploadedNarrationMp3,
+  UploadedNarrationAlignmentError,
+} from "@/server/uploaded-narration-alignment";
+import { postgresJsonbText } from "@/server/world-anchor-provider";
+
+const signedPreviewSeconds = 90;
+
+export type NarrationUploadPreparation = Readonly<{
+  quarantineAssetVersionId: string;
+  stableAssetId: string;
+  state: "confirmed" | "prepared" | "rejected" | "superseded" | "verified";
+  stateVersion: number;
+  uploadVersionId: string;
+  versionNumber: number;
+}>;
+
+export type ProcessedNarrationUpload = Readonly<{
+  assetVersionId: string;
+  comparisonEvidence: Readonly<Record<string, unknown>>;
+  durationMs: number;
+  originalFilename: string;
+  signedUrl: string;
+  state: "confirmed" | "verified";
+  transcriptionText: string;
+  uploadVersionId: string;
+}>;
+
+export class NarrationUploadProcessingError extends Error {
+  override readonly name = "NarrationUploadProcessingError";
+
+  constructor(
+    message: string,
+    readonly safeClass: string,
+    readonly retryable = false,
+  ) {
+    super(message);
+  }
+}
+
+function sha256(value: string | Buffer): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function exactObject(value: unknown, keys: readonly string[]): value is object {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.keys(value).sort().join(",") === [...keys].sort().join(",")
+  );
+}
+
+export function parseNarrationUploadPreparation(
+  value: unknown,
+): NarrationUploadPreparation {
+  const keys = [
+    "ok",
+    "quarantineAssetVersionId",
+    "stableAssetId",
+    "state",
+    "stateVersion",
+    "uploadVersionId",
+    "versionNumber",
+  ] as const;
+  const record = value as Record<string, unknown>;
+  if (
+    !exactObject(value, keys) ||
+    record.ok !== true ||
+    !["confirmed", "prepared", "rejected", "superseded", "verified"].includes(
+      String(record.state),
+    ) ||
+    !Number.isSafeInteger(record.stateVersion) ||
+    !Number.isSafeInteger(record.versionNumber) ||
+    (record.stateVersion as number) < 1 ||
+    (record.versionNumber as number) < 1 ||
+    ["quarantineAssetVersionId", "stableAssetId", "uploadVersionId"].some(
+      (key) => typeof record[key] !== "string",
+    )
+  ) {
+    throw new NarrationUploadProcessingError(
+      "The narration upload authority was malformed.",
+      "narration_upload.authority_malformed",
+    );
+  }
+  return value as NarrationUploadPreparation;
+}
+
+async function rpc(
+  client: SupabaseClient,
+  name: string,
+  parameters: Record<string, unknown>,
+): Promise<unknown> {
+  const { data, error } = await client.rpc(name, parameters);
+  if (error) {
+    throw new NarrationUploadProcessingError(
+      "The narration upload ledger rejected a processing step.",
+      "narration_upload.ledger_rejected",
+      true,
+    );
+  }
+  return data;
+}
+
+async function uploadOrVerify(
+  client: SupabaseClient,
+  bucket: "quarantine" | "workspace-media",
+  objectName: string,
+  bytes: Buffer,
+  contentType: string,
+): Promise<string> {
+  const expectedHash = sha256(bytes);
+  const storage = client.storage.from(bucket);
+  const upload = await storage.upload(objectName, bytes, {
+    cacheControl: "0",
+    contentType,
+    metadata: { sha256: expectedHash },
+    upsert: false,
+  });
+  if (!upload.error) {
+    const receipt = await storage.info(objectName);
+    if (
+      receipt.error ||
+      receipt.data.id !== upload.data.id ||
+      typeof receipt.data.version !== "string" ||
+      receipt.data.version.length < 1
+    ) {
+      throw new NarrationUploadProcessingError(
+        "Narration storage receipt was invalid.",
+        "narration_upload.storage_receipt_invalid",
+        true,
+      );
+    }
+    return receipt.data.version;
+  }
+  const existing = await storage.download(objectName);
+  if (existing.error) {
+    throw new NarrationUploadProcessingError(
+      "Narration could not enter isolated storage.",
+      "narration_upload.storage_failed",
+      true,
+    );
+  }
+  const existingBytes = Buffer.from(await existing.data.arrayBuffer());
+  if (sha256(existingBytes) !== expectedHash) {
+    throw new NarrationUploadProcessingError(
+      "An immutable narration object conflicted with this upload.",
+      "narration_upload.storage_conflict",
+    );
+  }
+  const receipt = await storage.info(objectName);
+  if (
+    receipt.error ||
+    typeof receipt.data.version !== "string" ||
+    receipt.data.version.length < 1
+  ) {
+    throw new NarrationUploadProcessingError(
+      "Existing narration storage receipt was invalid.",
+      "narration_upload.storage_receipt_invalid",
+      true,
+    );
+  }
+  return receipt.data.version;
+}
+
+type UploadRow = Readonly<{
+  alignment_hash: string | null;
+  display_filename: string;
+  duration_ms: number | null;
+  original_script_revision_id: string;
+  promoted_asset_version_id: string | null;
+  script_comparison_json: Readonly<Record<string, unknown>> | null;
+  state: string;
+  transcription_text: string | null;
+}>;
+
+async function uploadRow(
+  client: SupabaseClient,
+  workspaceId: string,
+  uploadVersionId: string,
+): Promise<UploadRow> {
+  const { data, error } = await client
+    .from("episode_narration_upload_versions")
+    .select(
+      "alignment_hash,display_filename,duration_ms,original_script_revision_id,promoted_asset_version_id,script_comparison_json,state,transcription_text",
+    )
+    .eq("workspace_id", workspaceId)
+    .eq("id", uploadVersionId)
+    .single();
+  if (error || !data) {
+    throw new NarrationUploadProcessingError(
+      "Narration upload evidence is unavailable.",
+      "narration_upload.evidence_unavailable",
+      true,
+    );
+  }
+  return data as UploadRow;
+}
+
+async function signPromotedAudio(
+  client: SupabaseClient,
+  workspaceId: string,
+  assetVersionId: string,
+): Promise<string> {
+  const { data: asset, error } = await client
+    .from("asset_versions")
+    .select("bucket_id,media_mime,object_name")
+    .eq("workspace_id", workspaceId)
+    .eq("id", assetVersionId)
+    .single();
+  if (
+    error ||
+    !asset ||
+    asset.bucket_id !== "workspace-media" ||
+    asset.media_mime !== "audio/mpeg"
+  ) {
+    throw new NarrationUploadProcessingError(
+      "The promoted narration asset is unavailable.",
+      "narration_upload.asset_unavailable",
+      true,
+    );
+  }
+  const signed = await client.storage
+    .from("workspace-media")
+    .createSignedUrl(asset.object_name, signedPreviewSeconds);
+  if (signed.error || !signed.data.signedUrl) {
+    throw new NarrationUploadProcessingError(
+      "The narration preview is temporarily unavailable.",
+      "narration_upload.preview_unavailable",
+      true,
+    );
+  }
+  return signed.data.signedUrl;
+}
+
+async function completedUpload(
+  client: SupabaseClient,
+  workspaceId: string,
+  uploadVersionId: string,
+): Promise<ProcessedNarrationUpload | null> {
+  const row = await uploadRow(client, workspaceId, uploadVersionId);
+  if (row.state !== "verified" && row.state !== "confirmed") return null;
+  if (
+    !row.promoted_asset_version_id ||
+    !row.duration_ms ||
+    !row.transcription_text ||
+    !row.script_comparison_json
+  ) {
+    throw new NarrationUploadProcessingError(
+      "The verified narration upload is incomplete.",
+      "narration_upload.verified_evidence_incomplete",
+    );
+  }
+  return Object.freeze({
+    assetVersionId: row.promoted_asset_version_id,
+    comparisonEvidence: row.script_comparison_json,
+    durationMs: row.duration_ms,
+    originalFilename: row.display_filename,
+    signedUrl: await signPromotedAudio(
+      client,
+      workspaceId,
+      row.promoted_asset_version_id,
+    ),
+    state: row.state,
+    transcriptionText: row.transcription_text,
+    uploadVersionId,
+  });
+}
+
+function alignmentJson(alignment: {
+  characterEndTimesSeconds: readonly number[];
+  characters: readonly string[];
+  characterStartTimesSeconds: readonly number[];
+}): Readonly<Record<string, unknown>> {
+  return Object.freeze({
+    characterEndTimesSeconds: alignment.characterEndTimesSeconds,
+    characters: alignment.characters,
+    characterStartTimesSeconds: alignment.characterStartTimesSeconds,
+  });
+}
+
+export async function processNarrationUpload(input: {
+  bytes: Buffer;
+  declaredMime: NarrationUploadMime;
+  preparation: NarrationUploadPreparation;
+  requestHash: string;
+  sourceSha256: string;
+  workspaceId: string;
+}): Promise<ProcessedNarrationUpload> {
+  const client = createAdminSupabaseClient();
+  const replay = await completedUpload(
+    client,
+    input.workspaceId,
+    input.preparation.uploadVersionId,
+  );
+  if (replay) return replay;
+
+  const quarantineObjectName = `${input.workspaceId}/quarantine/${input.preparation.stableAssetId}/${input.preparation.quarantineAssetVersionId}/source`;
+  let finalObjectName: string | null = null;
+  try {
+    await uploadOrVerify(
+      client,
+      "quarantine",
+      quarantineObjectName,
+      input.bytes,
+      input.declaredMime,
+    );
+    await rpc(client, "command_ensure_episode_narration_upload_quarantine", {
+      p_object_name: quarantineObjectName,
+      p_provenance_hash: sha256(
+        postgresJsonbText({
+          requestHash: input.requestHash,
+          sourceSha256: input.sourceSha256,
+          uploadVersionId: input.preparation.uploadVersionId,
+          workspaceId: input.workspaceId,
+        }),
+      ),
+      p_upload_version_id: input.preparation.uploadVersionId,
+      p_workspace_id: input.workspaceId,
+    });
+    const scanned = await scanAndReencodeNarrationAudio({
+      bytes: input.bytes,
+      declaredMime: input.declaredMime,
+      preserveDuration: true,
+    });
+    const transcription = await transcribeSanitizedUploadedNarrationMp3(
+      scanned.outputBytes,
+    );
+    if (Math.abs(transcription.durationSeconds * 1_000 - scanned.durationMs) > 1_500) {
+      throw new NarrationUploadProcessingError(
+        "The narration transcript timing did not bind to the inspected audio.",
+        "narration_upload.transcription_duration_mismatch",
+      );
+    }
+    const current = await uploadRow(
+      client,
+      input.workspaceId,
+      input.preparation.uploadVersionId,
+    );
+    const { data: originalScript, error: scriptError } = await client
+      .from("script_revisions")
+      .select("raw_text")
+      .eq("workspace_id", input.workspaceId)
+      .eq("id", current.original_script_revision_id)
+      .single();
+    if (scriptError || !originalScript?.raw_text) {
+      throw new NarrationUploadProcessingError(
+        "The earlier script is unavailable for advisory comparison.",
+        "narration_upload.original_script_unavailable",
+        true,
+      );
+    }
+    const comparison = compareUploadedNarrationToOriginalScript(
+      originalScript.raw_text,
+      transcription.authoritativeText,
+    );
+    const alignment = alignmentJson(transcription.speechAlignment);
+    const qualityEvidence = Object.freeze({
+      durationPreserved: Math.abs(scanned.timeScale - 1) <= 0.01,
+      ownerConfirmationRequired: true,
+      scriptComparisonAdvisoryOnly: true,
+      technicalInspection: {
+        audibleSeamsDetected: scanned.audibleSeamsDetected,
+        clippingDetected: scanned.clippingDetected,
+        corruptFramesDetected: scanned.corruptFramesDetected,
+        metadataStripped: true,
+        parserSandboxed: true,
+        longSilenceDetected: scanned.unintendedSilenceDetected,
+      },
+      transcription: {
+        alignmentSha256: transcription.alignmentSha256,
+        evidenceSha256: transcription.evidenceSha256,
+        language: transcription.language,
+        model: "whisper-1",
+        providerResponseSha256: transcription.providerResponseSha256,
+        wordCount: transcription.wordCount,
+      },
+      schemaVersion: "genie.owner-narration-quality-evidence.v1",
+    });
+    const policyValue = await rpc(
+      client,
+      "get_active_narration_upload_ingest_policy",
+      {},
+    );
+    if (
+      !exactObject(policyValue, ["id", "policy", "policyHash"]) ||
+      typeof (policyValue as Record<string, unknown>).id !== "string"
+    ) {
+      throw new NarrationUploadProcessingError(
+        "Narration ingest policy evidence is unavailable.",
+        "narration_upload.policy_unavailable",
+        true,
+      );
+    }
+    const attestationId = randomUUID();
+    const attested = await rpc(client, "command_attest_episode_narration_upload", {
+      p_alignment_hash: sha256(postgresJsonbText(alignment)),
+      p_alignment_json: alignment,
+      p_attestation_id: attestationId,
+      p_decompressed_bytes: scanned.decompressedBytes,
+      p_duration_ms: scanned.durationMs,
+      p_policy_version_id: (policyValue as Record<string, string>).id,
+      p_probe_sha256: scanned.probeSha256,
+      p_quality_evidence: qualityEvidence,
+      p_quality_evidence_hash: sha256(postgresJsonbText(qualityEvidence)),
+      p_sanitized_byte_length: scanned.outputBytes.length,
+      p_sanitized_sha256: scanned.outputSha256,
+      p_scan_engine: scanned.scanEngine,
+      p_scan_version: scanned.scanVersion,
+      p_script_comparison_hash: sha256(postgresJsonbText(comparison)),
+      p_script_comparison_json: comparison,
+      p_transcription_sha256: transcription.transcriptSha256,
+      p_transcription_text: transcription.authoritativeText,
+      p_upload_version_id: input.preparation.uploadVersionId,
+      p_workspace_id: input.workspaceId,
+    });
+    if (attested !== attestationId) {
+      throw new NarrationUploadProcessingError(
+        "Narration inspection attestation was malformed.",
+        "narration_upload.attestation_malformed",
+      );
+    }
+    const assetVersionId = randomUUID();
+    finalObjectName = `${input.workspaceId}/narration/${input.preparation.stableAssetId}/${assetVersionId}/source`;
+    const storageVersion = await uploadOrVerify(
+      client,
+      "workspace-media",
+      finalObjectName,
+      scanned.outputBytes,
+      "audio/mpeg",
+    );
+    const promotion = await rpc(client, "command_promote_episode_narration_upload", {
+      p_asset_version_id: assetVersionId,
+      p_attestation_id: attestationId,
+      p_final_object_name: finalObjectName,
+      p_storage_version: storageVersion,
+      p_upload_version_id: input.preparation.uploadVersionId,
+      p_workspace_id: input.workspaceId,
+    });
+    if (
+      !promotion ||
+      typeof promotion !== "object" ||
+      typeof (promotion as Record<string, unknown>).assetVersionId !== "string"
+    ) {
+      throw new NarrationUploadProcessingError(
+        "Narration promotion was malformed.",
+        "narration_upload.promotion_malformed",
+      );
+    }
+    const promotedAssetVersionId = (promotion as Record<string, string>).assetVersionId;
+    if (promotedAssetVersionId !== assetVersionId && finalObjectName) {
+      await client.storage.from("workspace-media").remove([finalObjectName]);
+      finalObjectName = null;
+    }
+    const result = await completedUpload(
+      client,
+      input.workspaceId,
+      input.preparation.uploadVersionId,
+    );
+    if (!result) {
+      throw new NarrationUploadProcessingError(
+        "Narration promotion did not publish verified evidence.",
+        "narration_upload.promotion_incomplete",
+        true,
+      );
+    }
+    return result;
+  } catch (error) {
+    const disposition =
+      error instanceof NarrationUploadProcessingError
+        ? error
+        : error instanceof SandboxMediaScannerError
+          ? new NarrationUploadProcessingError(
+              error.message,
+              error.safeClass,
+              error.safeClass.startsWith("scanner."),
+            )
+          : error instanceof UploadedNarrationAlignmentError
+            ? new NarrationUploadProcessingError(
+                error.message,
+                error.safeClass,
+                error.safeClass.includes("provider"),
+              )
+            : new NarrationUploadProcessingError(
+                "The narration upload could not be prepared.",
+                "narration_upload.processing_failed",
+                true,
+              );
+    if (!disposition.retryable) {
+      try {
+        await client.rpc("command_reject_episode_narration_upload", {
+          p_safe_failure_class: disposition.safeClass,
+          p_upload_version_id: input.preparation.uploadVersionId,
+          p_workspace_id: input.workspaceId,
+        });
+      } catch {
+        // The original failure remains authoritative; rejection is best effort.
+      }
+    }
+    if (finalObjectName) {
+      await client.storage
+        .from("workspace-media")
+        .remove([finalObjectName])
+        .catch(() => undefined);
+    }
+    throw disposition;
+  }
+}

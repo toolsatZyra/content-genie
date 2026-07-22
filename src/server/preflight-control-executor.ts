@@ -15,6 +15,12 @@ import { ensurePreflightAudioIdentities } from "@/server/audio-identity-prefligh
 import { prepareWorldAnchorProviderDispatches } from "@/server/world-anchor-provider";
 import { prepareNarrationProviderDispatches } from "@/server/narration-provider";
 import {
+  getConfirmedUploadedNarrationAssetVersionId,
+  getNarrationSourceKind,
+  prepareUploadedNarrationMasterClock,
+  UploadedNarrationClockError,
+} from "@/server/uploaded-narration-clock";
+import {
   executePlanPreflight,
   PreflightPlanAgentError,
 } from "@/server/preflight-plan-agent";
@@ -34,11 +40,14 @@ export function classifyPreflightControlFailure(
 ): ClassifiedPreflightControlFailure | null {
   if (
     !(error instanceof PreflightPlanAgentError) &&
-    !(error instanceof ProductionQuoteError)
+    !(error instanceof ProductionQuoteError) &&
+    !(error instanceof UploadedNarrationClockError)
   ) {
     return null;
   }
-  const safeErrorClass = error.code
+  const safeErrorClass = (
+    error instanceof UploadedNarrationClockError ? error.safeClass : error.code
+  )
     .toLowerCase()
     .replaceAll("_", "-")
     .replace(/[^a-z0-9.-]/gu, "-")
@@ -81,8 +90,20 @@ export async function executePreflightControl(input: {
     );
   }
   if (executionInput.kind === "narration_clock") {
+    const narrationSourceKind = await getNarrationSourceKind({
+      configurationCandidateId: executionInput.configurationCandidateId,
+      workspaceId: executionInput.workspaceId,
+    });
+    const humanRecordingAssetVersionId =
+      narrationSourceKind === "uploaded_audio"
+        ? await getConfirmedUploadedNarrationAssetVersionId({
+            configurationCandidateId: executionInput.configurationCandidateId,
+            workspaceId: executionInput.workspaceId,
+          })
+        : null;
     const preparedAudio = await ensurePreflightAudioIdentities({
       configurationCandidateId: executionInput.configurationCandidateId,
+      humanRecordingAssetVersionId,
       preflightRunId: input.envelope.preflightRunId,
       stageAttemptId: input.envelope.stageAttemptId,
       trustedScopeHash: input.envelope.inputManifestSha256,
@@ -96,6 +117,33 @@ export async function executePreflightControl(input: {
         "Pinned audio identities changed during narration preparation.",
         true,
       );
+    }
+    if (narrationSourceKind === "uploaded_audio") {
+      const clock = await prepareUploadedNarrationMasterClock({
+        audioIdentitySelectionId,
+        executionInput,
+      });
+      const result = await recordPreflightControlOutput({
+        envelope: input.envelope,
+        output: Object.freeze({
+          audioIdentitySelectionId,
+          durationMs: clock.durationMs,
+          masterClockVersionId: clock.masterClockVersionId,
+          narrationAssetVersionId: clock.narrationAssetVersionId,
+          narrationSourceKind,
+          narrationUploadVersionId: clock.narrationUploadVersionId,
+          processingTextSha256: executionInput.processingTextSha256,
+          schemaVersion: "genie.uploaded-narration-clock.v1",
+          segmentCount: clock.segmentCount,
+        }),
+        taskId: input.taskId,
+        triggerRunId: input.triggerRunId,
+      });
+      return Object.freeze({
+        pendingExternal: false,
+        providerDispatches: Object.freeze([]),
+        result,
+      });
     }
     const providerDispatches = await prepareNarrationProviderDispatches({
       audioIdentitySelectionId,

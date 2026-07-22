@@ -43,7 +43,11 @@ export async function POST(
     if (assetError || !asset || asset.bucket_id !== "workspace-media") {
       return reply({ code: "ASSET_NOT_FOUND", ok: false }, 404, requestId);
     }
-    if (!asset.media_mime.startsWith("image/")) {
+    if (
+      !asset.media_mime.startsWith("image/") &&
+      asset.media_mime !== "audio/mpeg" &&
+      asset.media_mime !== "audio/wav"
+    ) {
       return reply({ code: "ASSET_PREVIEW_UNSUPPORTED", ok: false }, 415, requestId);
     }
 

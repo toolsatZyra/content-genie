@@ -50,10 +50,24 @@ interface ConfigurationRow {
   look_confirmed_by: string | null;
   look_version_id: string;
   narrator_gender: "female" | "male";
+  narration_source_confirmed_at: string | null;
+  narration_source_confirmed_by: string | null;
+  narration_source_kind: "elevenlabs_v3" | "uploaded_audio";
   performance_profile_id: string;
+  selected_narration_upload_version_id: string | null;
   voice_confirmed_at: string | null;
   voice_confirmed_by: string | null;
   voice_version_id: string;
+}
+
+interface NarrationUploadRow {
+  script_comparison_json: Readonly<Record<string, unknown>> | null;
+  duration_ms: number | string;
+  id: string;
+  promoted_asset_version_id: string | null;
+  display_filename: string;
+  state: string;
+  transcription_text: string;
 }
 
 interface WorldProgressRow {
@@ -237,7 +251,7 @@ export async function loadCreationProjection(
       client
         .from("episode_configuration_candidates")
         .select(
-          "id,aggregate_version,narrator_gender,voice_version_id,look_version_id,performance_profile_id,voice_confirmed_at,voice_confirmed_by,look_confirmed_at,look_confirmed_by",
+          "id,aggregate_version,narrator_gender,voice_version_id,look_version_id,performance_profile_id,voice_confirmed_at,voice_confirmed_by,look_confirmed_at,look_confirmed_by,narration_source_kind,selected_narration_upload_version_id,narration_source_confirmed_by,narration_source_confirmed_at",
         )
         .eq("workspace_id", episode.workspace_id)
         .eq("episode_id", episode.id)
@@ -269,6 +283,19 @@ export async function loadCreationProjection(
 
   const script = scriptResult.data as ScriptRow | null;
   const configuration = configurationResult.data as ConfigurationRow | null;
+  const narrationUploadResult = configuration?.selected_narration_upload_version_id
+    ? await client
+        .from("episode_narration_upload_versions")
+        .select(
+          "id,state,display_filename,duration_ms,promoted_asset_version_id,transcription_text,script_comparison_json,created_at",
+        )
+        .eq("workspace_id", episode.workspace_id)
+        .eq("configuration_candidate_id", configuration.id)
+        .eq("id", configuration.selected_narration_upload_version_id)
+        .maybeSingle()
+    : { data: null, error: null };
+  if (narrationUploadResult.error) throw narrationUploadResult.error;
+  const narrationUpload = narrationUploadResult.data as NarrationUploadRow | null;
   const productionJobRow = productionJobResult.data as ProductionJobRow | null;
   const productionJob = productionJobRow
     ? projectProductionJob(productionJobRow)
@@ -368,6 +395,22 @@ export async function loadCreationProjection(
         ),
         lookVersionId: configuration.look_version_id,
         narratorGender: configuration.narrator_gender,
+        narrationSourceConfirmation: projectCreativeChoiceConfirmation(
+          configuration.narration_source_confirmed_at,
+          configuration.narration_source_confirmed_by,
+        ),
+        narrationSourceKind: configuration.narration_source_kind,
+        narrationUpload: narrationUpload
+          ? {
+              assetVersionId: narrationUpload.promoted_asset_version_id,
+              comparisonEvidence: narrationUpload.script_comparison_json ?? {},
+              durationMs: Number(narrationUpload.duration_ms),
+              id: narrationUpload.id,
+              originalFilename: narrationUpload.display_filename,
+              state: narrationUpload.state,
+              transcriptionText: narrationUpload.transcription_text,
+            }
+          : null,
         performanceProfileId: configuration.performance_profile_id,
         voiceAvailabilityByVersionId: Object.fromEntries(
           voiceAvailability.map((row) => [row.voice_version_id, row.status]),

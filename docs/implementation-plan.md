@@ -436,6 +436,11 @@ provider canary.
 - Pin the supplied ElevenLabs voice IDs as versioned, server-configured voice
   identities with ownership/test evidence.
 - Never silently substitute a different identity.
+- Present an equal third choice to upload an owner-recorded MP3 or WAV. Inspect,
+  sanitize, transcribe, align, preview, and require explicit confirmation. The
+  script comparison is advisory only: after confirmation, the recording and
+  its exact transcript are the Episode narration authority, the earlier script
+  revision remains immutable, and ElevenLabs is skipped.
 
 #### `P2-03` Look picker
 
@@ -557,16 +562,22 @@ provider canary.
   provenance/licensing, and approved library/generation sources.
 - Create ambience/SFX identity and dignity rules.
 - Generate only bounded micro-spend previews where needed.
+- A confirmed owner recording satisfies `human_recording_only` pronunciation
+  entries by binding them to that exact promoted narration asset; generated
+  narration continues to fail closed for those entries.
 - Pin approved voice, pronunciation, score, and sound-identity versions in the
   Series Release candidate.
 
 #### `P2-11` Pre-lock narration, story, shot, EDD, reference-graph, and QC preflight
 
 - Synthesize a bounded narration candidate/master clock with the selected voice
-  under the micro-quote.
+  under the micro-quote, or compile the master clock directly from the confirmed
+  owner-uploaded narration without creating any ElevenLabs request or spend.
 - Align exact locked words and verify actual 60–120 second duration,
   pronunciation, identity, monotonic timing, corruption, and seams before the
-  production quote.
+  production quote. For confirmed uploaded narration, "exact locked words"
+  means its authoritative transcript revision; mismatch with the earlier user
+  script remains visible evidence and never blocks after owner confirmation.
 - Produce immutable story, beat, shot, sound, composition, safety, routing, and
   preliminary EDD versions without changing source words.
 - Expand the EDD into exact provider request rows, durations, reference counts,

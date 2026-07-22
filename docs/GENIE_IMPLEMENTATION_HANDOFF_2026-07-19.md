@@ -1321,3 +1321,39 @@ deployment and public/authenticated owner path, then record the final evidence
 here. The traceability ledger must remain honest: without the external
 cryptographic provenance contract, Phase 2 entries may advance only to
 `implemented_unverified`, even after the owner-MVP software gate passes.
+
+## 26. 2026-07-22 owner-uploaded narration candidate
+
+The Voice chamber now presents three equal choices: male ElevenLabs V3,
+female ElevenLabs V3, or an owner-uploaded MP3/WAV. An upload is quarantined,
+inspected and re-encoded without tempo change, transcribed with timestamped
+evidence, aligned, promoted to an immutable audio asset and previewed beside
+its transcript. Comparison with the earlier script is advisory only and the UI
+requires the owner to explicitly confirm `Use this audio and transcript`.
+
+Confirmation makes the recording and its transcription authoritative for the
+Episode. A differing transcript creates a new immutable
+`uploaded_audio_transcript` script revision while retaining the earlier user
+revision; an exact match reuses the current revision. Preflight compiles its
+master clock from the confirmed uploaded asset and creates no ElevenLabs
+request, grant, quote or reservation. Confirmed owner audio also satisfies
+`human_recording_only` mantra/vedic pronunciation entries by binding them to
+that exact promoted asset. Selecting a generated voice restores the ordinary
+ElevenLabs path.
+
+Preview `iuzijmzcimtwyowhwinu` contains four forward migrations:
+`owner_uploaded_narration_source_enum`, `owner_uploaded_narration_source`,
+`owner_uploaded_narration_qc_authority`, and
+`owner_uploaded_narration_release_inheritance`. The last migration restores
+exact active Series-release look/voice inheritance after the complete database
+matrix exposed a stale default-only trigger body. Production remains unchanged
+until the frozen gate and independent review pass.
+
+Current focused evidence is green: all nine preview pgTAP suites pass
+`767/767`; full unit tests pass 111 files / 678 tests; integration passes 5/5
+with the intentional live-scanner skip; formatting, lint, route-aware type
+checking, trusted-harness integrity and both Phase 2 database policy mutation
+suites pass; and the focused Chromium uploaded-audio journey passes. The
+complete frozen candidate gate, independent adversarial review, production
+migration, explicit GitHub push, automatic Vercel deployment verification and
+live proof remain pending.

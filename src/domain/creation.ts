@@ -25,7 +25,19 @@ export type CreativeChoiceConfirmation =
     }>;
 
 export type ConfigurationConfirmationBlocker =
-  "look_human_confirmation_required" | "voice_human_confirmation_required";
+  | "look_human_confirmation_required"
+  | "narration_source_confirmation_required"
+  | "voice_human_confirmation_required";
+
+export interface CreationNarrationUpload {
+  readonly assetVersionId: string | null;
+  readonly comparisonEvidence: Readonly<Record<string, unknown>>;
+  readonly durationMs: number;
+  readonly id: string;
+  readonly originalFilename: string;
+  readonly state: string;
+  readonly transcriptionText: string;
+}
 
 export interface CreationConfiguration {
   readonly aggregateVersion: number;
@@ -38,6 +50,9 @@ export interface CreationConfiguration {
   readonly lookConfirmation: CreativeChoiceConfirmation;
   readonly lookVersionId: string;
   readonly narratorGender: "female" | "male";
+  readonly narrationSourceConfirmation: CreativeChoiceConfirmation;
+  readonly narrationSourceKind: "elevenlabs_v3" | "uploaded_audio";
+  readonly narrationUpload: CreationNarrationUpload | null;
   readonly performanceProfileId: string;
   readonly voiceAvailabilityByVersionId: Readonly<
     Record<string, VoiceAvailabilityStatus>
@@ -89,14 +104,29 @@ export function lookAvailabilityCanBeSelected(
 }
 
 export function configurationConfirmationGate(
-  configuration: Pick<CreationConfiguration, "lookConfirmation" | "voiceConfirmation">,
+  configuration: Pick<
+    CreationConfiguration,
+    | "lookConfirmation"
+    | "narrationSourceConfirmation"
+    | "narrationSourceKind"
+    | "voiceConfirmation"
+  >,
 ): Readonly<{
   blockers: readonly ConfigurationConfirmationBlocker[];
   canProgress: boolean;
 }> {
   const blockers: ConfigurationConfirmationBlocker[] = [];
-  if (configuration.voiceConfirmation.origin !== "human_confirmed") {
+  if (
+    configuration.narrationSourceKind === "elevenlabs_v3" &&
+    configuration.voiceConfirmation.origin !== "human_confirmed"
+  ) {
     blockers.push("voice_human_confirmation_required");
+  }
+  if (
+    configuration.narrationSourceKind === "uploaded_audio" &&
+    configuration.narrationSourceConfirmation.origin !== "human_confirmed"
+  ) {
+    blockers.push("narration_source_confirmation_required");
   }
   if (configuration.lookConfirmation.origin !== "human_confirmed") {
     blockers.push("look_human_confirmation_required");

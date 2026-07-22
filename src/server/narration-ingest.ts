@@ -413,7 +413,7 @@ async function promoteNarration(
   }
 }
 
-function alignmentSegments(input: {
+export function compileNarrationAlignmentSegments(input: {
   alignment: SpeechAlignment;
   durationMs: number;
   exactText: string;
@@ -597,7 +597,7 @@ async function assembleMasterClock(input: {
       "narration.pronunciation_evidence_missing",
     );
   }
-  const segments = alignmentSegments({
+  const segments = compileNarrationAlignmentSegments({
     alignment: input.claim.alignment,
     durationMs: input.scanned.durationMs,
     exactText,

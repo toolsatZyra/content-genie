@@ -69,7 +69,7 @@ export type MaterializedPronunciationEntry = PronunciationDirectorEntry &
   Readonly<{
     endScalar: number;
     evidenceHash: string;
-    humanRecordingAssetVersionId: null;
+    humanRecordingAssetVersionId: string | null;
     startScalar: number;
     verificationStatus: "verified";
   }>;
@@ -341,6 +341,7 @@ export function materializePronunciationEntries(
   input: Readonly<{
     directorOutput: unknown;
     modelRequestHash: string;
+    humanRecordingAssetVersionId?: string | null;
     processingText: string;
     scriptSha256: string;
     sourceReviewPacketId: string;
@@ -371,10 +372,15 @@ export function materializePronunciationEntries(
     const endScalar = startScalar + Array.from(entry.exactText).length;
     const humanOnly =
       entry.entryKind === "vedic_samhita" || entry.entryKind === "bija_mantra";
+    const humanRecordingAssetVersionId = humanOnly
+      ? (input.humanRecordingAssetVersionId ?? null)
+      : null;
     if (
-      humanOnly ||
-      entry.synthesisPolicy !== "synthetic_allowed" ||
-      (humanOnly && entry.providerMarkup !== null)
+      (humanOnly &&
+        (entry.synthesisPolicy !== "human_recording_only" ||
+          entry.providerMarkup !== null ||
+          humanRecordingAssetVersionId === null)) ||
+      (!humanOnly && entry.synthesisPolicy !== "synthetic_allowed")
     ) {
       throw new AudioIdentityPreflightError(
         "Vedic samhita and bija-mantra narration requires an approved human recording lane.",
@@ -388,6 +394,7 @@ export function materializePronunciationEntries(
         endScalar,
         entryKind: entry.entryKind,
         exactText: entry.exactText,
+        humanRecordingAssetVersionId,
         modelRequestHash: input.modelRequestHash,
         schemaVersion: "genie.pronunciation-evidence.v1",
         scriptSha256: input.scriptSha256,
@@ -401,7 +408,7 @@ export function materializePronunciationEntries(
       ...entry,
       endScalar,
       evidenceHash,
-      humanRecordingAssetVersionId: null,
+      humanRecordingAssetVersionId,
       startScalar,
       verificationStatus: "verified" as const,
     });
@@ -463,6 +470,7 @@ function pronunciationSchema(sourceVersionIds: readonly string[]) {
 async function generatePronunciationEntries(
   input: AudioIdentityInput,
   authority: Readonly<{
+    humanRecordingAssetVersionId: string | null;
     preflightRunId: string;
     stageAttemptId: string;
     trustedScopeHash: string;
@@ -504,6 +512,7 @@ async function generatePronunciationEntries(
   return Object.freeze({
     entries: materializePronunciationEntries({
       directorOutput: result.output,
+      humanRecordingAssetVersionId: authority.humanRecordingAssetVersionId,
       modelRequestHash: result.requestHash,
       processingText: input.processingText,
       scriptSha256: input.scriptSha256,
@@ -556,6 +565,7 @@ export async function ensurePreflightAudioIdentities(
     stageAttemptId: string;
     trustedScopeHash: string;
     workspaceId: string;
+    humanRecordingAssetVersionId?: string | null;
   }>,
 ): Promise<Readonly<{ replayed: boolean; selectionId: string }>> {
   const value = await rpc("get_audio_identity_preflight_input", {
@@ -584,6 +594,7 @@ export async function ensurePreflightAudioIdentities(
   }
 
   const pronunciation = await generatePronunciationEntries(preparation, {
+    humanRecordingAssetVersionId: input.humanRecordingAssetVersionId ?? null,
     preflightRunId: input.preflightRunId,
     stageAttemptId: input.stageAttemptId,
     trustedScopeHash: input.trustedScopeHash,

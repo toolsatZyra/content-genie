@@ -74,7 +74,7 @@ describe("audio identity pronunciation materialization", () => {
     ).toThrow("unscoped source");
   });
 
-  it("fails closed when sacred audio requires the future human-recording lane", () => {
+  it("fails closed when sacred audio has no confirmed human-recording asset", () => {
     try {
       materializePronunciationEntries({
         directorOutput: output({
@@ -98,5 +98,27 @@ describe("audio identity pronunciation materialization", () => {
         "HUMAN_SACRED_AUDIO_REQUIRED",
       );
     }
+  });
+
+  it("binds sacred pronunciation evidence to confirmed owner-uploaded narration", () => {
+    const humanRecordingAssetVersionId = "44444444-4444-4444-8444-444444444444";
+    const entries = materializePronunciationEntries({
+      directorOutput: output({
+        devanagari: "à¥ à¤¹à¥à¤°à¥€à¤‚",
+        entryKind: "bija_mantra",
+        exactText: "à¥ à¤¹à¥à¤°à¥€à¤‚",
+        providerMarkup: null,
+        synthesisPolicy: "human_recording_only",
+        transliteration: "oá¹ƒ hrÄ«á¹ƒ",
+      }),
+      humanRecordingAssetVersionId,
+      modelRequestHash: hash,
+      processingText: "à¥ à¤¹à¥à¤°à¥€à¤‚",
+      scriptSha256: hash,
+      sourceReviewPacketId: packetId,
+      sourceVersionIds: [sourceId],
+    });
+
+    expect(entries[0]?.humanRecordingAssetVersionId).toBe(humanRecordingAssetVersionId);
   });
 });

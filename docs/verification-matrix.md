@@ -74,7 +74,7 @@ affected feature disabled.
 | `V-P2-002` | Seed one scalar/byte mutation | downstream eligibility invalidates |
 | `V-P2-003` | Uploaded text with encoding evidence | original bytes/checksum retained |
 | `V-P2-004` | Script rubric suggests rewrite | advisory only; source unchanged |
-| `V-P2-005` | Narrator gender and voice identity | exact pinned ID; no silent fallback |
+| `V-P2-005` | Narrator gender/voice identity or owner-uploaded narration | exact pinned voice with no silent fallback; or sanitized MP3/WAV plus explicit confirmation makes its transcript authoritative and creates no ElevenLabs request |
 | `V-P2-006` | Look registry | exactly 117 unique IDs and correct default |
 | `V-P2-007` | Prompt edit/regenerate/accept/upload | creates immutable versions and correct selection |
 | `V-P2-008` | Malformed, polyglot, oversized, metadata-bearing upload | rejected or sanitized per policy |
@@ -89,7 +89,7 @@ affected feature disabled.
 | `V-P2-017` | Micro-quote tries to claim production-video slot | rejected |
 | `V-P2-018` | Missing/expired/recused source reviewer competency | Series publication blocked |
 | `V-P2-019` | Missing pronunciation/score/sound release component | Series publication blocked |
-| `V-P2-020` | Narration preflight spoken mutation or duration out of range | production quote/World Lock blocked |
+| `V-P2-020` | Generated narration spoken mutation, unconfirmed upload, or narration duration out of range | production quote/World Lock blocked; a confirmed upload may differ from the earlier immutable script only through its new authoritative transcript revision |
 | `V-P2-021` | Reference cycle, later-shot reference, cap breach, stale hash | preflight blocked |
 | `V-P2-022` | Upstream reference failure | no downstream spend |
 | `V-P2-023` | Fault at every World Lock write boundary | all-or-nothing |

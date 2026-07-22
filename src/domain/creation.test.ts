@@ -62,6 +62,8 @@ describe("creation choice confirmation", () => {
     expect(
       configurationConfirmationGate({
         lookConfirmation: systemDefault,
+        narrationSourceConfirmation: systemDefault,
+        narrationSourceKind: "elevenlabs_v3",
         voiceConfirmation: humanConfirmed,
       }),
     ).toEqual({
@@ -71,7 +73,37 @@ describe("creation choice confirmation", () => {
     expect(
       configurationConfirmationGate({
         lookConfirmation: humanConfirmed,
+        narrationSourceConfirmation: systemDefault,
+        narrationSourceKind: "elevenlabs_v3",
         voiceConfirmation: humanConfirmed,
+      }),
+    ).toEqual({ blockers: [], canProgress: true });
+  });
+
+  it("uses explicit source confirmation instead of voice confirmation for uploaded narration", () => {
+    const systemDefault = projectCreativeChoiceConfirmation(null, null);
+    const humanConfirmed = projectCreativeChoiceConfirmation(
+      "2026-07-19T10:00:00.000Z",
+      "10000000-0000-4000-8000-000000000001",
+    );
+
+    expect(
+      configurationConfirmationGate({
+        lookConfirmation: humanConfirmed,
+        narrationSourceConfirmation: systemDefault,
+        narrationSourceKind: "uploaded_audio",
+        voiceConfirmation: systemDefault,
+      }),
+    ).toEqual({
+      blockers: ["narration_source_confirmation_required"],
+      canProgress: false,
+    });
+    expect(
+      configurationConfirmationGate({
+        lookConfirmation: humanConfirmed,
+        narrationSourceConfirmation: humanConfirmed,
+        narrationSourceKind: "uploaded_audio",
+        voiceConfirmation: systemDefault,
       }),
     ).toEqual({ blockers: [], canProgress: true });
   });

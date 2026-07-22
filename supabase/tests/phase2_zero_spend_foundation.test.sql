@@ -643,6 +643,7 @@ select is(
     'command_authorize_micro_quote',
     'command_authorize_world_build_intent',
     'command_claim_work_item',
+    'command_confirm_episode_narration_upload',
     'command_confirm_production_quote',
     'command_create_episode',
     'command_create_invitation',
@@ -653,6 +654,7 @@ select is(
     'command_lock_episode_script_v2',
     'command_lock_first_episode_world',
     'command_offboard_member',
+    'command_prepare_episode_narration_upload',
     'command_prepare_world_upload',
     'command_record_mvp_master_cultural_decision',
     'command_register_broker_client',
@@ -1634,17 +1636,21 @@ select lives_ok(
   'script insertion creates the released-Series configuration candidate'
 );
 set local role authenticated;
-select ok(
+select is(
   (
-    select c.narrator_gender = 'female'
-      and c.voice_version_id = 'bb2db360-9e44-5e17-95d3-a1e38ef21fa7'
-      and l.look_key = 'divine-fury'
-      and c.voice_confirmed_by is null
-      and c.look_confirmed_by is null
+    select concat_ws(
+      '|',
+      c.narrator_gender::text,
+      c.voice_version_id::text,
+      l.look_key,
+      coalesce(c.voice_confirmed_by::text, 'null'),
+      coalesce(c.look_confirmed_by::text, 'null')
+    )
     from public.episode_configuration_candidates c
     join public.look_versions l on l.id = c.look_version_id
     where c.script_revision_id = '95000000-0000-4000-8000-000000000010'
   ),
+  'female|bb2db360-9e44-5e17-95d3-a1e38ef21fa7|divine-fury|null|null',
   'the candidate inherits the release look, narrator and voice exactly without forging human confirmation'
 );
 

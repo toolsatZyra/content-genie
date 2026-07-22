@@ -27,6 +27,13 @@ export function deterministicCreationProjection(
           },
           lookVersionId: look.versionId,
           narratorGender: "male",
+          narrationSourceConfirmation: {
+            confirmedAt: null,
+            confirmedBy: null,
+            origin: "system_default",
+          },
+          narrationSourceKind: "elevenlabs_v3",
+          narrationUpload: null,
           performanceProfileId: "genie-launch-hindi-delhi-sanskrit-performance.v1",
           voiceAvailabilityByVersionId: {
             [voiceForGender("female").versionId]: "pending_authenticated_canary",

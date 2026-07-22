@@ -614,7 +614,10 @@ export async function scanAndReencodeGeneratedVideo(input: {
   }
 }
 
-function parseAudioProbe(value: string): {
+function parseAudioProbe(
+  value: string,
+  allowedCodecs: readonly string[] = ["mp3"],
+): {
   channels: number;
   codecName: string;
   durationMs: number;
@@ -649,7 +652,8 @@ function parseAudioProbe(value: string): {
   const channels = Number(stream?.channels);
   if (
     stream?.codec_type !== "audio" ||
-    stream?.codec_name !== "mp3" ||
+    typeof stream?.codec_name !== "string" ||
+    !allowedCodecs.includes(stream.codec_name) ||
     !Number.isFinite(durationSeconds) ||
     durationSeconds <= 0 ||
     durationSeconds > 1_800 ||
@@ -667,7 +671,7 @@ function parseAudioProbe(value: string): {
   }
   return {
     channels,
-    codecName: "mp3",
+    codecName: stream.codec_name,
     durationMs: Math.round(durationSeconds * 1_000),
     sampleRate,
   };
@@ -675,10 +679,11 @@ function parseAudioProbe(value: string): {
 
 export async function scanAndReencodeNarrationAudio(input: {
   bytes: Buffer;
-  declaredMime: "audio/mpeg";
+  declaredMime: "audio/mpeg" | "audio/wav";
+  preserveDuration?: boolean;
 }): Promise<SandboxAudioScanResult> {
   if (
-    sniffMediaMagic(input.bytes) !== "audio/mpeg" ||
+    sniffMediaMagic(input.bytes) !== input.declaredMime ||
     input.bytes.length < 1_000 ||
     input.bytes.length > launchMediaLimits.maximumBytes
   ) {
@@ -767,17 +772,28 @@ export async function scanAndReencodeNarrationAudio(input: {
         [...probeArguments, inputPath],
         "media.audio_parser_rejected",
       ),
+      input.declaredMime === "audio/wav"
+        ? ["pcm_s16le", "pcm_s24le", "pcm_s32le", "pcm_f32le", "pcm_f64le"]
+        : ["mp3"],
     );
-    const targetDurationMs =
-      sourceProbe.durationMs < 60_000
+    const targetDurationMs = input.preserveDuration
+      ? sourceProbe.durationMs
+      : sourceProbe.durationMs < 60_000
         ? 60_050
         : sourceProbe.durationMs > 120_000
           ? 119_950
           : sourceProbe.durationMs;
     const tempo = sourceProbe.durationMs / targetDurationMs;
-    if (tempo < 0.8 || tempo > 1.25) {
+    if (
+      (input.preserveDuration &&
+        (sourceProbe.durationMs < 60_000 || sourceProbe.durationMs > 120_000)) ||
+      tempo < 0.8 ||
+      tempo > 1.25
+    ) {
       throw new SandboxMediaScannerError(
-        "Narration duration would require a performance-damaging tempo repair.",
+        input.preserveDuration
+          ? "The uploaded narration is outside the 60–120 second Episode contract."
+          : "Narration duration would require a performance-damaging tempo repair.",
         "media.narration_duration_rejected",
       );
     }

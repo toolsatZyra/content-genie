@@ -73,7 +73,7 @@
     {
       "path": "scripts/phase2-candidate-migrations.v1.json",
       "role": "candidate-migration-inventory",
-      "sha256": "d35bd276147f66e3da5d2368a141dd978abac0fba3acc5a07da9ac6f69b916b1"
+      "sha256": "4d9412303dd26f319f056477b8b39007dea1898e0fe0344c7b59e46148adb189"
     },
     {
       "path": "scripts/phase2-coordinate-upgrade-drill.mjs",
@@ -711,6 +711,26 @@
       "sha256": "15e7f5d0ab37ee73d41ef278630599407370e99fd79ddfdbbb37881270bd4093"
     },
     {
+      "path": "supabase/migrations/20260722125600_owner_uploaded_narration_source_enum.sql",
+      "role": "phase2-migration",
+      "sha256": "b18cd88fc2f0b020937b744c0bfa371d46fa6006fa9f69975cf5068025e3ed3d"
+    },
+    {
+      "path": "supabase/migrations/20260722125603_owner_uploaded_narration_source.sql",
+      "role": "phase2-migration",
+      "sha256": "f20a5113856934caa0df09fe61cd941ec4879454922c82af0d969965004e170c"
+    },
+    {
+      "path": "supabase/migrations/20260722125830_owner_uploaded_narration_qc_authority.sql",
+      "role": "phase2-migration",
+      "sha256": "ca1d20c3e3d9981d853b67f3dc99f6247551313c87e836b757edb0b772103c0f"
+    },
+    {
+      "path": "supabase/migrations/20260722184000_owner_uploaded_narration_release_inheritance.sql",
+      "role": "phase2-migration",
+      "sha256": "45e83d0be1913fb1bb452c3f3610cbb33436bd8075b69df5fc2731eccdb259f5"
+    },
+    {
       "path": "supabase/tests/fixtures/phase2_coordinate_v1_verifiers.sql",
       "role": "predecessor-fixture",
       "sha256": "2df42a28cd04b193b0eaf97c882a17edfb13688cad7aca9bf8845408e9d7ec1c"
@@ -718,7 +738,7 @@
     {
       "path": "supabase/tests/mvp_cinematic_pipeline.test.sql",
       "role": "pgtap-source",
-      "sha256": "053117942a4cb90d0616262a9dc8236731ba29396890ea7807c8083952d9e97c"
+      "sha256": "08a835e08b7cb00c8dd176ba7f68b9fad0750ffc72407dc4efcfa893075b5af8"
     },
     {
       "path": "supabase/tests/mvp_repair_feedback_grounding.test.sql",
@@ -753,7 +773,7 @@
     {
       "path": "supabase/tests/phase2_zero_spend_foundation.test.sql",
       "role": "pgtap-source",
-      "sha256": "f626f84eca02620139449d436597dabbc06ba76eb751b5f0832fcf236786e268"
+      "sha256": "377dc60216c5ef5752e217fd4147d1ff199d82f112f285aadc9e9b00bd6b093c"
     },
     {
       "path": "supabase/tests/workspace_authority_profile.test.sql",
@@ -784,9 +804,9 @@
   },
   "pgTapSuites": [
     {
-      "hardenedQuerySha256": "ee83760772f07c15cb9b2a3093af46ed9d6a30a365554dcf97065a4847983c80",
-      "plannedAssertions": 91,
-      "sourceSha256": "053117942a4cb90d0616262a9dc8236731ba29396890ea7807c8083952d9e97c",
+      "hardenedQuerySha256": "c218f1dc582f7caa7284cf54f3a2c671e2d56d61303daabf25a864fb0ed9a8a4",
+      "plannedAssertions": 102,
+      "sourceSha256": "08a835e08b7cb00c8dd176ba7f68b9fad0750ffc72407dc4efcfa893075b5af8",
       "testFile": "mvp_cinematic_pipeline.test.sql"
     },
     {
@@ -826,9 +846,9 @@
       "testFile": "phase2_world_cultural.test.sql"
     },
     {
-      "hardenedQuerySha256": "25a794fe258407943b387fe695328006d7220f791ff91055a3576b14463f2e46",
+      "hardenedQuerySha256": "207c88a515efcd37778338dbe55ae6479817f4840098df12bf6d170f12b81c01",
       "plannedAssertions": 179,
-      "sourceSha256": "f626f84eca02620139449d436597dabbc06ba76eb751b5f0832fcf236786e268",
+      "sourceSha256": "377dc60216c5ef5752e217fd4147d1ff199d82f112f285aadc9e9b00bd6b093c",
       "testFile": "phase2_zero_spend_foundation.test.sql"
     },
     {
@@ -950,7 +970,11 @@
     "supabase/migrations/20260721220248_phase2_character_identity_manifest_precedence_correction.sql",
     "supabase/migrations/20260721220500_phase2_p2_09_cultural_claim_contract.sql",
     "supabase/migrations/20260721220600_phase2_p2_09_cultural_claim_runtime_correction.sql",
-    "supabase/migrations/20260721220700_phase2_p2_09_service_grant_authority_correction.sql"
+    "supabase/migrations/20260721220700_phase2_p2_09_service_grant_authority_correction.sql",
+    "supabase/migrations/20260722125600_owner_uploaded_narration_source_enum.sql",
+    "supabase/migrations/20260722125603_owner_uploaded_narration_source.sql",
+    "supabase/migrations/20260722125830_owner_uploaded_narration_qc_authority.sql",
+    "supabase/migrations/20260722184000_owner_uploaded_narration_release_inheritance.sql"
   ],
   "predecessorFixture": {
     "capturedAt": "2026-07-18",

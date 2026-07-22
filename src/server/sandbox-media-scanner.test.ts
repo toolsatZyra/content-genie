@@ -65,6 +65,15 @@ function mp4Fixture() {
   return bytes;
 }
 
+function wavFixture() {
+  const bytes = Buffer.alloc(1_200);
+  bytes.write("RIFF", 0, "ascii");
+  bytes.writeUInt32LE(bytes.length - 8, 4);
+  bytes.write("WAVE", 8, "ascii");
+  bytes.write("fmt ", 12, "ascii");
+  return bytes;
+}
+
 function commandResult(stdout = "") {
   return {
     exitCode: 0,
@@ -84,6 +93,20 @@ function queueVideoScan(sourceProbe: string, outputProbe = sourceProbe) {
     sourceProbe,
     "",
     outputProbe,
+  ]) {
+    mocks.runCommand.mockResolvedValueOnce(commandResult(stdout));
+  }
+}
+
+function queueAudioSourceProbe(sourceProbe: string) {
+  for (const stdout of [
+    "",
+    "",
+    "",
+    "ClamAV 1.4",
+    "ffmpeg version 7",
+    "",
+    sourceProbe,
   ]) {
     mocks.runCommand.mockResolvedValueOnce(commandResult(stdout));
   }
@@ -170,6 +193,32 @@ describe("sandbox media scanner input envelope", () => {
       ],
       { timeoutMs: 180_000 },
     );
+    expect(mocks.stop).toHaveBeenCalledOnce();
+  });
+
+  it("accepts WAV intake but preserves owner-uploaded timing instead of stretching it", async () => {
+    queueAudioSourceProbe(
+      JSON.stringify({
+        format: { duration: "59.000" },
+        streams: [
+          {
+            channels: 1,
+            codec_name: "pcm_s16le",
+            codec_type: "audio",
+            sample_rate: "44100",
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      scanAndReencodeNarrationAudio({
+        bytes: wavFixture(),
+        declaredMime: "audio/wav",
+        preserveDuration: true,
+      }),
+    ).rejects.toMatchObject({ safeClass: "media.narration_duration_rejected" });
+    expect(mocks.readFileToBuffer).not.toHaveBeenCalled();
     expect(mocks.stop).toHaveBeenCalledOnce();
   });
 
