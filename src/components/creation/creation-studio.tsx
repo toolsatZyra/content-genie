@@ -613,6 +613,8 @@ export function CreationStudio({
     narrationSourceKind === "uploaded_audio"
       ? uploadedNarrationReady
       : effectiveVoicePinReconciled;
+  const narrationLookReady =
+    !narrationUploadAwaitingConfirmation && narrationIdentityReady;
   const narrationChoiceReady = narrationUploadAwaitingConfirmation
     ? false
     : narrationSourceKind === "uploaded_audio"
@@ -2423,7 +2425,7 @@ export function CreationStudio({
         {chambers.map((item, index) => {
           const reachable =
             item.id === "look"
-              ? configurationReady && narrationIdentityReady
+              ? configurationReady && narrationLookReady
               : item.id === "world"
                 ? worldConfigurationReady
                 : item.id === "preflight"
@@ -2838,7 +2840,7 @@ export function CreationStudio({
                 !canEditCreation ||
                 !configurationReady ||
                 working ||
-                !narrationIdentityReady
+                !narrationLookReady
               }
               onClick={() => setChamber("look")}
               type="button"
