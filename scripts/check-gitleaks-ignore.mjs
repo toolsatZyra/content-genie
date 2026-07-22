@@ -33,11 +33,16 @@ if (
   );
 }
 
-const prose = readFileSync("docs/implementation-plan.md", "utf8")
-  .split(/\r?\n/)
-  .slice(498, 508)
-  .join(" ");
-if (!prose.includes("wrong-project keys") || !prose.includes("wrong audience")) {
+const planLines = readFileSync("docs/implementation-plan.md", "utf8").split(/\r?\n/);
+const reviewedProseStart = planLines.findIndex((line) =>
+  line.includes("Keep all provider API keys in a narrowly deployed Vercel"),
+);
+const prose = planLines.slice(reviewedProseStart, reviewedProseStart + 12).join(" ");
+if (
+  reviewedProseStart < 0 ||
+  !prose.includes("wrong-project keys") ||
+  !prose.includes("wrong audience")
+) {
   throw new Error(
     "Reviewed Gitleaks prose context changed; re-review the fingerprint.",
   );
