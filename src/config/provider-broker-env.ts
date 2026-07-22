@@ -8,6 +8,7 @@ export type ProviderBrokerEnvironment = Readonly<{
   capabilityVerifyPublicKeySpkiBase64: string;
   environment: "development" | "preview" | "production" | "test";
   elevenLabsApiKey: string;
+  falAdminKey: string;
   falKey: string;
   falWebhookBaseUrl: string;
   referenceImageHosts: readonly string[];
@@ -27,6 +28,7 @@ export function parseProviderBrokerEnvironment(
   const audience = source.GENIE_BROKER_AUDIENCE?.trim() ?? "";
   const capabilityVerifyPublicKeySpkiBase64 =
     source.GENIE_CAPABILITY_VERIFY_PUBLIC_KEY?.trim() ?? "";
+  const falAdminKey = source.FAL_ADMIN_KEY?.trim() ?? "";
   const falKey = source.FAL_KEY?.trim() ?? "";
   const elevenLabsApiKey = source.ELEVENLABS_API_KEY?.trim() ?? "";
   const supabaseUrl = server.public.supabaseUrl;
@@ -38,6 +40,7 @@ export function parseProviderBrokerEnvironment(
     !supabaseUrl ||
     audience !== expectedAudience ||
     !/^[A-Za-z0-9+/]{56,200}={0,2}$/u.test(capabilityVerifyPublicKeySpkiBase64) ||
+    falAdminKey.length < 16 ||
     falKey.length < 16 ||
     elevenLabsApiKey.length < 16
   ) {
@@ -51,6 +54,7 @@ export function parseProviderBrokerEnvironment(
     capabilityVerifyPublicKeySpkiBase64,
     elevenLabsApiKey,
     environment: server.environment,
+    falAdminKey,
     falKey,
     falWebhookBaseUrl: `${server.public.appUrl}/api/internal/provider-webhooks/fal`,
     referenceImageHosts: Object.freeze([new URL(supabaseUrl).hostname.toLowerCase()]),

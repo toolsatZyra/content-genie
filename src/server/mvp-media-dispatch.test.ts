@@ -3,10 +3,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   admin: vi.fn(),
   billingEvent: vi.fn(),
+  eq: vi.fn(),
+  from: vi.fn(),
+  maybeSingle: vi.fn(),
   rpc: vi.fn(),
   result: vi.fn(),
+  select: vi.fn(),
   submit: vi.fn(),
 }));
+
+const billingQuery = {
+  eq: mocks.eq,
+  maybeSingle: mocks.maybeSingle,
+  select: mocks.select,
+};
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/admin", () => ({
@@ -99,7 +109,14 @@ function dispatchRow(
 describe("durable MVP media dispatch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.admin.mockReturnValue({ rpc: mocks.rpc });
+    mocks.admin.mockReturnValue({ from: mocks.from, rpc: mocks.rpc });
+    mocks.from.mockReturnValue(billingQuery);
+    mocks.select.mockReturnValue(billingQuery);
+    mocks.eq.mockReturnValue(billingQuery);
+    mocks.maybeSingle.mockResolvedValue({
+      data: { dispatched_at: "2026-07-20T12:05:00.000Z" },
+      error: null,
+    });
     mocks.billingEvent.mockResolvedValue(billingEvent);
   });
 
@@ -203,7 +220,31 @@ describe("durable MVP media dispatch", () => {
         timeoutMs: 5_000,
       }),
     ).resolves.toEqual({ ...result, billingEvent });
+    expect(mocks.from).toHaveBeenCalledWith("mvp_media_dispatch_worker");
+    expect(mocks.billingEvent).toHaveBeenCalledWith(
+      control.externalRequestId,
+      "2026-07-20T12:05:00.000Z",
+      5_000,
+    );
     expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when the persisted dispatch timestamp is unavailable", async () => {
+    mocks.maybeSingle.mockResolvedValue({ data: null, error: null });
+
+    await expect(
+      fetchMvpFalBilledResultForDispatch({
+        externalRequestId: control.externalRequestId,
+        providerDispatchId: ids.dispatch,
+        responseUrl: control.responseUrl,
+        timeoutMs: 5_000,
+      }),
+    ).rejects.toMatchObject({
+      retryable: false,
+      safeCode: "PRODUCTION_LEDGER_FAILED",
+    });
+    expect(mocks.result).not.toHaveBeenCalled();
+    expect(mocks.billingEvent).not.toHaveBeenCalled();
   });
 
   it("records provider-reported usage and names the locked-rate result as evidence", async () => {

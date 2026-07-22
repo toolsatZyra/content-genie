@@ -26,6 +26,7 @@ Only presence was inspected; values were not printed.
 | `SUPABASE_ACCESS_TOKEN` | Trusted local/CI control only | Supabase integration/CLI authentication | migrations, disposable branches, scheduled branch reaping |
 | `TRIGGER_SECRET_KEY` | Vercel server-only + Trigger deployment tooling | Trigger.dev SDK authentication | workflow enqueue/deploy |
 | `ELEVENLABS_API_KEY` | Vercel provider broker only | narration | voice adapter |
+| `FAL_ADMIN_KEY` | Vercel billing reconciler only | request-level billing-event reads | exact FAL cost evidence; Admin scope, never inference |
 | `FAL_KEY` | Vercel provider broker only | image/video/provider calls | Kling and fal-hosted adapters |
 | `GOOGLE_GENAI_API_KEY` | Vercel provider broker only | reasoning/judging/image/video capability where enabled | configured adapters |
 | `OPENAI_API_KEY` | Vercel provider broker only | reasoning/judging fallback where enabled | configured adapters |
@@ -58,6 +59,7 @@ Sentry variables remain unused and must not be added to runtime imports.
 | `GENIE_BROKER_CLIENT_PUBLIC_KEYS_JSON` | Vercel provider broker only | allowlisted `client_id`/`kid`/public-key registry during bootstrap; database registry is authoritative after bootstrap |
 | `GENIE_BROKER_AUDIENCE` | Vercel broker + each Trigger project | exact provider-broker audience string |
 | `FAL_CALLBACK_SECRET` | Vercel server-only, per environment | fal callback verification/correlation |
+| `FAL_ADMIN_KEY` | Vercel billing reconciler only | least-privilege FAL Admin API key for read-only billing-event reconciliation; never used for generation |
 | `ELEVENLABS_CALLBACK_SECRET` | Vercel server-only, per environment | ElevenLabs callback verification/correlation if enabled |
 | `GOOGLE_CALLBACK_SECRET` | Vercel server-only, per environment | Google callback verification/correlation if enabled |
 | `SEEDANCE_CALLBACK_SECRET` | Vercel server-only, per environment | Seedance endpoint callback verification/correlation if distinct |

@@ -130,6 +130,7 @@ describe("internal provider broker route", () => {
       capabilityVerifyPublicKeySpkiBase64: "A".repeat(64),
       elevenLabsApiKey: "elevenlabs-secret",
       environment: "preview",
+      falAdminKey: "fal-admin-secret-value-123",
       falKey: "fal-secret-value-123",
       falWebhookBaseUrl:
         "https://content-genie-three.vercel.app/api/internal/provider-webhooks/fal",

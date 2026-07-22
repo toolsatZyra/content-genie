@@ -1,12 +1,12 @@
 -- Focused database contract for the autonomous MVP cinematic pipeline.
--- Run after migrations through 20260722115341.
+-- Run after migrations through 20260722194700.
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions,auth,storage,private,audit,pg_catalog;
 
-select plan(118);
+select plan(120);
 
 create temp table mvp_pipeline_fixture(
   key text primary key,
@@ -842,6 +842,21 @@ insert into public.asset_versions(
   'fixture-v1',repeat('e',64),'audio/mpeg',4096,
   'c1a63000-0000-4000-8000-000000000001',repeat('f',64)
 );
+insert into public.narration_master_clock_versions(
+  id,workspace_id,configuration_candidate_id,preflight_run_id,
+  script_revision_id,audio_identity_selection_id,narration_asset_version_id,
+  version_number,duration_ms,processing_text_sha256,alignment_hash,
+  audio_evidence_hash,performance_profile_hash,segment_count,state
+) values(
+  'c1920000-0000-4000-8000-000000000001',
+  'c1100000-0000-4000-8000-000000000001',
+  'c1500000-0000-4000-8000-000000000001',
+  'c1910000-0000-4000-8000-000000000001',
+  'c1510000-0000-4000-8000-000000000001',
+  'c1920000-0000-4000-8000-000000000002',
+  'c1a60000-0000-4000-8000-000000000001',1,60000,
+  repeat('1',64),repeat('2',64),repeat('3',64),repeat('4',64),1,'verified'
+);
 insert into public.mvp_production_jobs(
   production_run_id,workspace_id,episode_id,plan_bundle_id,
   narration_asset_version_id,state,attempt_number,
@@ -1341,8 +1356,19 @@ select ok(
   )
   and not has_function_privilege(
     'authenticated','public.get_mvp_storyboard_cost_authority(uuid,uuid)','execute'
-  ),
-  'only the worker can read compatibility cost authority or reconcile old dispatches'
+  )
+  and not has_function_privilege(
+    'service_role',
+    'private.authorize_mvp_legacy_storyboard_owner_start(uuid,uuid,uuid,bigint)',
+    'execute'
+  )
+  and pg_get_functiondef(
+    'public.command_start_mvp_production(uuid,uuid)'::regprocedure
+  ) like '%authorize_mvp_legacy_storyboard_owner_start%'
+  and pg_get_functiondef(
+    'private.assert_workspace_action_authority(uuid,text)'::regprocedure
+  ) like '%authorityReceiptId%',
+  'Start alone binds exact owner authority; workers only read cost authority'
 );
 
 select ok(
@@ -1394,6 +1420,19 @@ insert into public.production_quotes(
   'c1ac0000-0000-4000-8000-000000000003',3,repeat('3',64),repeat('4',64),
   'USD',1000000,1000000,1000000,1000000,false,
   '2099-01-01 00:00:00+00','2026-01-01 00:00:00+00'
+);
+
+insert into public.production_quote_confirmations(
+  id,workspace_id,production_quote_id,quote_hash,hard_ceiling_microusd,
+  confirmed_by,actor_aal,command_id,confirmed_at,authority_profile_id,
+  authority_profile_epoch,authority_provenance
+) values(
+  'c1ad0000-0000-4000-8000-000000000003',
+  'c1100000-0000-4000-8000-000000000001',
+  'c1a30000-0000-4000-8000-000000000003',repeat('3',64),1000000,
+  'c1200000-0000-4000-8000-000000000001','aal2',
+  'c1ae0000-0000-4000-8000-000000000003','2000-01-01 00:00:00+00',
+  'c1150000-0000-4000-8000-000000000001',1,'verified_aal2'
 );
 
 insert into public.production_quote_lines(
@@ -1751,6 +1790,91 @@ select ok(
       'c1a80000-0000-4000-8000-000000000001',
   'an older locked run can reserve a cost-bound storyboard without rewriting its quote'
 );
+
+reset role;
+set local session_replication_role = replica;
+update public.memberships
+set role='admin'
+where workspace_id='c1100000-0000-4000-8000-000000000001'
+  and user_id='c1200000-0000-4000-8000-000000000001';
+update public.memberships
+set status='deactivated',deactivated_at=statement_timestamp()
+where workspace_id='c1100000-0000-4000-8000-000000000001'
+  and user_id='c1200000-0000-4000-8000-000000000002';
+update private.workspace_authority_profiles
+set profile_kind='single_owner_developer',
+    owner_user_id='c1200000-0000-4000-8000-000000000001',
+    transitioned_at=null,transition_reason=null
+where id='c1150000-0000-4000-8000-000000000001';
+set local session_replication_role = origin;
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"c1200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2","session_id":"c1210000-0000-4000-8000-000000000001"}',
+  true
+);
+select set_config(
+  'request.jwt.claim.sub','c1200000-0000-4000-8000-000000000001',true
+);
+select set_config('request.jwt.claim.role','authenticated',true);
+set local role authenticated;
+
+select lives_ok(
+  $$select public.command_start_mvp_production(
+    'c1100000-0000-4000-8000-000000000001',
+    'c1a00000-0000-4000-8000-000000000003'
+  )$$,
+  'the exact owner Start atomically authorizes a post-migration legacy run'
+);
+
+reset role;
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
+select set_config('request.jwt.claim.role','service_role',true);
+set local role service_role;
+insert into mvp_pipeline_fixture(key,value)
+select 'runtime-legacy-owner-authority',
+  public.get_mvp_storyboard_cost_authority(
+    'c1100000-0000-4000-8000-000000000001',
+    'c1a00000-0000-4000-8000-000000000003'
+  );
+reset role;
+select ok(
+  (select value->>'source'
+   from mvp_pipeline_fixture
+   where key='runtime-legacy-owner-authority')='legacy_quote_compatibility'
+  and exists(
+    select 1
+    from private.mvp_storyboard_quote_compatibility_owner_authorizations approval
+    join private.workspace_authority_receipts receipt
+      on receipt.id=approval.mvp_start_authority_receipt_id
+    where approval.production_run_id=
+        'c1a00000-0000-4000-8000-000000000003'
+      and approval.owner_user_id=
+        'c1200000-0000-4000-8000-000000000001'
+      and receipt.action_key='mvp_start'
+      and receipt.actor_user_id=approval.owner_user_id
+      and receipt.actor_aal='aal2'
+  ),
+  'runtime compatibility authority is bound to that exact owner Start receipt'
+);
+
+set local session_replication_role = replica;
+update public.memberships
+set role='member'
+where workspace_id='c1100000-0000-4000-8000-000000000001'
+  and user_id='c1200000-0000-4000-8000-000000000001';
+update public.memberships
+set status='active',deactivated_at=null
+where workspace_id='c1100000-0000-4000-8000-000000000001'
+  and user_id='c1200000-0000-4000-8000-000000000002';
+update private.workspace_authority_profiles
+set profile_kind='managed_team',owner_user_id=null,
+    transitioned_at=null,transition_reason=null
+where id='c1150000-0000-4000-8000-000000000001';
+set local session_replication_role = origin;
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
+select set_config('request.jwt.claim.role','service_role',true);
+set local role service_role;
 
 insert into mvp_pipeline_fixture(key,value)
 select 'production-claim-1',

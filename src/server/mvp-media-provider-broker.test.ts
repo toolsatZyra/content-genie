@@ -35,14 +35,19 @@ function billedJsonResponse(body: unknown, billableUnits?: string): Response {
 
 describe("MVP FAL provider broker", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-22T13:00:00.000Z"));
+    process.env.FAL_ADMIN_KEY = "test-fal-admin-key-at-least-16-characters";
     process.env.FAL_KEY = "test-fal-key-at-least-16-characters";
     process.env.NEXT_PUBLIC_APP_URL = "https://genie.example";
     vi.stubGlobal("fetch", vi.fn());
   });
 
   afterEach(() => {
+    delete process.env.FAL_ADMIN_KEY;
     delete process.env.FAL_KEY;
     delete process.env.NEXT_PUBLIC_APP_URL;
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -194,7 +199,9 @@ describe("MVP FAL provider broker", () => {
       }),
     );
 
-    await expect(fetchMvpFalBillingEvent(requestId, 12_345)).resolves.toEqual({
+    await expect(
+      fetchMvpFalBillingEvent(requestId, "2026-07-20T12:05:00.000Z", 12_345),
+    ).resolves.toEqual({
       costEstimateNanoUsd: 109_800_000,
       endpointId: endpoint,
       evidenceSha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
@@ -204,13 +211,15 @@ describe("MVP FAL provider broker", () => {
       unitPriceUsd: 0.08,
     });
     const billingUrl = new URL("https://api.fal.ai/v1/models/billing-events");
+    billingUrl.searchParams.set("end", "2026-07-22T13:00:00.000Z");
     billingUrl.searchParams.set("limit", "2");
     billingUrl.searchParams.set("request_id", requestId);
+    billingUrl.searchParams.set("start", "2026-07-20T12:00:00.000Z");
     expect(fetch).toHaveBeenCalledWith(
       billingUrl,
       expect.objectContaining({
         headers: expect.objectContaining({
-          Authorization: expect.stringMatching(/^Key /u),
+          Authorization: "Key test-fal-admin-key-at-least-16-characters",
         }),
         redirect: "error",
         signal: expect.any(AbortSignal),
@@ -223,10 +232,40 @@ describe("MVP FAL provider broker", () => {
       jsonResponse({ billing_events: [], has_more: false, next_cursor: null }),
     );
 
-    await expect(fetchMvpFalBillingEvent(requestId, 12_345)).rejects.toMatchObject({
+    await expect(
+      fetchMvpFalBillingEvent(requestId, "2026-07-20T12:05:00.000Z", 12_345),
+    ).rejects.toMatchObject({
       disposition: "unknown",
       safeCode: "PROVIDER_BILLING_EVENT_PENDING",
     });
+  });
+
+  it("fails closed without the dedicated billing-admin credential", async () => {
+    delete process.env.FAL_ADMIN_KEY;
+
+    await expect(
+      fetchMvpFalBillingEvent(requestId, "2026-07-20T12:05:00.000Z", 12_345),
+    ).rejects.toMatchObject({
+      disposition: "terminal",
+      safeCode: "PROVIDER_BILLING_UNRECONCILED",
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("uses an explicit historical window capped at ninety days", async () => {
+    vi.setSystemTime(new Date("2026-07-22T13:00:00.000Z"));
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse({ billing_events: [], has_more: false, next_cursor: null }),
+    );
+
+    await expect(
+      fetchMvpFalBillingEvent(requestId, "2026-01-01T00:05:00.000Z", 12_345),
+    ).rejects.toMatchObject({ safeCode: "PROVIDER_BILLING_EVENT_PENDING" });
+    const requested = vi.mocked(fetch).mock.calls[0]?.[0];
+    expect(requested).toBeInstanceOf(URL);
+    const url = requested as URL;
+    expect(url.searchParams.get("start")).toBe("2026-01-01T00:00:00.000Z");
+    expect(url.searchParams.get("end")).toBe("2026-04-01T00:00:00.000Z");
   });
 
   it("bounds an accepted submission receipt before parsing JSON", async () => {

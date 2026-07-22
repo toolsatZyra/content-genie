@@ -1357,3 +1357,50 @@ suites pass; and the focused Chromium uploaded-audio journey passes. The
 complete frozen candidate gate, independent adversarial review, production
 migration, explicit GitHub push, automatic Vercel deployment verification and
 live proof remain pending.
+
+## 27. 2026-07-22 owner-authority and provider-billing re-gate
+
+The independent owner-MVP adversarial review initially found three P1 release
+defects. The current dirty candidate closes all three without weakening the
+provider or owner-authority boundaries:
+
+- forward migration
+  `20260722194700_mvp_legacy_storyboard_owner_start_authority.sql` makes an
+  authenticated owner Start atomically capture its exact authority receipt and
+  bind any legacy storyboard compatibility envelope before the queued job is
+  visible to a worker;
+- FAL generation continues to use `FAL_KEY`, while request-level billing-event
+  reconciliation now requires the distinct server-only `FAL_ADMIN_KEY`;
+- billing-event lookup binds the provider dispatch ID and external request ID
+  to the persisted `dispatched_at` value, then sends an explicit five-minute-
+  skewed, maximum-90-day `start`/`end` window instead of relying on FAL's
+  24-hour default.
+
+Preview `iuzijmzcimtwyowhwinu` contains the forward owner-authority migration.
+Production `fnxztrqsqucojcvabjhk` remains unchanged. Current re-gate evidence:
+
+- preview pgTAP: nine suites, `786/786` assertions, including a post-migration
+  owner Start and exact worker-readable compatibility authority;
+- complete RLS/database-policy/trusted-harness and repository security
+  composites: passed; trusted manifest SHA-256
+  `19a7114a0335e288dc0d9bdd8ad32e72fa368c7e97d4447cbe9cb23f7494f00f`;
+- focused provider-billing tests: `49/49`; lint and route-aware TypeScript:
+  passed;
+- unit: 114 files / 720 tests; coverage 94.73% statements, 91.89% branches,
+  96.77% functions and 96.51% lines;
+- integration: `5/5`, with the live provider scanner intentionally skipped in
+  the deterministic environment;
+- complete Chromium rerun: `64/64`, with the bounded server stopped. One prior
+  attempt encountered a transient Next development-manifest parse error before
+  a product assertion; the exact case passed independently and the complete
+  fresh rerun passed;
+- context-minimized independent re-review: no P0/P1/P2 findings. All three
+  original P1 defects are code-closed.
+
+The remaining external release-evidence gap is explicit: no FAL Admin key is
+present in the current local or Vercel environment, so the read-only live
+billing-event canary cannot yet run. Do not substitute the inference key. The
+next steps are to bind the candidate to a local commit, run the exact-commit
+precheckpoint gate, provision `FAL_ADMIN_KEY` without printing or committing
+it, run the live billing canary, promote the approved migrations, push `main`
+explicitly, and verify the Git-connected Vercel deployment and live owner path.

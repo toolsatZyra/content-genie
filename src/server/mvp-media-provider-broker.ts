@@ -7,6 +7,8 @@ import { readJsonResponseBounded } from "@/server/bounded-response-body";
 const QUEUE_ORIGIN = "https://queue.fal.run";
 const PLATFORM_ORIGIN = "https://api.fal.ai";
 const MAXIMUM_PROVIDER_JSON_BYTES = 131_072;
+const BILLING_EVENT_CLOCK_SKEW_MS = 5 * 60 * 1_000;
+const BILLING_EVENT_MAXIMUM_WINDOW_MS = 90 * 24 * 60 * 60 * 1_000;
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
@@ -32,6 +34,50 @@ function falKey(): string {
     );
   }
   return key;
+}
+
+function falAdminKey(): string {
+  const key = process.env.FAL_ADMIN_KEY?.trim() ?? "";
+  if (key.length < 16) {
+    throw new MvpMediaProviderBrokerError(
+      "FAL billing reconciliation is not configured.",
+      "terminal",
+      "PROVIDER_BILLING_UNRECONCILED",
+    );
+  }
+  return key;
+}
+
+function billingEventWindow(dispatchedAt: string): Readonly<{
+  end: string;
+  start: string;
+}> {
+  const dispatchedAtMs = Date.parse(dispatchedAt);
+  const nowMs = Date.now();
+  if (
+    !Number.isFinite(dispatchedAtMs) ||
+    dispatchedAt.length > 64 ||
+    dispatchedAtMs > nowMs + BILLING_EVENT_CLOCK_SKEW_MS
+  ) {
+    throw new MvpMediaProviderBrokerError(
+      "The provider billing dispatch timestamp is invalid.",
+      "terminal",
+      "PROVIDER_BILLING_UNRECONCILED",
+    );
+  }
+  const startMs = dispatchedAtMs - BILLING_EVENT_CLOCK_SKEW_MS;
+  const endMs = Math.min(nowMs, startMs + BILLING_EVENT_MAXIMUM_WINDOW_MS);
+  if (endMs <= startMs) {
+    throw new MvpMediaProviderBrokerError(
+      "The provider billing dispatch window is invalid.",
+      "terminal",
+      "PROVIDER_BILLING_UNRECONCILED",
+    );
+  }
+  return Object.freeze({
+    end: new Date(endMs).toISOString(),
+    start: new Date(startMs).toISOString(),
+  });
 }
 
 function queueUrl(value: string, requestId?: string): URL {
@@ -311,6 +357,7 @@ export async function fetchMvpFalQueueResult(
 
 export async function fetchMvpFalBillingEvent(
   requestId: string,
+  dispatchedAt: string,
   timeoutMs: number,
 ): Promise<MvpFalBillingEvent> {
   if (!/^[A-Za-z0-9_-]{6,200}$/u.test(requestId)) {
@@ -320,13 +367,16 @@ export async function fetchMvpFalBillingEvent(
       "PROVIDER_BILLING_UNRECONCILED",
     );
   }
+  const window = billingEventWindow(dispatchedAt);
   const url = new URL("/v1/models/billing-events", PLATFORM_ORIGIN);
+  url.searchParams.set("end", window.end);
   url.searchParams.set("limit", "2");
   url.searchParams.set("request_id", requestId);
+  url.searchParams.set("start", window.start);
   let response: Response;
   try {
     response = await fetch(url, {
-      headers: { Authorization: `Key ${falKey()}` },
+      headers: { Authorization: `Key ${falAdminKey()}` },
       redirect: "error",
       signal: AbortSignal.timeout(timeoutMs),
     });

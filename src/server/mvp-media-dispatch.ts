@@ -29,6 +29,10 @@ type DispatchRow = Readonly<{
   version: number;
 }>;
 
+type DispatchBillingIdentity = Readonly<{
+  dispatched_at: string;
+}>;
+
 export class MvpMediaDispatchError extends Error {
   override readonly name = "MvpMediaDispatchError";
 
@@ -75,6 +79,32 @@ async function rpc(name: string, parameters: Record<string, unknown>) {
     );
   }
   return data;
+}
+
+async function dispatchBillingIdentity(input: {
+  externalRequestId: string;
+  providerDispatchId: string;
+}): Promise<DispatchBillingIdentity> {
+  const { data, error } = await createAdminSupabaseClient()
+    .from("mvp_media_dispatch_worker")
+    .select("dispatched_at")
+    .eq("id", input.providerDispatchId)
+    .eq("external_request_id", input.externalRequestId)
+    .maybeSingle();
+  if (
+    error ||
+    !data ||
+    typeof data.dispatched_at !== "string" ||
+    data.dispatched_at.length > 64 ||
+    !Number.isFinite(Date.parse(data.dispatched_at))
+  ) {
+    throw new MvpMediaDispatchError(
+      "The provider dispatch billing identity is unavailable.",
+      "PRODUCTION_LEDGER_FAILED",
+      false,
+    );
+  }
+  return Object.freeze({ dispatched_at: new Date(data.dispatched_at).toISOString() });
 }
 
 function existingControl(dispatch: DispatchRow): MvpFalControl | null {
@@ -343,6 +373,7 @@ export async function fetchMvpFalBilledResultForDispatch(input: {
   timeoutMs: number;
 }): Promise<MvpFalBilledResult & Readonly<{ billingEvent: MvpFalBillingEvent }>> {
   try {
+    const billingIdentity = await dispatchBillingIdentity(input);
     const result = await fetchMvpFalQueueResult(input.responseUrl, input.timeoutMs);
     let billingEvent: MvpFalBillingEvent | null = null;
     let pendingError: MvpMediaProviderBrokerError | null = null;
@@ -350,6 +381,7 @@ export async function fetchMvpFalBilledResultForDispatch(input: {
       try {
         billingEvent = await fetchMvpFalBillingEvent(
           input.externalRequestId,
+          billingIdentity.dispatched_at,
           input.timeoutMs,
         );
         break;

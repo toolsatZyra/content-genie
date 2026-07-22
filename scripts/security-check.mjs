@@ -12,6 +12,7 @@ const violations = [];
 const secretNames = [
   "ANTHROPIC_API_KEY",
   "ELEVENLABS_API_KEY",
+  "FAL_ADMIN_KEY",
   "FAL_KEY",
   "GENIE_COMMAND_HMAC_SECRET",
   "GENIE_DIAGNOSTIC_HASH_KEY",
