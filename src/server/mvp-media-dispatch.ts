@@ -6,8 +6,10 @@ import { setTimeout as delay } from "node:timers/promises";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import {
   MvpMediaProviderBrokerError,
+  fetchMvpFalBillingEvent,
   fetchMvpFalQueueResult,
   submitMvpFalProvider,
+  type MvpFalBillingEvent,
   type MvpFalBilledResult,
   type MvpFalControl,
 } from "@/server/mvp-media-provider-broker";
@@ -93,6 +95,8 @@ function existingControl(dispatch: DispatchRow): MvpFalControl | null {
 
 const RECEIPT_RECONCILIATION_ATTEMPTS = 3;
 const RECEIPT_RECONCILIATION_BACKOFF_MS = [50, 150] as const;
+const BILLING_EVENT_ATTEMPTS = 4;
+const BILLING_EVENT_BACKOFF_MS = [250, 750, 2_000] as const;
 
 async function bindMediaCallback(
   dispatch: DispatchRow & Readonly<{ claim_token: string }>,
@@ -309,6 +313,7 @@ export async function dispatchMvpFalMedia(
 }
 
 export async function completeMvpMediaDispatchOutput(input: {
+  billingEvent: MvpFalBillingEvent;
   externalRequestId: string;
   outputContentSha256: string;
   providerDispatchId: string;
@@ -317,6 +322,13 @@ export async function completeMvpMediaDispatchOutput(input: {
 }): Promise<void> {
   await rpc("command_complete_mvp_media_dispatch_output", {
     p_dispatch_id: input.providerDispatchId,
+    p_billing_event_cost_nano_usd: input.billingEvent.costEstimateNanoUsd,
+    p_billing_event_endpoint_id: input.billingEvent.endpointId,
+    p_billing_event_evidence_sha256: input.billingEvent.evidenceSha256,
+    p_billing_event_output_units: input.billingEvent.outputUnits,
+    p_billing_event_percent_discount: input.billingEvent.percentDiscount,
+    p_billing_event_timestamp: input.billingEvent.timestamp,
+    p_billing_event_unit_price_usd: input.billingEvent.unitPriceUsd,
     p_external_request_id: input.externalRequestId,
     p_output_content_sha256: input.outputContentSha256,
     p_provider_reported_billable_units: input.providerReportedBillableUnits,
@@ -329,24 +341,65 @@ export async function fetchMvpFalBilledResultForDispatch(input: {
   providerDispatchId: string;
   responseUrl: string;
   timeoutMs: number;
-}): Promise<MvpFalBilledResult> {
+}): Promise<MvpFalBilledResult & Readonly<{ billingEvent: MvpFalBillingEvent }>> {
   try {
-    return await fetchMvpFalQueueResult(input.responseUrl, input.timeoutMs);
+    const result = await fetchMvpFalQueueResult(input.responseUrl, input.timeoutMs);
+    let billingEvent: MvpFalBillingEvent | null = null;
+    let pendingError: MvpMediaProviderBrokerError | null = null;
+    for (let attempt = 1; attempt <= BILLING_EVENT_ATTEMPTS; attempt += 1) {
+      try {
+        billingEvent = await fetchMvpFalBillingEvent(
+          input.externalRequestId,
+          input.timeoutMs,
+        );
+        break;
+      } catch (caught) {
+        if (
+          !(caught instanceof MvpMediaProviderBrokerError) ||
+          caught.safeCode !== "PROVIDER_BILLING_EVENT_PENDING"
+        ) {
+          throw caught;
+        }
+        pendingError = caught;
+        if (attempt < BILLING_EVENT_ATTEMPTS) {
+          await delay(BILLING_EVENT_BACKOFF_MS[attempt - 1]);
+        }
+      }
+    }
+    if (!billingEvent) {
+      throw (
+        pendingError ??
+        new MvpMediaProviderBrokerError(
+          "The provider billing event is not available yet.",
+          "unknown",
+          "PROVIDER_BILLING_EVENT_PENDING",
+        )
+      );
+    }
+    if (
+      Math.abs(billingEvent.outputUnits - result.providerReportedBillableUnits) >
+      0.000_001
+    ) {
+      throw new MvpMediaProviderBrokerError(
+        "The provider billing event conflicts with its result receipt.",
+        "terminal",
+        "PROVIDER_BILLING_UNRECONCILED",
+      );
+    }
+    return Object.freeze({ ...result, billingEvent });
   } catch (caught) {
     if (
       caught instanceof MvpMediaProviderBrokerError &&
-      caught.safeCode === "PROVIDER_BILLING_UNRECONCILED"
+      ["PROVIDER_BILLING_UNRECONCILED", "PROVIDER_BILLING_EVENT_PENDING"].includes(
+        caught.safeCode,
+      )
     ) {
       await rpc("command_record_mvp_media_billing_unreconciled", {
         p_dispatch_id: input.providerDispatchId,
         p_error_summary: caught.message.slice(0, 500),
         p_external_request_id: input.externalRequestId,
       });
-      throw new MvpMediaDispatchError(
-        caught.message,
-        "PROVIDER_BILLING_UNRECONCILED",
-        true,
-      );
+      throw new MvpMediaDispatchError(caught.message, caught.safeCode, true);
     }
     throw caught;
   }

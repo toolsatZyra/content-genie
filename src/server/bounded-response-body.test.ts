@@ -58,6 +58,53 @@ describe("bounded response body reader", () => {
     ).rejects.toThrow(/length declaration/u);
   });
 
+  it.each(["gzip", "br"])(
+    "accepts bounded decoded %s bytes when wire Content-Length differs",
+    async (contentEncoding) => {
+      const decoded = Buffer.from('{"status":"COMPLETED"}', "utf8");
+      const response = new Response(decoded, {
+        headers: {
+          "content-encoding": contentEncoding,
+          "content-length": "9",
+        },
+      });
+
+      await expect(readResponseBodyBounded(response, decoded.length)).resolves.toEqual(
+        decoded,
+      );
+    },
+  );
+
+  it("still cancels a compressed response when decoded bytes exceed the limit", async () => {
+    let cancelled = false;
+    const response = new Response(
+      new ReadableStream({
+        cancel() {
+          cancelled = true;
+        },
+        start(controller) {
+          controller.enqueue(new Uint8Array([1, 2, 3]));
+          controller.enqueue(new Uint8Array([4, 5, 6]));
+        },
+      }),
+      { headers: { "content-encoding": "gzip", "content-length": "2" } },
+    );
+
+    await expect(readResponseBodyBounded(response, 5)).rejects.toThrow(/byte limit/u);
+    expect(cancelled).toBe(true);
+  });
+
+  it("rejects an invalid declared length even for compressed responses", async () => {
+    await expect(
+      readResponseBodyBounded(
+        new Response(Buffer.alloc(4), {
+          headers: { "content-encoding": "br", "content-length": "invalid" },
+        }),
+        4,
+      ),
+    ).rejects.toThrow(/length declaration/u);
+  });
+
   it("parses JSON only after the complete body satisfies the byte contract", async () => {
     await expect(
       readJsonResponseBounded(new Response('{"status":"COMPLETED"}'), 64),

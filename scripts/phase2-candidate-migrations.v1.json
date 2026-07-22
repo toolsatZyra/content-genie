@@ -128,6 +128,9 @@
     "supabase/migrations/20260722194200_mvp_cost_evidence_semantics.sql",
     "supabase/migrations/20260722194250_mvp_legacy_storyboard_dispatch_terms.sql",
     "supabase/migrations/20260722194300_mvp_legacy_storyboard_cost_comment.sql",
-    "supabase/migrations/20260722194350_mvp_media_completion_acl.sql"
+    "supabase/migrations/20260722194350_mvp_media_completion_acl.sql",
+    "supabase/migrations/20260722194400_mvp_provider_billing_event_receipts.sql",
+    "supabase/migrations/20260722194500_owner_uploaded_narration_recovery_scan_audit.sql",
+    "supabase/migrations/20260722194600_mvp_legacy_storyboard_owner_authority.sql"
   ]
 }

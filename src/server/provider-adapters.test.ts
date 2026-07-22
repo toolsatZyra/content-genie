@@ -83,7 +83,11 @@ describe("narrow provider adapters", () => {
           response_url: "https://untrusted",
         }),
         {
-          headers: { "content-type": "application/json" },
+          headers: {
+            "content-encoding": "gzip",
+            "content-length": "9",
+            "content-type": "application/json",
+          },
           status: 200,
         },
       ),

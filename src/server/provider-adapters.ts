@@ -2,6 +2,8 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 
+import { readResponseBodyBounded } from "@/server/bounded-response-body";
+
 import {
   microProviderOperations,
   type MicroProviderOperation,
@@ -506,21 +508,11 @@ function parseSpeechAlignment(
 }
 
 async function boundedResponseBytes(response: Response, maximumBytes: number) {
-  const declared = response.headers.get("content-length");
-  if (declared !== null) {
-    const length = Number(declared);
-    if (!Number.isSafeInteger(length) || length < 0 || length > maximumBytes) {
-      throw new ProviderAdapterError("Provider response length is invalid.");
-    }
-  }
-  const bytes = Buffer.from(await response.arrayBuffer());
-  if (
-    bytes.length > maximumBytes ||
-    (declared !== null && bytes.length !== Number(declared))
-  ) {
+  try {
+    return await readResponseBodyBounded(response, maximumBytes);
+  } catch {
     throw new ProviderAdapterError("Provider response exceeded its byte contract.");
   }
-  return bytes;
 }
 
 export async function submitProviderAdapter(

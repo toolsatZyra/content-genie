@@ -28,7 +28,8 @@ describe("FAL webhook signature verifier", () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(jwksBytes, {
         headers: {
-          "content-length": String(Buffer.byteLength(jwksBytes)),
+          "content-encoding": "gzip",
+          "content-length": "13",
           "content-type": "application/json",
         },
         status: 200,

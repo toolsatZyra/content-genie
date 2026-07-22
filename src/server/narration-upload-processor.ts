@@ -97,6 +97,30 @@ export function deterministicNarrationUploadUuid(
   return `${digest.slice(0, 8)}-${digest.slice(8, 12)}-8${digest.slice(13, 16)}-a${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
 }
 
+function deterministicNarrationRecoveryScanUuid(
+  uploadVersionId: string,
+  attestationId: string,
+  scanned: SandboxAudioScanResult,
+): string {
+  const digest = createHash("sha256")
+    .update(
+      postgresJsonbText({
+        attestationId,
+        decompressedBytes: scanned.decompressedBytes,
+        durationMs: scanned.durationMs,
+        probeSha256: scanned.probeSha256,
+        sanitizedByteLength: scanned.outputBytes.length,
+        sanitizedSha256: scanned.outputSha256,
+        scanEngine: scanned.scanEngine,
+        scanVersion: scanned.scanVersion,
+        schemaVersion: "genie.owner-narration-recovery-scan.v1",
+        uploadVersionId,
+      }),
+    )
+    .digest("hex");
+  return `${digest.slice(0, 8)}-${digest.slice(8, 12)}-8${digest.slice(13, 16)}-a${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
+}
+
 function exactObject(value: unknown, keys: readonly string[]): value is object {
   return (
     value !== null &&
@@ -263,7 +287,7 @@ export function assertRetainedNarrationUploadAttestationMatches(
     sourceSha256: string;
   }>,
   scanned: SandboxAudioScanResult,
-): void {
+): Readonly<{ scannerIdentityDrift: boolean }> {
   if (
     sha256(input.bytes) !== input.sourceSha256 ||
     attestation.quarantineAssetVersionId !==
@@ -276,15 +300,18 @@ export function assertRetainedNarrationUploadAttestationMatches(
     attestation.sanitizedByteLength !== scanned.outputBytes.length ||
     attestation.decompressedBytes !== scanned.decompressedBytes ||
     attestation.durationMs !== scanned.durationMs ||
-    attestation.probeSha256 !== scanned.probeSha256 ||
-    attestation.scanEngine !== scanned.scanEngine ||
-    attestation.scanVersion !== scanned.scanVersion
+    attestation.probeSha256 !== scanned.probeSha256
   ) {
     throw new NarrationUploadProcessingError(
       "Retained narration evidence conflicted with the inspected upload.",
       "narration_upload.retained_attestation_conflict",
     );
   }
+  return Object.freeze({
+    scannerIdentityDrift:
+      attestation.scanEngine !== scanned.scanEngine ||
+      attestation.scanVersion !== scanned.scanVersion,
+  });
 }
 
 async function rpc(
@@ -539,12 +566,44 @@ export async function processNarrationUpload(input: {
     }
     let attestationId: string;
     if (processingState.attestation) {
-      assertRetainedNarrationUploadAttestationMatches(
+      const recoveryValidation = assertRetainedNarrationUploadAttestationMatches(
         processingState.attestation,
         input,
         scanned,
       );
       attestationId = processingState.attestation.id;
+      const recoveryScanId = deterministicNarrationRecoveryScanUuid(
+        input.preparation.uploadVersionId,
+        attestationId,
+        scanned,
+      );
+      const recordedRecoveryScan = await rpc(
+        client,
+        "command_record_episode_narration_upload_recovery_scan",
+        {
+          p_attestation_id: attestationId,
+          p_decompressed_bytes: scanned.decompressedBytes,
+          p_duration_ms: scanned.durationMs,
+          p_probe_sha256: scanned.probeSha256,
+          p_recovery_scan_id: recoveryScanId,
+          p_sanitized_byte_length: scanned.outputBytes.length,
+          p_sanitized_sha256: scanned.outputSha256,
+          p_scan_engine: scanned.scanEngine,
+          p_scan_version: scanned.scanVersion,
+          p_scanner_identity_drift: recoveryValidation.scannerIdentityDrift,
+          p_source_byte_length: input.bytes.length,
+          p_source_sha256: input.sourceSha256,
+          p_upload_version_id: input.preparation.uploadVersionId,
+          p_workspace_id: input.workspaceId,
+        },
+      );
+      if (recordedRecoveryScan !== recoveryScanId) {
+        throw new NarrationUploadProcessingError(
+          "Narration recovery inspection evidence was malformed.",
+          "narration_upload.recovery_scan_evidence_malformed",
+          true,
+        );
+      }
     } else {
       const transcription = await transcribeSanitizedUploadedNarrationMp3(
         scanned.outputBytes,

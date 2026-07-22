@@ -83,7 +83,14 @@ describe("FAL authenticated result recovery", () => {
             },
           ],
         }),
-        { headers: { "content-type": "application/json" }, status: 200 },
+        {
+          headers: {
+            "content-encoding": "br",
+            "content-length": "11",
+            "content-type": "application/json",
+          },
+          status: 200,
+        },
       ),
     );
     await expect(

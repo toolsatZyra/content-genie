@@ -325,6 +325,7 @@ async function completeClip(clip: ClipRow): Promise<boolean> {
     }
   }
   await completeMvpMediaDispatchOutput({
+    billingEvent: billedResult.billingEvent,
     externalRequestId: clip.external_request_id,
     outputContentSha256: scan.outputSha256,
     providerDispatchId: clip.provider_dispatch_id,

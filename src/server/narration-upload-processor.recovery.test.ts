@@ -263,6 +263,9 @@ describe("narration upload interrupted retry recovery", () => {
             ? { data: null, error: { message: "response lost" } }
             : { data: attestationId, error: null };
         }
+        if (name === "command_record_episode_narration_upload_recovery_scan") {
+          return { data: parameters.p_recovery_scan_id, error: null };
+        }
         if (name === "command_promote_episode_narration_upload") {
           return { data: { assetVersionId }, error: null };
         }
@@ -291,6 +294,58 @@ describe("narration upload interrupted retry recovery", () => {
     expect(remove).not.toHaveBeenCalled();
   });
 
+  it("audits scanner version drift and resumes without transcription", async () => {
+    const { client, remove } = makeClient([
+      { data: preparedRow, error: null },
+      { data: verifiedRow, error: null },
+    ]);
+    mocks.createAdmin.mockReturnValue(client);
+    const recoveryScanCalls: Array<Record<string, unknown>> = [];
+    mocks.rpc.mockImplementation(
+      async (name: string, parameters: Record<string, unknown>) => {
+        if (name === "get_episode_narration_upload_processing_state") {
+          return {
+            data: processingState(attestationId, {
+              scanEngine: "retained-scanner",
+              scanVersion: "retained-v1",
+            }),
+            error: null,
+          };
+        }
+        if (name === "command_record_episode_narration_upload_recovery_scan") {
+          recoveryScanCalls.push(parameters);
+          return { data: parameters.p_recovery_scan_id, error: null };
+        }
+        if (name === "command_promote_episode_narration_upload") {
+          return { data: { assetVersionId }, error: null };
+        }
+        return { data: {}, error: null };
+      },
+    );
+
+    await expect(processNarrationUpload(input)).resolves.toMatchObject({
+      assetVersionId,
+      state: "verified",
+    });
+    expect(mocks.scan).toHaveBeenCalledTimes(1);
+    expect(mocks.transcribe).not.toHaveBeenCalled();
+    expect(mocks.compare).not.toHaveBeenCalled();
+    expect(
+      mocks.rpc.mock.calls.filter(
+        ([name]) => name === "command_attest_episode_narration_upload",
+      ),
+    ).toHaveLength(0);
+    expect(recoveryScanCalls).toHaveLength(1);
+    expect(recoveryScanCalls[0]).toMatchObject({
+      p_scan_engine: "fixture-scanner",
+      p_scan_version: "fixture-v1",
+      p_scanner_identity_drift: true,
+      p_sanitized_sha256: sha256(sanitizedBytes),
+      p_source_sha256: sha256(sourceBytes),
+    });
+    expect(remove).not.toHaveBeenCalled();
+  });
+
   it("fails closed before transcription when retained bytes conflict", async () => {
     const { client, remove } = makeClient([{ data: preparedRow, error: null }]);
     mocks.createAdmin.mockReturnValue(client);
@@ -316,6 +371,7 @@ describe("narration upload interrupted retry recovery", () => {
       mocks.rpc.mock.calls.filter(
         ([name]) =>
           name === "command_attest_episode_narration_upload" ||
+          name === "command_record_episode_narration_upload_recovery_scan" ||
           name === "command_promote_episode_narration_upload",
       ),
     ).toHaveLength(0);

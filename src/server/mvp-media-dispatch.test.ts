@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   admin: vi.fn(),
+  billingEvent: vi.fn(),
   rpc: vi.fn(),
   result: vi.fn(),
   submit: vi.fn(),
@@ -16,6 +17,7 @@ vi.mock("@/server/mvp-media-provider-broker", async (importOriginal) => {
     await importOriginal<typeof import("@/server/mvp-media-provider-broker")>();
   return {
     ...original,
+    fetchMvpFalBillingEvent: mocks.billingEvent,
     fetchMvpFalQueueResult: mocks.result,
     submitMvpFalProvider: mocks.submit,
   };
@@ -60,6 +62,15 @@ const control = {
     "https://queue.fal.run/fal-ai/nano-banana-2/requests/request_123456/status",
 } as const;
 const callbackToken = "A".repeat(43);
+const billingEvent = {
+  costEstimateNanoUsd: 122_000_000,
+  endpointId: input.endpoint,
+  evidenceSha256: "d".repeat(64),
+  outputUnits: 1.525,
+  percentDiscount: null,
+  timestamp: "2026-07-22T12:00:00.000Z",
+  unitPriceUsd: 0.08,
+} as const;
 
 function dispatchRow(
   state:
@@ -89,6 +100,7 @@ describe("durable MVP media dispatch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.admin.mockReturnValue({ rpc: mocks.rpc });
+    mocks.billingEvent.mockResolvedValue(billingEvent);
   });
 
   it("durably reserves and claims the dispatch before the provider network call", async () => {
@@ -190,7 +202,7 @@ describe("durable MVP media dispatch", () => {
         responseUrl: control.responseUrl,
         timeoutMs: 5_000,
       }),
-    ).resolves.toEqual(result);
+    ).resolves.toEqual({ ...result, billingEvent });
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
@@ -198,6 +210,7 @@ describe("durable MVP media dispatch", () => {
     mocks.rpc.mockResolvedValue({ data: dispatchRow("succeeded"), error: null });
 
     await completeMvpMediaDispatchOutput({
+      billingEvent,
       externalRequestId: control.externalRequestId,
       outputContentSha256: "c".repeat(64),
       providerDispatchId: ids.dispatch,
@@ -208,6 +221,13 @@ describe("durable MVP media dispatch", () => {
     expect(mocks.rpc).toHaveBeenCalledWith(
       "command_complete_mvp_media_dispatch_output",
       {
+        p_billing_event_cost_nano_usd: billingEvent.costEstimateNanoUsd,
+        p_billing_event_endpoint_id: billingEvent.endpointId,
+        p_billing_event_evidence_sha256: billingEvent.evidenceSha256,
+        p_billing_event_output_units: billingEvent.outputUnits,
+        p_billing_event_percent_discount: billingEvent.percentDiscount,
+        p_billing_event_timestamp: billingEvent.timestamp,
+        p_billing_event_unit_price_usd: billingEvent.unitPriceUsd,
         p_dispatch_id: ids.dispatch,
         p_external_request_id: control.externalRequestId,
         p_output_content_sha256: "c".repeat(64),

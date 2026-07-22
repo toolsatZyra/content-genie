@@ -17,6 +17,11 @@ function declaredLength(response: Response): number | null {
   return parsed;
 }
 
+function hasIdentityContentEncoding(response: Response): boolean {
+  const value = response.headers.get("content-encoding")?.trim().toLowerCase();
+  return value === undefined || value === "" || value === "identity";
+}
+
 export async function readResponseBodyBounded(
   response: Response,
   maximumBytes: number,
@@ -25,7 +30,8 @@ export async function readResponseBodyBounded(
     throw new BoundedResponseBodyError("The response byte limit is invalid.");
   }
   const declared = declaredLength(response);
-  if (declared !== null && declared > maximumBytes) {
+  const identityEncoded = hasIdentityContentEncoding(response);
+  if (identityEncoded && declared !== null && declared > maximumBytes) {
     throw new BoundedResponseBodyError("The response exceeds its byte limit.");
   }
   if (!response.body) {
@@ -50,7 +56,7 @@ export async function readResponseBodyBounded(
   } finally {
     reader.releaseLock();
   }
-  if (declared !== null && received !== declared) {
+  if (identityEncoded && declared !== null && received !== declared) {
     throw new BoundedResponseBodyError(
       "The response body does not match its length declaration.",
     );

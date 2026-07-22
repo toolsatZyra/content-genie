@@ -9,6 +9,7 @@ import {
   inspectStillImageDimensions,
   type StillImageMime,
 } from "@/security/still-image-container";
+import { readResponseBodyBounded } from "@/server/bounded-response-body";
 import {
   getNextFalAuthenticatedPollCandidate,
   getProviderDispatchManifest,
@@ -27,12 +28,13 @@ function sha256(value: string) {
 }
 
 async function boundedBody(response: Response): Promise<string> {
-  const declared = Number(response.headers.get("content-length") ?? "0");
-  if (!Number.isSafeInteger(declared) || declared > MAXIMUM_RESULT_BYTES) {
+  let bytes: Buffer;
+  try {
+    bytes = await readResponseBodyBounded(response, MAXIMUM_RESULT_BYTES);
+  } catch {
     throw new FalResultRecoveryError("FAL recovery result is too large.");
   }
-  const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.length < 1 || bytes.length > MAXIMUM_RESULT_BYTES) {
+  if (bytes.length < 1) {
     throw new FalResultRecoveryError("FAL recovery result size is invalid.");
   }
   return bytes.toString("utf8");
@@ -82,15 +84,18 @@ async function exactImageMetadata(
     redirect: "error",
     signal: AbortSignal.timeout(120_000),
   });
-  const declaredBytes = Number(response.headers.get("content-length") ?? "0");
-  if (
-    !response.ok ||
-    !Number.isSafeInteger(declaredBytes) ||
-    (declaredBytes > 0 && declaredBytes > launchMediaLimits.maximumImageBytes)
-  ) {
+  if (!response.ok) {
     throw new FalResultRecoveryError("FAL recovery media is unavailable.");
   }
-  const bytes = Buffer.from(await response.arrayBuffer());
+  let bytes: Buffer;
+  try {
+    bytes = await readResponseBodyBounded(
+      response,
+      launchMediaLimits.maximumImageBytes,
+    );
+  } catch {
+    throw new FalResultRecoveryError("FAL recovery media is unavailable.");
+  }
   const mime = media.content_type as StillImageMime;
   const dimensions = inspectStillImageDimensions(bytes, mime);
   if (

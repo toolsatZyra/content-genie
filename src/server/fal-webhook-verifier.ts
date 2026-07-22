@@ -6,6 +6,7 @@ import {
   FalWebhookError,
   parseFalWebhookSignatureEnvelope,
 } from "@/domain/provider/fal-webhook";
+import { readResponseBodyBounded } from "@/server/bounded-response-body";
 
 const FAL_JWKS_URL = "https://rest.fal.ai/.well-known/jwks.json";
 const JWKS_CACHE_MS = 60 * 60 * 1_000;
@@ -71,12 +72,13 @@ async function fetchJwks(
   ) {
     throw new FalWebhookError("FAL JWKS response is invalid.", true);
   }
-  const declared = Number(response.headers.get("content-length") ?? "0");
-  if (declared > 64 * 1024) {
+  let bytes: Buffer;
+  try {
+    bytes = await readResponseBodyBounded(response, 64 * 1024);
+  } catch {
     throw new FalWebhookError("FAL JWKS response is too large.", true);
   }
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.byteLength < 1 || bytes.byteLength > 64 * 1024) {
+  if (bytes.byteLength < 1) {
     throw new FalWebhookError("FAL JWKS response size is invalid.", true);
   }
   let value: unknown;

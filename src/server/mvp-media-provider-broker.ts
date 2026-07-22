@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { readJsonResponseBounded } from "@/server/bounded-response-body";
 
 const QUEUE_ORIGIN = "https://queue.fal.run";
+const PLATFORM_ORIGIN = "https://api.fal.ai";
 const MAXIMUM_PROVIDER_JSON_BYTES = 131_072;
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -85,6 +86,16 @@ export type MvpFalBilledResult = Readonly<{
   data: Record<string, unknown>;
   providerReportedBillableUnits: number;
   providerUsageEvidenceSha256: string;
+}>;
+
+export type MvpFalBillingEvent = Readonly<{
+  costEstimateNanoUsd: number;
+  endpointId: string;
+  evidenceSha256: string;
+  outputUnits: number;
+  percentDiscount: number | null;
+  timestamp: string;
+  unitPriceUsd: number;
 }>;
 
 function billableUnits(response: Response): Readonly<{
@@ -295,5 +306,149 @@ export async function fetchMvpFalQueueResult(
         "utf8",
       )
       .digest("hex"),
+  });
+}
+
+export async function fetchMvpFalBillingEvent(
+  requestId: string,
+  timeoutMs: number,
+): Promise<MvpFalBillingEvent> {
+  if (!/^[A-Za-z0-9_-]{6,200}$/u.test(requestId)) {
+    throw new MvpMediaProviderBrokerError(
+      "The provider billing request identity is invalid.",
+      "terminal",
+      "PROVIDER_BILLING_UNRECONCILED",
+    );
+  }
+  const url = new URL("/v1/models/billing-events", PLATFORM_ORIGIN);
+  url.searchParams.set("limit", "2");
+  url.searchParams.set("request_id", requestId);
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: { Authorization: `Key ${falKey()}` },
+      redirect: "error",
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (caught) {
+    if (caught instanceof MvpMediaProviderBrokerError) throw caught;
+    throw new MvpMediaProviderBrokerError(
+      "The provider billing event is not available yet.",
+      "unknown",
+      "PROVIDER_BILLING_EVENT_PENDING",
+    );
+  }
+  if (!response.ok) {
+    throw new MvpMediaProviderBrokerError(
+      "The provider billing event is not available yet.",
+      response.status === 408 || response.status === 429 || response.status >= 500
+        ? "unknown"
+        : "terminal",
+      response.status === 408 || response.status === 429 || response.status >= 500
+        ? "PROVIDER_BILLING_EVENT_PENDING"
+        : "PROVIDER_BILLING_UNRECONCILED",
+    );
+  }
+  let parsed: unknown;
+  try {
+    parsed = await readJsonResponseBounded(response, MAXIMUM_PROVIDER_JSON_BYTES);
+  } catch {
+    throw new MvpMediaProviderBrokerError(
+      "The provider billing event is malformed.",
+      "terminal",
+      "PROVIDER_BILLING_UNRECONCILED",
+    );
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new MvpMediaProviderBrokerError(
+      "The provider billing event is malformed.",
+      "terminal",
+      "PROVIDER_BILLING_UNRECONCILED",
+    );
+  }
+  const events = (parsed as Record<string, unknown>).billing_events;
+  if (!Array.isArray(events)) {
+    throw new MvpMediaProviderBrokerError(
+      "The provider billing event is malformed.",
+      "terminal",
+      "PROVIDER_BILLING_UNRECONCILED",
+    );
+  }
+  const exact = events.filter(
+    (event) =>
+      event !== null &&
+      typeof event === "object" &&
+      !Array.isArray(event) &&
+      (event as Record<string, unknown>).request_id === requestId,
+  );
+  if (exact.length === 0) {
+    throw new MvpMediaProviderBrokerError(
+      "The provider billing event is not available yet.",
+      "unknown",
+      "PROVIDER_BILLING_EVENT_PENDING",
+    );
+  }
+  if (exact.length !== 1) {
+    throw new MvpMediaProviderBrokerError(
+      "The provider returned conflicting billing events.",
+      "terminal",
+      "PROVIDER_BILLING_UNRECONCILED",
+    );
+  }
+  const event = exact[0] as Record<string, unknown>;
+  const endpointId = event.endpoint_id;
+  const outputUnits = event.output_units;
+  const unitPriceUsd = event.unit_price;
+  const percentDiscount = event.percent_discount;
+  const costEstimateNanoUsd = event.cost_estimate_nano_usd;
+  const timestamp = event.timestamp;
+  if (
+    typeof endpointId !== "string" ||
+    !/^[A-Za-z0-9][A-Za-z0-9._/-]{2,199}$/u.test(endpointId) ||
+    typeof outputUnits !== "number" ||
+    !Number.isFinite(outputUnits) ||
+    outputUnits <= 0 ||
+    outputUnits > 10_000 ||
+    typeof unitPriceUsd !== "number" ||
+    !Number.isFinite(unitPriceUsd) ||
+    unitPriceUsd < 0 ||
+    unitPriceUsd > 10_000 ||
+    (percentDiscount !== null &&
+      (typeof percentDiscount !== "number" ||
+        !Number.isFinite(percentDiscount) ||
+        percentDiscount < 0 ||
+        percentDiscount > 100)) ||
+    typeof costEstimateNanoUsd !== "number" ||
+    !Number.isSafeInteger(costEstimateNanoUsd) ||
+    costEstimateNanoUsd < 0 ||
+    typeof timestamp !== "string" ||
+    timestamp.length > 64 ||
+    !Number.isFinite(Date.parse(timestamp))
+  ) {
+    throw new MvpMediaProviderBrokerError(
+      "The provider billing event is malformed.",
+      "terminal",
+      "PROVIDER_BILLING_UNRECONCILED",
+    );
+  }
+  const normalized = Object.freeze({
+    costEstimateNanoUsd,
+    endpointId,
+    outputUnits,
+    percentDiscount,
+    requestId,
+    timestamp: new Date(timestamp).toISOString(),
+    unitPriceUsd,
+  });
+  return Object.freeze({
+    costEstimateNanoUsd,
+    endpointId,
+    evidenceSha256: createHash("sha256")
+      .update(JSON.stringify(normalized), "utf8")
+      .digest("hex"),
+    outputUnits,
+    percentDiscount,
+    timestamp: normalized.timestamp,
+    unitPriceUsd,
   });
 }

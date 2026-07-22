@@ -630,6 +630,7 @@ async function pollStoryboardFrame(frame: StoryboardFrame): Promise<boolean> {
     }
   }
   await completeMvpMediaDispatchOutput({
+    billingEvent: billedResult.billingEvent,
     externalRequestId: frame.external_request_id,
     outputContentSha256: scan.outputSha256,
     providerDispatchId: frame.provider_dispatch_id,

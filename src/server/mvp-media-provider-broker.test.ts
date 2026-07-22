@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import {
+  fetchMvpFalBillingEvent,
   fetchMvpFalQueueJson,
   fetchMvpFalQueueResult,
   MvpMediaProviderBrokerError,
@@ -171,6 +172,60 @@ describe("MVP FAL provider broker", () => {
       data: { images: [{ url: "https://x.fal.media/frame.png" }] },
       providerReportedBillableUnits: 1.525,
       providerUsageEvidenceSha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
+    });
+  });
+
+  it("binds a request-level provider billing event with discounts", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse({
+        billing_events: [
+          {
+            cost_estimate_nano_usd: 109_800_000,
+            endpoint_id: endpoint,
+            output_units: 1.525,
+            percent_discount: 10,
+            request_id: requestId,
+            timestamp: "2026-07-22T12:00:00Z",
+            unit_price: 0.08,
+          },
+        ],
+        has_more: false,
+        next_cursor: null,
+      }),
+    );
+
+    await expect(fetchMvpFalBillingEvent(requestId, 12_345)).resolves.toEqual({
+      costEstimateNanoUsd: 109_800_000,
+      endpointId: endpoint,
+      evidenceSha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      outputUnits: 1.525,
+      percentDiscount: 10,
+      timestamp: "2026-07-22T12:00:00.000Z",
+      unitPriceUsd: 0.08,
+    });
+    const billingUrl = new URL("https://api.fal.ai/v1/models/billing-events");
+    billingUrl.searchParams.set("limit", "2");
+    billingUrl.searchParams.set("request_id", requestId);
+    expect(fetch).toHaveBeenCalledWith(
+      billingUrl,
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: expect.stringMatching(/^Key /u),
+        }),
+        redirect: "error",
+        signal: expect.any(AbortSignal),
+      }),
+    );
+  });
+
+  it("keeps a missing request-level billing event retryable", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse({ billing_events: [], has_more: false, next_cursor: null }),
+    );
+
+    await expect(fetchMvpFalBillingEvent(requestId, 12_345)).rejects.toMatchObject({
+      disposition: "unknown",
+      safeCode: "PROVIDER_BILLING_EVENT_PENDING",
     });
   });
 

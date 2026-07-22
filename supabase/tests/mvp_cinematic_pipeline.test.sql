@@ -6,7 +6,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions,auth,storage,private,audit,pg_catalog;
 
-select plan(116);
+select plan(118);
 
 create temp table mvp_pipeline_fixture(
   key text primary key,
@@ -1181,7 +1181,7 @@ select ok(
     'public.command_fail_mvp_media_dispatch(uuid,bigint,uuid,bigint,boolean,text,text)'
   ) is not null
   and to_regprocedure(
-    'public.command_complete_mvp_media_dispatch_output(uuid,text,text,numeric,text)'
+    'public.command_complete_mvp_media_dispatch_output(uuid,text,text,numeric,text,text,numeric,numeric,numeric,bigint,timestamptz,text)'
   ) is not null
   and to_regprocedure(
     'public.command_record_mvp_media_billing_unreconciled(uuid,text,text)'
@@ -1304,6 +1304,9 @@ select ok(
   and to_regclass(
     'private.mvp_storyboard_quote_compatibility_dispatch_terms'
   ) is not null
+  and to_regclass(
+    'private.mvp_storyboard_quote_compatibility_owner_authorizations'
+  ) is not null
   and exists(select 1 from information_schema.triggers
     where event_object_schema='private'
       and event_object_table='mvp_storyboard_quote_compatibility_authorities'
@@ -1312,10 +1315,20 @@ select ok(
     where event_object_schema='private'
       and event_object_table='mvp_storyboard_quote_compatibility_dispatch_terms'
       and trigger_name='mvp_storyboard_quote_compatibility_dispatch_terms_immutable')
+  and exists(select 1 from information_schema.triggers
+    where event_object_schema='private'
+      and event_object_table=
+        'mvp_storyboard_quote_compatibility_owner_authorizations'
+      and trigger_name=
+        'mvp_storyboard_compat_owner_authorizations_immutable')
   and not has_table_privilege(
     'service_role','private.mvp_storyboard_quote_compatibility_authorities','select'
+  )
+  and not has_table_privilege(
+    'service_role',
+    'private.mvp_storyboard_quote_compatibility_owner_authorizations','select'
   ),
-  'legacy storyboard quote compatibility is immutable and not directly exposed'
+  'legacy storyboard compatibility and owner authority are immutable and private'
 );
 
 select ok(
@@ -1348,8 +1361,10 @@ select ok(
   and pg_get_functiondef('public.get_mvp_episode_costs(uuid)'::regprocedure)
     like '%mvp_repair_feedback_grounding_versions%'
   and pg_get_functiondef('public.get_mvp_episode_costs(uuid)'::regprocedure)
-    like '%incomplete_uncosted_repair_director%',
-  'members see estimated or incomplete costs including uncosted repair calls'
+    like '%incomplete_uncosted_repair_director%'
+  and pg_get_functiondef('public.get_mvp_episode_costs(uuid)'::regprocedure)
+    like '%provider_billing_event_recorded%',
+  'members see provider billing-event costs or an explicit incomplete status'
 );
 
 set local session_replication_role = replica;
@@ -1513,6 +1528,144 @@ insert into private.mvp_media_dispatches(
   statement_timestamp(),'pending',false
 );
 
+-- A separate exact-single-owner fixture proves that the compatibility amount
+-- is authorized by durable owner evidence rather than by the calculation.
+insert into public.workspaces(id,organization_id,name,slug) values(
+  'c2100000-0000-4000-8000-000000000001',
+  'c1000000-0000-4000-8000-000000000001',
+  'Owner compatibility','owner-compatibility'
+);
+insert into public.memberships(
+  workspace_id,user_id,role,status,authority_epoch,activated_at
+) values(
+  'c2100000-0000-4000-8000-000000000001',
+  'c1200000-0000-4000-8000-000000000001','admin','active',1,
+  '2000-02-01 00:00:00+00'
+);
+insert into private.workspace_authority_profiles(
+  id,workspace_id,profile_kind,owner_user_id,profile_epoch,activated_at
+) values(
+  'c2150000-0000-4000-8000-000000000001',
+  'c2100000-0000-4000-8000-000000000001','single_owner_developer',
+  'c1200000-0000-4000-8000-000000000001',1,
+  '2000-02-01 00:00:00+00'
+);
+insert into public.series(
+  id,workspace_id,slug,title,owner_user_id,created_by
+) values(
+  'c2300000-0000-4000-8000-000000000001',
+  'c2100000-0000-4000-8000-000000000001','owner-compatibility',
+  'Owner compatibility','c1200000-0000-4000-8000-000000000001',
+  'c1200000-0000-4000-8000-000000000001'
+);
+insert into public.episodes(
+  id,workspace_id,series_id,episode_number,title,owner_user_id,created_by
+) values(
+  'c2400000-0000-4000-8000-000000000001',
+  'c2100000-0000-4000-8000-000000000001',
+  'c2300000-0000-4000-8000-000000000001',1,'Owner compatibility',
+  'c1200000-0000-4000-8000-000000000001',
+  'c1200000-0000-4000-8000-000000000001'
+);
+insert into public.production_quotes(
+  id,workspace_id,configuration_candidate_id,plan_bundle_id,
+  plan_qc_consensus_id,quote_number,quote_hash,rate_snapshot_hash,currency,
+  low_total_microusd,expected_total_microusd,high_total_microusd,
+  hard_ceiling_microusd,target_40usd_breached,expires_at,created_at
+) values(
+  'c2a30000-0000-4000-8000-000000000001',
+  'c2100000-0000-4000-8000-000000000001',
+  'c2500000-0000-4000-8000-000000000001',
+  'c2900000-0000-4000-8000-000000000001',
+  'c29c0000-0000-4000-8000-000000000001',1,repeat('5',64),repeat('6',64),
+  'USD',0,0,0,0,false,'2099-01-01 00:00:00+00',
+  '2000-02-01 00:00:00+00'
+);
+insert into public.production_quote_confirmations(
+  id,workspace_id,production_quote_id,quote_hash,hard_ceiling_microusd,
+  confirmed_by,actor_aal,command_id,confirmed_at,authority_profile_id,
+  authority_profile_epoch,authority_provenance
+) values(
+  'c2ad0000-0000-4000-8000-000000000001',
+  'c2100000-0000-4000-8000-000000000001',
+  'c2a30000-0000-4000-8000-000000000001',repeat('5',64),0,
+  'c1200000-0000-4000-8000-000000000001','aal1',
+  'c2ae0000-0000-4000-8000-000000000001','2000-02-01 00:00:00+00',
+  'c2150000-0000-4000-8000-000000000001',1,
+  'verified_single_owner_developer'
+);
+insert into public.production_runs(
+  id,workspace_id,episode_id,series_id,configuration_candidate_id,
+  series_release_id,series_release_component_id,production_quote_id,
+  budget_authorization_id,budget_reservation_id,run_number,authority_epoch,
+  pinned_manifest_hash,authorized_high_microusd,hard_ceiling_microusd,
+  created_by,authority_profile_id,authority_profile_epoch,authority_provenance
+) values(
+  'c2a00000-0000-4000-8000-000000000001',
+  'c2100000-0000-4000-8000-000000000001',
+  'c2400000-0000-4000-8000-000000000001',
+  'c2300000-0000-4000-8000-000000000001',
+  'c2500000-0000-4000-8000-000000000001',
+  'c2a10000-0000-4000-8000-000000000001',
+  'c2a20000-0000-4000-8000-000000000001',
+  'c2a30000-0000-4000-8000-000000000001',
+  'c2a40000-0000-4000-8000-000000000001',
+  'c2a50000-0000-4000-8000-000000000001',1,1,repeat('7',64),0,0,
+  'c1200000-0000-4000-8000-000000000001',
+  'c2150000-0000-4000-8000-000000000001',1,
+  'verified_single_owner_developer'
+);
+insert into public.mvp_production_jobs(
+  production_run_id,workspace_id,episode_id,plan_bundle_id,
+  narration_asset_version_id,state,attempt_number,version,created_at,updated_at,
+  authority_profile_id,authority_profile_epoch,authority_provenance
+) values(
+  'c2a00000-0000-4000-8000-000000000001',
+  'c2100000-0000-4000-8000-000000000001',
+  'c2400000-0000-4000-8000-000000000001',
+  'c2900000-0000-4000-8000-000000000001',
+  'c2a60000-0000-4000-8000-000000000001','review_ready',1,1,
+  '2000-02-01 00:00:00+00','2000-02-01 00:00:00+00',
+  'c2150000-0000-4000-8000-000000000001',1,
+  'verified_single_owner_developer'
+);
+insert into private.workspace_authority_receipts(
+  workspace_id,authority_profile_id,authority_profile_epoch,action_key,
+  actor_user_id,actor_aal,authority_provenance,created_at
+) values(
+  'c2100000-0000-4000-8000-000000000001',
+  'c2150000-0000-4000-8000-000000000001',1,'mvp_start',
+  'c1200000-0000-4000-8000-000000000001','aal1',
+  'verified_single_owner_developer','2000-02-01 00:00:00+00'
+);
+insert into private.mvp_storyboard_quote_compatibility_authorities(
+  id,workspace_id,production_run_id,production_quote_id,plan_bundle_id,
+  quote_hash,source_edd_content_sha256,storyboard_rate_card_version_id,
+  storyboard_billing_quantum_count,per_frame_expected_cost_microusd,
+  authorized_attempt_count,authorized_additional_maximum_microusd,
+  authority_reason,authority_manifest_sha256
+) values(
+  'c2aa0000-0000-4000-8000-000000000001',
+  'c2100000-0000-4000-8000-000000000001',
+  'c2a00000-0000-4000-8000-000000000001',
+  'c2a30000-0000-4000-8000-000000000001',
+  'c2900000-0000-4000-8000-000000000001',repeat('5',64),repeat('8',64),
+  'c1a80000-0000-4000-8000-000000000001',3.05,122000,20,4880000,
+  'legacy_quote_without_storyboard_line',repeat('f',64)
+);
+insert into private.mvp_storyboard_quote_compatibility_dispatch_terms(
+  id,compatibility_authority_id,workspace_id,production_run_id,
+  expected_cost_microusd,maximum_cost_microusd,legacy_contract_git_commit,
+  compatibility_reason,terms_manifest_sha256
+) values(
+  'c2aa0000-0000-4000-8000-000000000002',
+  'c2aa0000-0000-4000-8000-000000000001',
+  'c2100000-0000-4000-8000-000000000001',
+  'c2a00000-0000-4000-8000-000000000001',120000,120000,
+  '35ff40f15af820514913fbf19c4ec0a9e7699845',
+  'legacy_storyboard_worker_reservation_replay',repeat('0',64)
+);
+
 set local session_replication_role = origin;
 
 select set_config(
@@ -1534,15 +1687,35 @@ select set_config('request.jwt.claims','{"role":"service_role"}',true);
 select set_config('request.jwt.claim.role','service_role',true);
 set local role service_role;
 
-select ok(
-  public.get_mvp_storyboard_cost_authority(
+select throws_ok(
+  $$select public.get_mvp_storyboard_cost_authority(
     'c1100000-0000-4000-8000-000000000001',
     'c1a00000-0000-4000-8000-000000000003'
+  )$$,
+  '23514','storyboard cost authority is unavailable',
+  'a synthesized compatibility calculation has no spend authority by itself'
+);
+
+reset role;
+select is(
+  private.reconcile_mvp_legacy_storyboard_owner_authorities(),
+  1,
+  'the exact owner quote and MVP start evidence authorize compatibility once'
+);
+
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
+select set_config('request.jwt.claim.role','service_role',true);
+set local role service_role;
+
+select ok(
+  public.get_mvp_storyboard_cost_authority(
+    'c2100000-0000-4000-8000-000000000001',
+    'c2a00000-0000-4000-8000-000000000001'
   )->>'source'='legacy_quote_compatibility'
   and not exists(select 1 from public.production_quote_lines
-    where production_quote_id='c1a30000-0000-4000-8000-000000000003'
+    where production_quote_id='c2a30000-0000-4000-8000-000000000001'
       and line_key='storyboard_generation'),
-  'a legacy run gains separate storyboard authority without changing its quote'
+  'an owner-started legacy run gains authority without changing its quote'
 );
 
 select is(
@@ -1563,9 +1736,9 @@ select ok(
 set local role service_role;
 insert into mvp_pipeline_fixture(key,value)
 select 'legacy-storyboard-dispatch',public.command_reserve_mvp_media_dispatch(
-  'c1100000-0000-4000-8000-000000000001',
-  'c1a00000-0000-4000-8000-000000000003',
-  'c1400000-0000-4000-8000-000000000001',1,1,
+  'c2100000-0000-4000-8000-000000000001',
+  'c2a00000-0000-4000-8000-000000000001',
+  'c2400000-0000-4000-8000-000000000001',1,1,
   'storyboard:1:single','storyboard','fal-ai/nano-banana-2',repeat('c',64),
   120000,120000
 );
@@ -1861,14 +2034,16 @@ insert into mvp_pipeline_fixture(key,value)
 select 'dispatch-complete-1', public.command_complete_mvp_media_dispatch_output(
   (select (value->>'id')::uuid from mvp_pipeline_fixture
     where key='dispatch-submit-1'),'request_123456',repeat('4',64),
-    1.525,repeat('6',64)
+    1.525,repeat('6',64),'fal-ai/nano-banana-2',1.525,0.08,10,
+    109800000,'2026-01-02 00:00:00+00',repeat('7',64)
 );
 insert into mvp_pipeline_fixture(key,value)
 select 'dispatch-complete-replay',
   public.command_complete_mvp_media_dispatch_output(
     (select (value->>'id')::uuid from mvp_pipeline_fixture
       where key='dispatch-submit-1'),'request_123456',repeat('4',64),
-      1.525,repeat('6',64)
+      1.525,repeat('6',64),'fal-ai/nano-banana-2',1.525,0.08,10,
+      109800000,'2026-01-02 00:00:00+00',repeat('7',64)
   );
 
 select ok(
@@ -1882,19 +2057,24 @@ select ok(
     where key='dispatch-complete-replay') = repeat('4',64)
   and (select value->>'cost_evidence_state'
     from mvp_pipeline_fixture where key='dispatch-complete-replay')=
-      'estimated_from_provider_reported_units'
+      'provider_billing_event_recorded'
   and (select (value->>'estimated_cost_microusd')::bigint
     from mvp_pipeline_fixture where key='dispatch-complete-replay')=122000
   and (select value->>'provider_usage_evidence_sha256'
-    from mvp_pipeline_fixture where key='dispatch-complete-replay')=repeat('6',64),
-  'provider output completion stores a reproducible estimate and is idempotent'
+    from mvp_pipeline_fixture where key='dispatch-complete-replay')=repeat('6',64)
+  and (select (value->>'provider_billing_event_cost_nano_usd')::bigint
+    from mvp_pipeline_fixture where key='dispatch-complete-replay')=109800000
+  and (select value->>'provider_billing_event_evidence_sha256'
+    from mvp_pipeline_fixture where key='dispatch-complete-replay')=repeat('7',64),
+  'provider output completion stores the request billing event and is idempotent'
 );
 
 select throws_ok(
   format(
-    'select public.command_complete_mvp_media_dispatch_output(%L,%L,%L,1.525,%L)',
+    'select public.command_complete_mvp_media_dispatch_output(%L,%L,%L,1.525,%L,%L,1.525,0.08,10,109800000,%L,%L)',
     (select value->>'id' from mvp_pipeline_fixture where key='dispatch-submit-1'),
-    'request_123456',repeat('5',64),repeat('6',64)
+    'request_123456',repeat('5',64),repeat('6',64),
+    'fal-ai/nano-banana-2','2026-01-02 00:00:00+00',repeat('7',64)
   ),
   '40001','media dispatch cost evidence conflicts with completion',
   'a completed dispatch cannot be rebound to conflicting output bytes'
@@ -2165,8 +2345,26 @@ select ok(
     'anon',
     'public.get_episode_narration_upload_processing_state(uuid,uuid)',
     'execute'
+  )
+  and to_regprocedure(
+    'public.command_record_episode_narration_upload_recovery_scan(uuid,uuid,uuid,uuid,text,text,boolean,text,bigint,text,bigint,bigint,integer,text)'
+  ) is not null
+  and has_function_privilege(
+    'service_role',
+    'public.command_record_episode_narration_upload_recovery_scan(uuid,uuid,uuid,uuid,text,text,boolean,text,bigint,text,bigint,bigint,integer,text)',
+    'execute'
+  )
+  and not has_function_privilege(
+    'authenticated',
+    'public.command_record_episode_narration_upload_recovery_scan(uuid,uuid,uuid,uuid,text,text,boolean,text,bigint,text,bigint,bigint,integer,text)',
+    'execute'
+  )
+  and not has_function_privilege(
+    'anon',
+    'public.command_record_episode_narration_upload_recovery_scan(uuid,uuid,uuid,uuid,text,text,boolean,text,bigint,text,bigint,bigint,integer,text)',
+    'execute'
   ),
-  'only service processing can recover a retained narration-upload attestation identity'
+  'only service processing can recover and audit retained narration-upload evidence'
 );
 
 select ok(
