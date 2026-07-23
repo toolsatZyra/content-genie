@@ -249,7 +249,7 @@ describe("ledgered World Extraction", () => {
       toolName: "source.extract",
     });
     expect(mocks.agent.mock.calls[0]?.[1]).toMatchObject({
-      maxOutputTokens: 12_000,
+      maxOutputTokens: 16_000,
       model: "gpt-5.6-sol",
       reasoningEffort: "medium",
       schemaName: "genie_world_extraction",

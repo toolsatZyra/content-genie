@@ -450,7 +450,7 @@ export async function extractWorldFromLockedScript(
     {
       input: `LOCKED_SCRIPT_SHA256=${inputHash}\nSCRIPT_DATA_JSON=${JSON.stringify({ script: input.script })}`,
       instructions,
-      maxOutputTokens: 12_000,
+      maxOutputTokens: 16_000,
       model: "gpt-5.6-sol",
       reasoningEffort: "medium",
       schema: WORLD_EXTRACTION_JSON_SCHEMA,
@@ -482,7 +482,7 @@ export async function extractWorldFromLockedScript(
       {
         input: `LOCKED_SCRIPT_SHA256=${inputHash}\nSCRIPT_DATA_JSON=${JSON.stringify({ script: input.script })}\nVALIDATION_FAILURE_CODE=${validationFailureCode}\nPREVIOUS_OUTPUT_JSON=${JSON.stringify(firstResult.output)}`,
         instructions: repairInstructions,
-        maxOutputTokens: 12_000,
+        maxOutputTokens: 16_000,
         model: "gpt-5.6-sol",
         reasoningEffort: "medium",
         schema: WORLD_EXTRACTION_JSON_SCHEMA,
