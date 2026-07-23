@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import {
   assertTrustedHarnessManifest,
   canonicalTrustedHarnessManifestSha256,
+  canonicalTrustedTextSource,
   TRUSTED_HARNESS_MANIFEST_PATH,
 } from "./generate-live-trusted-harness-manifest.mjs";
 import { loadPhase2CandidateMigrationInventory } from "./phase2-candidate-migration-inventory.mjs";
@@ -12,6 +13,11 @@ const manifest = JSON.parse(await readFile(TRUSTED_HARNESS_MANIFEST_PATH, "utf8"
 const validated = await assertTrustedHarnessManifest(manifest);
 assert.match(validated.sha256, /^[a-f0-9]{64}$/u);
 assert.equal(validated.sha256, canonicalTrustedHarnessManifestSha256(manifest));
+assert.equal(
+  canonicalTrustedTextSource("first\r\nsecond\nthird\r\n"),
+  "first\nsecond\nthird\n",
+  "trusted text hashes must not depend on checkout line endings",
+);
 assert.ok(manifest.entries.some(({ role }) => role === "candidate-runner"));
 assert.ok(manifest.entries.some(({ role }) => role === "strict-evidence-validator"));
 assert.ok(manifest.entries.some(({ role }) => role === "trusted-branch-controller"));

@@ -573,7 +573,7 @@
     {
       "path": "supabase/migrations/20260719165003_phase2_uploaded_script_and_rubric_foundation.sql",
       "role": "phase2-migration",
-      "sha256": "e044308c6fe2ed60baab08664649f14133707e9b4396878f94e3cea3b529704e"
+      "sha256": "d937297b78f0ef34afb955e56d3d79e002696d4b9fdb2bc9841bf2c2eecd2650"
     },
     {
       "path": "supabase/migrations/20260719195650_phase2_script_rubric_foundation.sql",

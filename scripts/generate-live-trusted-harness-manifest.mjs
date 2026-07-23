@@ -57,11 +57,18 @@ function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+export function canonicalTrustedTextSource(value) {
+  return value.replace(/\r\n/gu, "\n");
+}
+
 async function hashEntry(workspace, path, role) {
+  const source = canonicalTrustedTextSource(
+    await readFile(resolve(workspace, path), "utf8"),
+  );
   return Object.freeze({
     path,
     role,
-    sha256: sha256(await readFile(resolve(workspace, path))),
+    sha256: sha256(source),
   });
 }
 
@@ -87,7 +94,9 @@ export async function buildTrustedHarnessManifest(workspace = resolve(".")) {
   );
   const pgTapSuites = await Promise.all(
     pgTapPaths.map(async (path) => {
-      const source = await readFile(resolve(workspace, path), "utf8");
+      const source = canonicalTrustedTextSource(
+        await readFile(resolve(workspace, path), "utf8"),
+      );
       const testFile = path.split("/").at(-1);
       return Object.freeze({
         hardenedQuerySha256: sha256(hardenPgTapQuery(source, testFile)),
