@@ -34,6 +34,8 @@ export type PreparedOpenAiStructuredAgentRequest = Readonly<{
   schemaName: string;
 }>;
 
+type StructuredAgentSleep = (delayMs: number) => Promise<void>;
+
 export class OpenAiStructuredAgentError extends Error {
   override readonly name = "OpenAiStructuredAgentError";
 
@@ -43,6 +45,38 @@ export class OpenAiStructuredAgentError extends Error {
   ) {
     super(message);
   }
+}
+
+function parseRetryDelayMs(response: Response, attempt: number): number {
+  const retryAfterMs = Number(response.headers.get("retry-after-ms"));
+  if (Number.isFinite(retryAfterMs) && retryAfterMs >= 0 && retryAfterMs <= 60_000) {
+    return Math.ceil(retryAfterMs);
+  }
+  const retryAfterSeconds = Number(response.headers.get("retry-after"));
+  if (
+    Number.isFinite(retryAfterSeconds) &&
+    retryAfterSeconds >= 0 &&
+    retryAfterSeconds <= 60
+  ) {
+    return Math.ceil(retryAfterSeconds * 1_000);
+  }
+  return [5_000, 15_000, 45_000][attempt] ?? 45_000;
+}
+
+function isRetryableProviderStatus(status: number): boolean {
+  return (
+    status === 429 ||
+    status === 500 ||
+    status === 502 ||
+    status === 503 ||
+    status === 504
+  );
+}
+
+async function defaultSleep(delayMs: number): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, delayMs);
+  });
 }
 
 function boundedText(value: string, label: string, maximum: number): string {
@@ -181,6 +215,7 @@ export async function runPreparedOpenAiStructuredAgent(
   options: Readonly<{
     apiKey?: string;
     fetchImplementation?: typeof fetch;
+    sleepImplementation?: StructuredAgentSleep;
   }> = {},
 ): Promise<OpenAiStructuredAgentResult> {
   const apiKey = (options.apiKey ?? process.env.OPENAI_API_KEY ?? "").trim();
@@ -191,17 +226,29 @@ export async function runPreparedOpenAiStructuredAgent(
     );
   }
   const fetchImplementation = options.fetchImplementation ?? fetch;
-  const response = await fetchImplementation("https://api.openai.com/v1/responses", {
-    body: prepared.bodyText,
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "X-Client-Request-Id": prepared.requestHash.slice(0, 32),
-    },
-    method: "POST",
-    redirect: "error",
-    signal: AbortSignal.timeout(prepared.maximumDurationMs),
-  });
+  const sleepImplementation = options.sleepImplementation ?? defaultSleep;
+  let response: Response | null = null;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    response = await fetchImplementation("https://api.openai.com/v1/responses", {
+      body: prepared.bodyText,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "X-Client-Request-Id": prepared.requestHash.slice(0, 32),
+      },
+      method: "POST",
+      redirect: "error",
+      signal: AbortSignal.timeout(prepared.maximumDurationMs),
+    });
+    if (!isRetryableProviderStatus(response.status) || attempt === 3) {
+      break;
+    }
+    await boundedResponseBytes(response, prepared.maximumResponseBytes);
+    await sleepImplementation(parseRetryDelayMs(response, attempt));
+  }
+  if (response === null) {
+    throw new OpenAiStructuredAgentError("OpenAI request did not start.", "provider");
+  }
   const responseRequestId = response.headers.get("x-request-id");
   const contentType = response.headers.get("content-type")?.split(";", 1)[0];
   const bytes = await boundedResponseBytes(response, prepared.maximumResponseBytes);
@@ -282,6 +329,7 @@ export async function runOpenAiStructuredAgent(
   options: Readonly<{
     apiKey?: string;
     fetchImplementation?: typeof fetch;
+    sleepImplementation?: StructuredAgentSleep;
   }> = {},
 ): Promise<OpenAiStructuredAgentResult> {
   return runPreparedOpenAiStructuredAgent(

@@ -1535,7 +1535,7 @@ Vercel's bounded 800-second Pro function limit instead of the five-minute
 default.
 
 Current affected evidence is green: formatting, lint, route-aware TypeScript,
-115 unit files / 722 tests, integration `5/5` with the intentional live-scanner
+115 unit files / 724 tests, integration `5/5` with the intentional live-scanner
 skip, the focused empty-World Chromium regression, the Phase 2
 preflight/provider policy and hostile controls, and the regenerated trusted
 harness. Database advisors found no new migration-specific error. The two
@@ -1548,5 +1548,16 @@ request ledgers. That invocation exposed a separate five-minute submission
 cliff: it reached FAL for two requests but expired while submitting the
 remainder sequentially. The sealed run remains audit evidence; the two accepted
 requests are now recoverable by authenticated polling. The concurrent,
-waiting-first, 800-second candidate must be deployed before one final fresh
-World run is followed through all 11 secured, review-ready anchors.
+waiting-first, 800-second candidate was deployed from commit `fca5789` as
+`dpl_5ogZkCVk8Tu4mHxeTxxVZ4BdmcaY`, reached READY, and owns the public alias.
+
+Fresh run 5 (`0188d32f-a9b5-4941-a8d8-95a76aab2942`) then started correctly
+from the live recovery action but exhausted its three fenced attempts on an
+external OpenAI HTTP 429 during extraction, before research, preparation, FAL
+submission, or spend. The provider adapter candidate now performs at most four
+bounded retries for HTTP 429 and transient 5xx responses, honors safe
+`retry-after-ms` or `retry-after` guidance up to sixty seconds, uses bounded
+fallback delays, and never exposes provider response bodies. Its focused and
+complete unit gates pass. Deploy that adapter, allow the provider window to
+cool, then start one final fresh World run and follow all 11 anchors through
+secured review readiness.

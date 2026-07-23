@@ -115,11 +115,12 @@ describe("OpenAI strict structured agent", () => {
   });
 
   it("does not expose provider response bodies in errors", async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(JSON.stringify({ error: { message: "sensitive detail" } }), {
-        headers: { "content-type": "application/json" },
-        status: 429,
-      }),
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ error: { message: "sensitive detail" } }), {
+          headers: { "content-type": "application/json" },
+          status: 429,
+        }),
     );
     await expect(
       runOpenAiStructuredAgent(
@@ -132,8 +133,67 @@ describe("OpenAI strict structured agent", () => {
         {
           apiKey: "openai-test-secret-that-is-long-enough",
           fetchImplementation: fetchMock,
+          sleepImplementation: async () => {},
         },
       ),
     ).rejects.not.toThrow("sensitive detail");
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("honors bounded provider retry guidance before succeeding", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: { message: "rate limited" } }), {
+          headers: {
+            "content-type": "application/json",
+            "retry-after-ms": "25",
+          },
+          status: 429,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: "resp_after_retry",
+            output: [
+              {
+                content: [
+                  {
+                    text: JSON.stringify({ answer: "recovered" }),
+                    type: "output_text",
+                  },
+                ],
+                type: "message",
+              },
+            ],
+            status: "completed",
+          }),
+          {
+            headers: {
+              "content-type": "application/json",
+              "x-request-id": "request-after-retry",
+            },
+            status: 200,
+          },
+        ),
+      );
+    const sleepMock = vi.fn(async () => {});
+    const result = await runOpenAiStructuredAgent(
+      {
+        input: "data",
+        instructions: "analyze",
+        schema,
+        schemaName: "safe_answer",
+      },
+      {
+        apiKey: "openai-test-secret-that-is-long-enough",
+        fetchImplementation: fetchMock,
+        sleepImplementation: sleepMock,
+      },
+    );
+    expect(result.output).toEqual({ answer: "recovered" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(sleepMock).toHaveBeenCalledWith(25);
   });
 });
