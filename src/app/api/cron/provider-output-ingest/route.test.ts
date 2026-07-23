@@ -194,6 +194,37 @@ describe("provider output secure-ingest cron", () => {
     );
   });
 
+  it("securely ingests a bounded World batch in one invocation", async () => {
+    mocks.claim
+      .mockReset()
+      .mockResolvedValueOnce({
+        ...claim,
+        candidateId: "30000000-0000-4000-8000-000000000021",
+      })
+      .mockResolvedValueOnce({
+        ...claim,
+        candidateId: "30000000-0000-4000-8000-000000000022",
+      })
+      .mockResolvedValueOnce({
+        ...claim,
+        candidateId: "30000000-0000-4000-8000-000000000023",
+      });
+
+    const result = await GET(request());
+
+    await expect(result.json()).resolves.toMatchObject({
+      claimed: 3,
+      completed: 3,
+      failed: 0,
+      ok: true,
+    });
+    expect(mocks.fetch).toHaveBeenCalledTimes(3);
+    expect(mocks.quarantine).toHaveBeenCalledTimes(3);
+    expect(mocks.scan).toHaveBeenCalledTimes(3);
+    expect(mocks.promote).toHaveBeenCalledTimes(3);
+    expect(mocks.falRecovery).not.toHaveBeenCalled();
+  });
+
   it("rejects MIME confusion without writing or completing an asset", async () => {
     mocks.fetch.mockResolvedValue({
       bytes: png,
