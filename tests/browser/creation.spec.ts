@@ -1907,6 +1907,53 @@ test.describe("Living Cinema creation flow", () => {
     expect(worldBuildRequests).toBe(1);
   });
 
+  test("retains one fresh World recovery key while the terminal projection is unchanged", async ({
+    page,
+  }) => {
+    const authorityKeys: string[] = [];
+    await page.route(`**/api/episodes/${episodeId}/world-build`, async (route) => {
+      authorityKeys.push(route.request().headers()["x-idempotency-key"] ?? "");
+      if (authorityKeys.length === 1) {
+        await route.fulfill({
+          json: { code: "WORLD_BUILD_UNAVAILABLE", ok: false },
+          status: 503,
+        });
+        return;
+      }
+      await route.fulfill({
+        json: {
+          ok: true,
+          result: {
+            preflightRunId: "20000000-0000-4000-8000-000000000498",
+            spendCeilingUsd: 5,
+            state: "queued",
+            triggerRunId: null,
+          },
+        },
+        status: 202,
+      });
+    });
+
+    await page.goto(
+      `/episodes/${episodeId}/create?fixture=phase2-world-partial-failed&resumeCreation=world`,
+    );
+    await expect(page.locator(".world-card")).toHaveCount(2);
+    const retry = page.getByRole("button", { name: "Retry World" });
+    await expect(retry).toBeVisible();
+    await retry.click();
+    await expect.poll(() => authorityKeys.length).toBe(1);
+    await expect(retry).toBeEnabled();
+    await retry.click();
+    await expect.poll(() => authorityKeys.length).toBe(2);
+    expect(authorityKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
+    expect(authorityKeys[1]).toMatch(/^[0-9a-f-]{36}$/u);
+    expect(authorityKeys[1]).toBe(authorityKeys[0]);
+    await expect(retry).toBeEnabled();
+    await retry.click();
+    await expect.poll(() => authorityKeys.length).toBe(3);
+    expect(authorityKeys[2]).toBe(authorityKeys[0]);
+  });
+
   test("shows Monica's evidence and autonomously seals only the exact quote ceiling", async ({
     page,
   }) => {

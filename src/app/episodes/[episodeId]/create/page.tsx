@@ -211,6 +211,7 @@ export default async function CreationPage({
       "phase2-read-only-no-script",
       "phase2-world-empty",
       "phase2-world",
+      "phase2-world-partial-failed",
       "phase2-world-ready",
       "phase2-preflight",
       "phase2-preflight-blocked",
@@ -267,6 +268,23 @@ export default async function CreationPage({
       };
     } else if (query.fixture === "phase2-world") {
       fixtureProjection = deterministicReadyCreationProjection("review");
+    } else if (query.fixture === "phase2-world-partial-failed") {
+      const partialProjection = deterministicReadyCreationProjection("review");
+      fixtureProjection = {
+        ...partialProjection,
+        world: {
+          ...partialProjection.world,
+          progress: partialProjection.world.progress.map((item) =>
+            item.itemKind === "prop"
+              ? {
+                  ...item,
+                  safeDetail: "Secure ingest stopped safely",
+                  state: "failed" as const,
+                }
+              : item,
+          ),
+        },
+      };
     } else if (query.fixture === "phase2-world-ready") {
       fixtureProjection = deterministicReadyCreationProjection("ready");
     } else if (query.fixture === "phase2-preflight") {

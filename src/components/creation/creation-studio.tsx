@@ -487,6 +487,7 @@ export function CreationStudio({
   );
   const lookIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
   const worldBuildIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
+  const worldBuildRecoveryProjectionRef = useRef<string | null>(null);
   const worldBuildStartedConfigurationRef = useRef<string | null>(null);
   const worldFinalizeIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
   const worldIdempotencyKeys = useRef(new Map<string, RetainedIdempotencyAttempt>());
@@ -661,6 +662,19 @@ export function CreationStudio({
           "secure_ingest",
         ].includes(item.state),
   );
+  const worldGenerationFailed =
+    !activeWorldProgress &&
+    projection.world.progress.some((item) => item.state === "failed");
+  const worldTerminalProjectionSignature = worldGenerationFailed
+    ? projection.world.progress
+        .filter((item) => item.state === "failed")
+        .map(
+          (item) =>
+            `${item.id}:${item.updatedAt}:${item.providerRequestId ?? "none"}:${item.safeDetail}`,
+        )
+        .sort()
+        .join("|")
+    : null;
   const worldReady =
     allWorldAnchorsAccepted && projection.world.referencePack?.state === "verified";
   const preflightReady =
@@ -1754,7 +1768,7 @@ export function CreationStudio({
     ) {
       return;
     }
-    if (worldEntities.length > 0) {
+    if (worldEntities.length > 0 && !worldGenerationFailed) {
       setChamber("world");
       return;
     }
@@ -1764,6 +1778,17 @@ export function CreationStudio({
       workspaceId: projection.episode.workspaceId,
     };
     const requestBody = JSON.stringify(payload);
+    if (
+      worldTerminalProjectionSignature &&
+      worldBuildRecoveryProjectionRef.current !== worldTerminalProjectionSignature
+    ) {
+      // A terminal World projection is authoritative evidence that the prior
+      // attempt ended. Consume each distinct terminal projection once: the
+      // first recovery receives fresh authority, while an unknown response
+      // against that unchanged projection retains the same safe retry key.
+      worldBuildIdempotencyKey.current = null;
+      worldBuildRecoveryProjectionRef.current = worldTerminalProjectionSignature;
+    }
     const attempt = retainIdempotencyAttempt(
       worldBuildIdempotencyKey.current,
       requestBody,
@@ -1788,7 +1813,9 @@ export function CreationStudio({
         },
       );
       await readCommandResponse(response, "The world build could not be dispatched.");
-      worldBuildIdempotencyKey.current = null;
+      // Keep the accepted recovery key until the authoritative projection
+      // advances. A slow router refresh must not let a third click create a
+      // duplicate paid run against the still-visible terminal projection.
       setSaveState("saved");
       setNotice(
         "Monica is extracting identities and locations. You can leave this Episode while the agentic AI crew works.",

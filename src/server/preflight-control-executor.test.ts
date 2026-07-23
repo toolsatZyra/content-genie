@@ -3,10 +3,22 @@ import { describe, expect, it } from "vitest";
 import { PreflightPlanAgentError } from "@/server/preflight-plan-agent";
 import { ProductionQuoteError } from "@/server/production-quote";
 import { UploadedNarrationClockError } from "@/server/uploaded-narration-clock";
+import { WorldExtractionUpgradeRequiredError } from "@/server/preflight-control-ledger";
 
 import { classifyPreflightControlFailure } from "./preflight-control-executor";
 
 describe("preflight control failure classification", () => {
+  it("terminalizes an obsolete World extraction so recovery starts a fresh run", () => {
+    expect(
+      classifyPreflightControlFailure(
+        new WorldExtractionUpgradeRequiredError("upgrade required"),
+      ),
+    ).toEqual({
+      retryable: false,
+      safeErrorClass: "world-extraction-upgrade-required",
+    });
+  });
+
   it("seals genuine plan-repair exhaustion without scheduling another attempt", () => {
     expect(
       classifyPreflightControlFailure(

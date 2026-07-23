@@ -8,6 +8,8 @@ import {
   compileCharacterAnchorPrompt,
   compileLocationAnchorPrompt,
   compilePropAnchorPrompt,
+  type ExtractedCharacter,
+  type ExtractedCharacterForm,
   type WorldExtraction,
 } from "@/domain/agent/world-extraction";
 import type { LookDefinition } from "@/domain/look/look-registry";
@@ -84,6 +86,24 @@ export function postgresJsonbText(value: unknown): string {
       .join(", ")}}`;
   }
   throw new WorldAnchorProviderError("World manifest is not JSON-compatible.");
+}
+
+export function buildCharacterIdentityManifest(
+  character: ExtractedCharacter,
+  form: ExtractedCharacterForm,
+): ExtractedCharacterForm["identityManifest"] {
+  const identity = form.identityManifest.identity;
+  if (
+    identity.characterKey !== character.canonicalKey ||
+    identity.canonicalName !== character.displayName ||
+    identity.formKey !== form.formKey ||
+    identity.formName !== form.displayName
+  ) {
+    throw new WorldAnchorProviderError(
+      "Character identity manifest is not bound to the extracted form.",
+    );
+  }
+  return form.identityManifest;
 }
 
 async function rpc(name: string, parameters: Record<string, unknown>) {
@@ -337,13 +357,7 @@ function jobsForExtraction(input: {
       );
       const targetAssetId = deterministicUuid(`job:${jobId}:asset`);
       const compiled = compileCharacterAnchorPrompt(character, form, input.look);
-      const worldManifest = {
-        characterKey: character.canonicalKey,
-        continuityRole: character.continuityRole,
-        culturalNotes: character.culturalNotes,
-        form,
-        schemaVersion: "genie.character-identity-manifest.v1",
-      };
+      const worldManifest = buildCharacterIdentityManifest(character, form);
       jobs.push({
         capabilityJti: deterministicUuid(`job:${jobId}:capability-jti`),
         characterFormId: formId,

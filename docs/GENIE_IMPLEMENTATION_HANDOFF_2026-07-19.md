@@ -1574,3 +1574,43 @@ negative controls pass. The real Anthropic key and exact structured-output
 request were also verified successfully without logging credentials or model
 content. Deploy this candidate, then start one final fresh World run and follow
 all 11 anchors through secured review readiness.
+
+## 31. 2026-07-23 terminal World recovery and identity-bound generation gate
+
+The later `Ekadashi 1` recovery attempt exposed a separate terminal-state
+defect after two anchors had promoted: five exhausted secure-ingest jobs stayed
+`waiting_output`, leaving the World run indefinitely `waiting_external`.
+The sealed run is now truthfully terminal (`failed` / `failed_terminal`), its
+two promoted anchors remain preserved as audit evidence, and the UI presents
+one idempotent fresh-run recovery action. An unchanged terminal projection
+retains the same recovery key even across an unknown response, a confirmed
+202, and a stale refresh. An empty World still starts automatically on entry.
+
+The forward migration set from `20260723080500` through `20260723102000`
+closes partial-index failure replay, terminal secure-ingest reconciliation,
+current-run fencing, World regeneration lock order, v3 extraction upgrade
+terminalization, bounded fair FAL polling, signed-candidate arrival races,
+exact extraction-model provenance, and credential-claim release. Preview and
+production migration history contain the governed connector records and full
+statement sets. HTTP 401/403 now preserves the remote job and CAS-releases the
+exact poll claim; malformed or missing job-specific results still terminate
+only after the bounded budget.
+
+World extraction v3 now requires an exact closed v2 identity manifest for
+every character form. Required weapons, held attributes, ornaments and vahana
+are bidirectionally bound to the rendered sacred attributes. Exact topology,
+hand assignments and mudras, skin/form/wardrobe/dignity requirements and
+prohibitions all reach the provider prompt, while the immutable extraction
+ledger records the actual `gpt-5.6-sol` model identity. No v3 result existed in
+preview or production before that provenance correction.
+
+The corrected candidate is green on formatting, lint, route-aware TypeScript,
+116 unit files / 742 tests, integration `5/5` with the intentional live-scanner
+skip, complete Chromium `66/66`, the regenerated trusted harness, the full
+RLS/database-policy composite, acceptance-structure, production secretless and
+fail-closed boot, security, canary build, bundle scan, license policy, SBOM
+`829` components, and the high-severity dependency gate (three moderate
+advisories remain). Three context-minimized adversarial reviews cleared the
+candidate after fixes with no remaining P0/P1. The next action is the explicit
+`main` push, automatic Vercel deployment verification, then one fresh live
+`Ekadashi 1` World run followed through secured anchor review readiness.

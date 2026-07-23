@@ -22,6 +22,10 @@ export class PreflightControlLedgerError extends Error {
   }
 }
 
+export class WorldExtractionUpgradeRequiredError extends Error {
+  override readonly name = "WorldExtractionUpgradeRequiredError";
+}
+
 export type PreflightControlExecutionInput = Readonly<{
   configurationCandidateId: string;
   episodeId: string;
@@ -458,6 +462,14 @@ export async function getWorldExtractionReplayResult(
     p_stage_attempt_id: envelope.stageAttemptId,
   });
   if (value === null) return null;
+  if (
+    exactObject(value, ["upgradeRequired"]) &&
+    (value as Record<string, unknown>).upgradeRequired === true
+  ) {
+    throw new WorldExtractionUpgradeRequiredError(
+      "The prior World extraction requires a fresh run under the current identity contract.",
+    );
+  }
   if (
     !exactObject(value, ["extractionHash", "extractionJson", "resultId"]) ||
     typeof (value as Record<string, unknown>).extractionHash !== "string" ||

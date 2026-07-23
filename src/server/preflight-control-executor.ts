@@ -9,6 +9,7 @@ import {
   PreflightControlLedgerError,
   recordPreflightControlOutput,
   recordWorldExtractionResult,
+  WorldExtractionUpgradeRequiredError,
 } from "@/server/preflight-control-ledger";
 import { extractWorldFromLockedScript } from "@/server/world-extraction-agent";
 import { ensurePreflightAudioIdentities } from "@/server/audio-identity-preflight";
@@ -38,6 +39,12 @@ export type ClassifiedPreflightControlFailure = Readonly<{
 export function classifyPreflightControlFailure(
   error: unknown,
 ): ClassifiedPreflightControlFailure | null {
+  if (error instanceof WorldExtractionUpgradeRequiredError) {
+    return Object.freeze({
+      retryable: false,
+      safeErrorClass: "world-extraction-upgrade-required",
+    });
+  }
   if (
     !(error instanceof PreflightPlanAgentError) &&
     !(error instanceof ProductionQuoteError) &&

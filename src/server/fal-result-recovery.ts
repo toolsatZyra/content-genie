@@ -11,13 +11,19 @@ import {
 } from "@/security/still-image-container";
 import { readResponseBodyBounded } from "@/server/bounded-response-body";
 import {
+  failFalAuthenticatedPollCandidate,
   getNextFalAuthenticatedPollCandidate,
   getProviderDispatchManifest,
   recordFalSignedWebhook,
+  releaseFalAuthenticatedPollCredentialClaim,
 } from "@/server/provider-broker-ledger";
 
 const MAXIMUM_RESULT_BYTES = 1024 * 1024;
 const pendingStatuses = new Set([400, 404, 409, 422, 425]);
+const credentialStatuses = new Set([401, 403]);
+const terminalStatuses = new Set([410]);
+const METHOD_NOT_ALLOWED = 405;
+const MAXIMUM_POLL_ATTEMPTS = 5;
 
 export class FalResultRecoveryError extends Error {
   override readonly name = "FalResultRecoveryError";
@@ -38,6 +44,30 @@ async function boundedBody(response: Response): Promise<string> {
     throw new FalResultRecoveryError("FAL recovery result size is invalid.");
   }
   return bytes.toString("utf8");
+}
+
+async function fetchFalQueueResult(
+  input: Readonly<{
+    externalJobId: string;
+    falKey: string;
+    fetchImplementation: typeof fetch;
+    modelKey: string;
+  }>,
+): Promise<Response> {
+  const baseUrl = `https://queue.fal.run/${input.modelKey}/requests/${input.externalJobId}`;
+  const request = {
+    headers: { Authorization: `Key ${input.falKey}` },
+    method: "GET",
+    redirect: "error" as const,
+    signal: AbortSignal.timeout(30_000),
+  };
+  const direct = await input.fetchImplementation(baseUrl, request);
+  if (direct.status !== METHOD_NOT_ALLOWED) return direct;
+
+  // FAL receipts have used both the direct request URL and an explicit
+  // `/response` URL across queue/model versions. A bounded authenticated
+  // fallback keeps durable recovery compatible with either receipt shape.
+  return input.fetchImplementation(`${baseUrl}/response`, request);
 }
 
 async function exactImageMetadata(
@@ -127,34 +157,78 @@ export async function recoverNextCompletedFalResult(
     fetchImplementation?: typeof fetch;
   }>,
 ): Promise<FalResultRecoveryResult> {
+  const falKey = (input.falKey ?? process.env.FAL_KEY ?? "").trim();
+  if (falKey.length < 16) {
+    throw new FalResultRecoveryError("FAL recovery credential is unavailable.");
+  }
   const candidate = await getNextFalAuthenticatedPollCandidate({
     environment: input.environment,
   });
   if (!candidate) {
     return Object.freeze({ checked: false, providerRequestId: null, recovered: false });
   }
-  const falKey = (input.falKey ?? process.env.FAL_KEY ?? "").trim();
-  if (falKey.length < 16) {
-    throw new FalResultRecoveryError("FAL recovery credential is unavailable.");
-  }
-  const manifest = await getProviderDispatchManifest(candidate.providerRequestId);
-  if (
-    manifest.provider !== "fal" ||
-    !["gen_image", "edit_image"].includes(manifest.operation)
-  ) {
-    throw new FalResultRecoveryError("FAL recovery manifest is invalid.");
+  const terminalizeAtBudget = async (
+    safeErrorClass: string,
+    error: unknown,
+  ): Promise<FalResultRecoveryResult> => {
+    if (candidate.pollAttemptCount < MAXIMUM_POLL_ATTEMPTS) {
+      throw error;
+    }
+    await failFalAuthenticatedPollCandidate({
+      providerRequestId: candidate.providerRequestId,
+      safeErrorClass,
+    });
+    return Object.freeze({
+      checked: true,
+      providerRequestId: candidate.providerRequestId,
+      recovered: false,
+    });
+  };
+  let manifest: Awaited<ReturnType<typeof getProviderDispatchManifest>>;
+  try {
+    manifest = await getProviderDispatchManifest(candidate.providerRequestId);
+    if (
+      manifest.provider !== "fal" ||
+      !["gen_image", "edit_image"].includes(manifest.operation)
+    ) {
+      throw new FalResultRecoveryError("FAL recovery manifest is invalid.");
+    }
+  } catch (error) {
+    if (error instanceof FalResultRecoveryError) {
+      return terminalizeAtBudget("fal.poll.manifest-invalid", error);
+    }
+    throw error;
   }
   const fetchImplementation = input.fetchImplementation ?? fetch;
-  const response = await fetchImplementation(
-    `https://queue.fal.run/${manifest.modelKey}/requests/${candidate.externalJobId}`,
-    {
-      headers: { Authorization: `Key ${falKey}` },
-      method: "GET",
-      redirect: "error",
-      signal: AbortSignal.timeout(30_000),
-    },
-  );
+  let response: Response;
+  try {
+    response = await fetchFalQueueResult({
+      externalJobId: candidate.externalJobId,
+      falKey,
+      fetchImplementation,
+      modelKey: manifest.modelKey,
+    });
+  } catch (error) {
+    if (candidate.pollAttemptCount >= MAXIMUM_POLL_ATTEMPTS) {
+      await failFalAuthenticatedPollCandidate({
+        providerRequestId: candidate.providerRequestId,
+        safeErrorClass: "fal.poll.transport-exhausted",
+      });
+      return Object.freeze({
+        checked: true,
+        providerRequestId: candidate.providerRequestId,
+        recovered: false,
+      });
+    }
+    throw error;
+  }
   if (pendingStatuses.has(response.status)) {
+    if (candidate.pollAttemptCount >= MAXIMUM_POLL_ATTEMPTS) {
+      await failFalAuthenticatedPollCandidate({
+        providerRequestId: candidate.providerRequestId,
+        safeErrorClass: "fal.poll.result-exhausted",
+      });
+    }
     return Object.freeze({
       checked: true,
       providerRequestId: candidate.providerRequestId,
@@ -162,43 +236,80 @@ export async function recoverNextCompletedFalResult(
     });
   }
   if (!response.ok) {
+    if (credentialStatuses.has(response.status)) {
+      await releaseFalAuthenticatedPollCredentialClaim({
+        expectedPollAttemptCount: candidate.pollAttemptCount,
+        providerRequestId: candidate.providerRequestId,
+      });
+      throw new FalResultRecoveryError(
+        `FAL recovery credential was rejected with HTTP ${response.status}.`,
+      );
+    }
+    if (
+      terminalStatuses.has(response.status) ||
+      candidate.pollAttemptCount >= MAXIMUM_POLL_ATTEMPTS
+    ) {
+      await failFalAuthenticatedPollCandidate({
+        providerRequestId: candidate.providerRequestId,
+        safeErrorClass: `fal.poll.http-${response.status}`,
+      });
+      return Object.freeze({
+        checked: true,
+        providerRequestId: candidate.providerRequestId,
+        recovered: false,
+      });
+    }
     throw new FalResultRecoveryError(
       `FAL recovery result returned HTTP ${response.status}.`,
     );
   }
-  const rawBody = await boundedBody(response);
-  let value: unknown;
+  let rawBody: string;
+  let output: Readonly<{
+    contentType: "image/jpeg" | "image/png" | "image/webp";
+    height: number;
+    ordinal: 1;
+    targetAssetId: string;
+    url: string;
+    urlSha256: string;
+    width: number;
+  }>;
   try {
-    value = JSON.parse(rawBody);
-  } catch {
-    throw new FalResultRecoveryError("FAL recovery result JSON is invalid.");
+    rawBody = await boundedBody(response);
+    let value: unknown;
+    try {
+      value = JSON.parse(rawBody);
+    } catch {
+      throw new FalResultRecoveryError("FAL recovery result JSON is invalid.");
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new FalResultRecoveryError("FAL recovery result is invalid.");
+    }
+    const images = (value as Record<string, unknown>).images;
+    if (!Array.isArray(images) || images.length !== 1) {
+      throw new FalResultRecoveryError("FAL recovery image output is not exact.");
+    }
+    const image = images[0];
+    if (!image || typeof image !== "object" || Array.isArray(image)) {
+      throw new FalResultRecoveryError("FAL recovery image output is invalid.");
+    }
+    const media = image as Record<string, unknown>;
+    const targetAssetId = manifest.payload.targetAssetId;
+    if (typeof targetAssetId !== "string") {
+      throw new FalResultRecoveryError("FAL recovery media metadata is invalid.");
+    }
+    const metadata = await exactImageMetadata(media, fetchImplementation);
+    output = Object.freeze({
+      contentType: media.content_type as "image/jpeg" | "image/png" | "image/webp",
+      height: metadata.height,
+      ordinal: 1 as const,
+      targetAssetId,
+      url: metadata.url,
+      urlSha256: sha256(metadata.url),
+      width: metadata.width,
+    });
+  } catch (error) {
+    return terminalizeAtBudget("fal.poll.output-invalid", error);
   }
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new FalResultRecoveryError("FAL recovery result is invalid.");
-  }
-  const images = (value as Record<string, unknown>).images;
-  if (!Array.isArray(images) || images.length !== 1) {
-    throw new FalResultRecoveryError("FAL recovery image output is not exact.");
-  }
-  const image = images[0];
-  if (!image || typeof image !== "object" || Array.isArray(image)) {
-    throw new FalResultRecoveryError("FAL recovery image output is invalid.");
-  }
-  const media = image as Record<string, unknown>;
-  const targetAssetId = manifest.payload.targetAssetId;
-  if (typeof targetAssetId !== "string") {
-    throw new FalResultRecoveryError("FAL recovery media metadata is invalid.");
-  }
-  const metadata = await exactImageMetadata(media, fetchImplementation);
-  const output = Object.freeze({
-    contentType: media.content_type as "image/jpeg" | "image/png" | "image/webp",
-    height: metadata.height,
-    ordinal: 1 as const,
-    targetAssetId,
-    url: metadata.url,
-    urlSha256: sha256(metadata.url),
-    width: metadata.width,
-  });
   const canonicalPayloadHash = sha256(
     canonicalJson({
       externalJobId: candidate.externalJobId,

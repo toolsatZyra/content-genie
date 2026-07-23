@@ -31,10 +31,129 @@ const extraction = {
           formKey: "meditating",
           framing: "three-quarter full body portrait",
           hairAndHeadwear: "high matted jata with crescent moon",
+          identityManifest: {
+            allowedTransitions: [],
+            deity: {
+              arms: [
+                {
+                  armId: "left-1",
+                  handId: "left-hand-1",
+                  ordinal: 1,
+                  side: "left",
+                },
+                {
+                  armId: "right-1",
+                  handId: "right-hand-1",
+                  ordinal: 1,
+                  side: "right",
+                },
+              ],
+              handObjectAssignments: [
+                {
+                  assignmentKind: "weapon",
+                  handId: "left-hand-1",
+                  objectKey: "trident",
+                },
+                {
+                  assignmentKind: "empty",
+                  handId: "right-hand-1",
+                  objectKey: null,
+                },
+              ],
+              vahana: { key: null, status: "none" },
+              weapons: [{ key: "trident", required: true }],
+            },
+            dignity: {
+              prohibited: ["caricature", "sexualized depiction"],
+              required: ["serene compassion"],
+            },
+            form: {
+              rules: {
+                prohibited: ["identity drift", "anatomy drift"],
+                required: [
+                  "tall balanced build, ash-blue complexion",
+                  "oval face, calm deep-set eyes, straight nose",
+                  "high matted jata with crescent moon",
+                  "same face",
+                  "same crescent placement",
+                ],
+              },
+              topology: {
+                armCount: 2,
+                handCount: 2,
+                headCount: 1,
+                legCount: 2,
+              },
+            },
+            identity: {
+              canonicalName: "Bhagwan Shiva",
+              characterKey: "shiva",
+              essentialAttributes: [
+                "trident",
+                "crescent moon",
+                "rudraksha beads",
+                "serpent at neck",
+              ],
+              formKey: "meditating",
+              formName: "Meditating Shiva",
+            },
+            isDeity: true,
+            ornaments: [
+              {
+                key: "crescent-moon",
+                placement: "in the matted hair",
+                required: true,
+              },
+              {
+                key: "rudraksha",
+                placement: "around the neck",
+                required: true,
+              },
+              {
+                key: "serpent",
+                placement: "coiled at the neck",
+                required: true,
+              },
+            ],
+            schemaVersion: "genie-character-identity-manifest.v2",
+            skin: {
+              formRules: ["ageless adult", "ash-blue divine adult form"],
+              toneRules: ["ash-blue complexion"],
+            },
+            wardrobe: {
+              prohibited: ["modern clothing"],
+              required: ["tiger-skin drape and rudraksha beads"],
+            },
+          },
           lightingMode: "soft predawn blue with warm divine rim light",
           physicalDescription: "tall balanced build, ash-blue complexion",
-          sacredAttributes: ["trident", "crescent moon", "serpent at neck"],
-          subjectPose: "seated in stable meditation with hands at rest",
+          sacredAttributes: [
+            {
+              depictionKind: "weapon",
+              description: "trident",
+              key: "trident",
+              required: true,
+            },
+            {
+              depictionKind: "ornament",
+              description: "crescent moon",
+              key: "crescent-moon",
+              required: true,
+            },
+            {
+              depictionKind: "ornament",
+              description: "rudraksha beads",
+              key: "rudraksha",
+              required: true,
+            },
+            {
+              depictionKind: "ornament",
+              description: "serpent at neck",
+              key: "serpent",
+              required: true,
+            },
+          ],
+          subjectPose: "seated in meditation, left hand holding the trident",
         },
       ],
     },
@@ -99,10 +218,21 @@ describe("world extraction contract", () => {
     const blocks = prompt.prompt.split("\n\n");
     expect(blocks).toHaveLength(2);
     expect(blocks[0]).toContain("Bhagwan Shiva");
+    expect(blocks[0]).toContain(
+      "Exact immutable anatomy: 1 head(s), 2 arm(s), 2 hand(s), 2 leg(s)",
+    );
+    expect(blocks[0]).toContain("left hand 1 performs or holds exactly weapon trident");
+    expect(blocks[0]).toContain("rudraksha beads around the neck");
+    expect(blocks[0]).toContain(
+      "Never depict these manifest-prohibited features: modern clothing",
+    );
     expect(blocks[0]).toContain("Single self-contained still image only");
     expect(blocks[0]).toContain("no sequence, montage, split frame");
     expect(blocks[1]).toBe(look.lockedLookBlock);
-    expect(prompt.negativePrompt).toBe(look.negativePolicy.promptTail);
+    expect(prompt.negativePrompt).toContain(look.negativePolicy.promptTail);
+    expect(prompt.negativePrompt).toContain(
+      "Character-manifest exclusions: modern clothing; identity drift",
+    );
   });
 
   it("blocks a named temple until photographic references are verified", () => {
@@ -207,5 +337,150 @@ describe("world extraction contract", () => {
       narrationOnly: false,
       requiresLipSync: true,
     });
+  });
+
+  it("preserves explicit unusual deity topology without a two-or-four-arm default", () => {
+    const baseForm = extraction.characters[0].forms[0];
+    const arms = Array.from({ length: 8 }, (_, index) => {
+      const side = index < 4 ? ("left" as const) : ("right" as const);
+      const ordinal = (index % 4) + 1;
+      return {
+        armId: `${side}-${ordinal}`,
+        handId: `${side}-hand-${ordinal}`,
+        ordinal,
+        side,
+      };
+    });
+    const parsed = parseWorldExtraction({
+      ...extraction,
+      characters: [
+        {
+          ...extraction.characters[0],
+          forms: [
+            {
+              ...baseForm,
+              identityManifest: {
+                ...baseForm.identityManifest,
+                deity: {
+                  arms,
+                  handObjectAssignments: arms.map(({ handId }, index) =>
+                    index === 0
+                      ? {
+                          assignmentKind: "weapon",
+                          handId,
+                          objectKey: "trident",
+                        }
+                      : {
+                          assignmentKind: "empty",
+                          handId,
+                          objectKey: null,
+                        },
+                  ),
+                  vahana: { key: null, status: "none" },
+                  weapons: [{ key: "trident", required: true }],
+                },
+                form: {
+                  ...baseForm.identityManifest.form,
+                  topology: {
+                    armCount: 8,
+                    handCount: 8,
+                    headCount: 3,
+                    legCount: 2,
+                  },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+    expect(parsed.characters[0]!.forms[0]!.identityManifest.form.topology).toEqual({
+      armCount: 8,
+      handCount: 8,
+      headCount: 3,
+      legCount: 2,
+    });
+    const prompt = compileCharacterAnchorPrompt(
+      parsed.characters[0]!,
+      parsed.characters[0]!.forms[0]!,
+      findLook(DEFAULT_LOOK_ID)!,
+    );
+    expect(prompt.prompt).toContain(
+      "Exact immutable anatomy: 3 head(s), 8 arm(s), 8 hand(s), 2 leg(s)",
+    );
+    expect(prompt.negativePrompt).toContain("identity drift");
+  });
+
+  it("normalizes manifest text and rejects identity manifests bound to another form", () => {
+    const baseForm = extraction.characters[0].forms[0];
+    const normalized = parseWorldExtraction({
+      ...extraction,
+      characters: [
+        {
+          ...extraction.characters[0],
+          forms: [
+            {
+              ...baseForm,
+              emotionalBaseline: "se\u0301rene compassion",
+              identityManifest: {
+                ...baseForm.identityManifest,
+                dignity: {
+                  ...baseForm.identityManifest.dignity,
+                  required: ["se\u0301rene compassion"],
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+    expect(normalized.characters[0]!.forms[0]!.emotionalBaseline).toBe(
+      "sérene compassion",
+    );
+
+    expect(() =>
+      parseWorldExtraction({
+        ...extraction,
+        characters: [
+          {
+            ...extraction.characters[0],
+            forms: [
+              {
+                ...baseForm,
+                identityManifest: {
+                  ...baseForm.identityManifest,
+                  identity: {
+                    ...baseForm.identityManifest.identity,
+                    characterKey: "another-character",
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow("not bound");
+  });
+
+  it("rejects a required manifest feature omitted from the rendered sacred attributes", () => {
+    const baseForm = extraction.characters[0].forms[0];
+    expect(() =>
+      parseWorldExtraction({
+        ...extraction,
+        characters: [
+          {
+            ...extraction.characters[0],
+            forms: [
+              {
+                ...baseForm,
+                sacredAttributes: baseForm.sacredAttributes.filter(
+                  (attribute) => attribute.key !== "trident",
+                ),
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow("omit a required identityManifest feature");
   });
 });

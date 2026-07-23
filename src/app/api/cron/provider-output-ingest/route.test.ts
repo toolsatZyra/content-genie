@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   policy: vi.fn(),
   promote: vi.fn(),
   quarantine: vi.fn(),
+  reconcileTerminalWorld: vi.fn(),
   recordFetch: vi.fn(),
   scan: vi.fn(),
   narration: vi.fn(),
@@ -37,6 +38,7 @@ vi.mock("@/server/provider-broker-ledger", async (importOriginal) => {
     getActiveRemoteFetchPolicy: mocks.policy,
     promoteProviderWorldAnchor: mocks.promote,
     quarantineProviderOutputBytes: mocks.quarantine,
+    reconcileTerminalWorldAnchorIngest: mocks.reconcileTerminalWorld,
     recordProviderRemoteFetch: mocks.recordFetch,
   };
 });
@@ -104,6 +106,7 @@ describe("provider output secure-ingest cron", () => {
       providerRequestId: null,
       recovered: false,
     });
+    mocks.reconcileTerminalWorld.mockResolvedValue(0);
     mocks.plan.mockResolvedValue({
       configurationCandidateId: "30000000-0000-4000-8000-000000000014",
       preflightRunId: "30000000-0000-4000-8000-000000000015",
@@ -172,6 +175,7 @@ describe("provider output secure-ingest cron", () => {
       ok: true,
       planQueued: false,
       planRunId: null,
+      terminalWorldRunsReconciled: 0,
     });
     expect(mocks.fetch.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.recordFetch.mock.invocationCallOrder[0]!,
@@ -213,6 +217,7 @@ describe("provider output secure-ingest cron", () => {
       ok: true,
       planQueued: false,
       planRunId: null,
+      terminalWorldRunsReconciled: 0,
     });
     expect(mocks.recordFetch).not.toHaveBeenCalled();
     expect(mocks.quarantine).not.toHaveBeenCalled();
@@ -315,6 +320,7 @@ describe("provider output secure-ingest cron", () => {
       ok: true,
       planQueued: true,
       planRunId: "30000000-0000-4000-8000-000000000015",
+      terminalWorldRunsReconciled: 0,
     });
   });
 
@@ -336,11 +342,17 @@ describe("provider output secure-ingest cron", () => {
 
   it("uses an idle invocation to recover a completed FAL result before narration", async () => {
     mocks.claim.mockReset().mockResolvedValue(null);
-    mocks.falRecovery.mockResolvedValue({
-      checked: true,
-      providerRequestId: claim.providerRequestId,
-      recovered: true,
-    });
+    mocks.falRecovery
+      .mockResolvedValueOnce({
+        checked: true,
+        providerRequestId: claim.providerRequestId,
+        recovered: true,
+      })
+      .mockResolvedValueOnce({
+        checked: false,
+        providerRequestId: null,
+        recovered: false,
+      });
     const result = await GET(request());
     await expect(result.json()).resolves.toEqual({
       claimed: 0,
@@ -354,7 +366,9 @@ describe("provider output secure-ingest cron", () => {
       ok: true,
       planQueued: false,
       planRunId: null,
+      terminalWorldRunsReconciled: 0,
     });
+    expect(mocks.falRecovery).toHaveBeenCalledTimes(2);
     expect(mocks.narration).not.toHaveBeenCalled();
   });
 });

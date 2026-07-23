@@ -19,6 +19,7 @@ import {
   getActiveRemoteFetchPolicy,
   ProviderBrokerLedgerError,
   quarantineProviderOutputBytes,
+  reconcileTerminalWorldAnchorIngest,
   recordProviderRemoteFetch,
   promoteProviderWorldAnchor,
   type ProviderOutputIngestClaim,
@@ -137,6 +138,7 @@ export async function GET(request: Request) {
       return response({ code: "CRON_AUTHORIZATION_REJECTED", ok: false }, 401);
     }
 
+    const terminalWorldRunsReconciled = await reconcileTerminalWorldAnchorIngest();
     let completed = 0;
     let failed = 0;
     let claimed = 0;
@@ -180,18 +182,28 @@ export async function GET(request: Request) {
       recovered: false,
     };
     if (claimed === 0) {
-      try {
-        falRecovery = await recoverNextCompletedFalResult({
-          environment: cron.environment,
-        });
-      } catch (error) {
-        console.error("FAL authenticated result recovery failed safely", {
-          errorMessage:
-            error instanceof FalResultRecoveryError
-              ? error.message
-              : "Unexpected FAL recovery failure.",
-          errorName: error instanceof Error ? error.name : "UnknownError",
-        });
+      for (let recoveryIndex = 0; recoveryIndex < 10; recoveryIndex += 1) {
+        try {
+          const recovered = await recoverNextCompletedFalResult({
+            environment: cron.environment,
+          });
+          if (!recovered.checked) break;
+          falRecovery = {
+            checked: true,
+            providerRequestId:
+              recovered.providerRequestId ?? falRecovery.providerRequestId,
+            recovered: recovered.recovered || falRecovery.recovered,
+          };
+        } catch (error) {
+          console.error("FAL authenticated result recovery failed safely", {
+            errorMessage:
+              error instanceof FalResultRecoveryError
+                ? error.message
+                : "Unexpected FAL recovery failure.",
+            errorName: error instanceof Error ? error.name : "UnknownError",
+          });
+          break;
+        }
       }
     }
     const narration =
@@ -226,6 +238,7 @@ export async function GET(request: Request) {
         ok: true,
         planQueued,
         planRunId,
+        terminalWorldRunsReconciled,
       },
       200,
     );

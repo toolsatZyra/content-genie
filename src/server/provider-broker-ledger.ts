@@ -203,6 +203,7 @@ export type FalAuthenticatedPollCandidate = Readonly<{
   empty: false;
   externalJobId: string;
   ok: true;
+  pollAttemptCount: number;
   providerRequestId: string;
 }>;
 
@@ -219,15 +220,77 @@ export async function getNextFalAuthenticatedPollCandidate(input: {
     if (record.empty === true && record.ok === true) return null;
   }
   if (
-    !exactObject(value, ["empty", "externalJobId", "ok", "providerRequestId"]) ||
+    !exactObject(value, [
+      "empty",
+      "externalJobId",
+      "ok",
+      "pollAttemptCount",
+      "providerRequestId",
+    ]) ||
     (value as Record<string, unknown>).empty !== false ||
     (value as Record<string, unknown>).ok !== true ||
     typeof (value as Record<string, unknown>).externalJobId !== "string" ||
+    !Number.isSafeInteger((value as Record<string, unknown>).pollAttemptCount) ||
+    Number((value as Record<string, unknown>).pollAttemptCount) < 1 ||
     typeof (value as Record<string, unknown>).providerRequestId !== "string"
   ) {
     throw new ProviderBrokerLedgerError("FAL poll recovery claim is malformed.");
   }
   return value as FalAuthenticatedPollCandidate;
+}
+
+export async function failFalAuthenticatedPollCandidate(input: {
+  providerRequestId: string;
+  safeErrorClass: string;
+}): Promise<boolean> {
+  const value = await rpc("command_fail_fal_authenticated_poll_candidate", {
+    p_provider_request_id: input.providerRequestId,
+    p_safe_error_class: input.safeErrorClass,
+  });
+  if (
+    exactObject(value, [
+      "candidateArrived",
+      "ok",
+      "providerRequestId",
+      "terminalized",
+    ]) &&
+    (value as Record<string, unknown>).candidateArrived === true &&
+    (value as Record<string, unknown>).ok === true &&
+    (value as Record<string, unknown>).providerRequestId === input.providerRequestId &&
+    (value as Record<string, unknown>).terminalized === false
+  ) {
+    return false;
+  }
+  if (
+    !exactObject(value, ["ok", "providerRequestId", "terminalized"]) ||
+    (value as Record<string, unknown>).ok !== true ||
+    (value as Record<string, unknown>).providerRequestId !== input.providerRequestId ||
+    typeof (value as Record<string, unknown>).terminalized !== "boolean"
+  ) {
+    throw new ProviderBrokerLedgerError(
+      "FAL poll terminal reconciliation is malformed.",
+    );
+  }
+  return (value as Record<string, unknown>).terminalized as boolean;
+}
+
+export async function releaseFalAuthenticatedPollCredentialClaim(input: {
+  expectedPollAttemptCount: number;
+  providerRequestId: string;
+}): Promise<boolean> {
+  const value = await rpc("command_release_fal_authenticated_poll_credential_claim", {
+    p_expected_poll_attempt_count: input.expectedPollAttemptCount,
+    p_provider_request_id: input.providerRequestId,
+  });
+  if (
+    !exactObject(value, ["ok", "providerRequestId", "released"]) ||
+    (value as Record<string, unknown>).ok !== true ||
+    (value as Record<string, unknown>).providerRequestId !== input.providerRequestId ||
+    typeof (value as Record<string, unknown>).released !== "boolean"
+  ) {
+    throw new ProviderBrokerLedgerError("FAL credential poll release is malformed.");
+  }
+  return (value as Record<string, unknown>).released as boolean;
 }
 
 export type FalWebhookRecordResult = Readonly<{
@@ -727,13 +790,31 @@ export async function failProviderOutputCandidate(input: {
     throw new ProviderBrokerLedgerError("Provider output failure result is malformed.");
   }
   const state = (value as Record<string, unknown>).state;
-  if (!input.retryable || state === "failed") {
+  if (!input.retryable || state === "rejected") {
     await markWorldProgressByProviderRequest(
       input.providerRequestId,
       "failed",
       "Secure ingest stopped safely. Retry this World image when you are ready.",
     );
   }
+}
+
+export async function reconcileTerminalWorldAnchorIngest(limit = 20): Promise<number> {
+  const value = await rpc("command_reconcile_terminal_world_anchor_ingest", {
+    p_limit: limit,
+  });
+  const reconciled = (value as Record<string, unknown> | null)?.reconciled;
+  if (
+    !exactObject(value, ["ok", "reconciled"]) ||
+    (value as Record<string, unknown>).ok !== true ||
+    !Number.isSafeInteger(reconciled) ||
+    (reconciled as number) < 0
+  ) {
+    throw new ProviderBrokerLedgerError(
+      "Terminal World ingest reconciliation is malformed.",
+    );
+  }
+  return reconciled as number;
 }
 
 export async function quarantineImmediateProviderBytes(input: {

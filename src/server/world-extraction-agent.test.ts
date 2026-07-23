@@ -45,10 +45,129 @@ const extraction = {
           formKey: "meditating",
           framing: "three-quarter full body portrait",
           hairAndHeadwear: "high matted jata with crescent moon",
+          identityManifest: {
+            allowedTransitions: [],
+            deity: {
+              arms: [
+                {
+                  armId: "left-1",
+                  handId: "left-hand-1",
+                  ordinal: 1,
+                  side: "left",
+                },
+                {
+                  armId: "right-1",
+                  handId: "right-hand-1",
+                  ordinal: 1,
+                  side: "right",
+                },
+              ],
+              handObjectAssignments: [
+                {
+                  assignmentKind: "weapon",
+                  handId: "left-hand-1",
+                  objectKey: "trident",
+                },
+                {
+                  assignmentKind: "empty",
+                  handId: "right-hand-1",
+                  objectKey: null,
+                },
+              ],
+              vahana: { key: null, status: "none" },
+              weapons: [{ key: "trident", required: true }],
+            },
+            dignity: {
+              prohibited: ["caricature", "sexualized depiction"],
+              required: ["serene compassion"],
+            },
+            form: {
+              rules: {
+                prohibited: ["identity drift", "anatomy drift"],
+                required: [
+                  "tall balanced build, ash-blue complexion",
+                  "oval face, calm deep-set eyes, straight nose",
+                  "high matted jata with crescent moon",
+                  "same face",
+                  "same crescent placement",
+                ],
+              },
+              topology: {
+                armCount: 2,
+                handCount: 2,
+                headCount: 1,
+                legCount: 2,
+              },
+            },
+            identity: {
+              canonicalName: "Bhagwan Shiva",
+              characterKey: "shiva",
+              essentialAttributes: [
+                "trident",
+                "crescent moon",
+                "rudraksha beads",
+                "serpent at neck",
+              ],
+              formKey: "meditating",
+              formName: "Meditating Shiva",
+            },
+            isDeity: true,
+            ornaments: [
+              {
+                key: "crescent-moon",
+                placement: "in the matted hair",
+                required: true,
+              },
+              {
+                key: "rudraksha",
+                placement: "around the neck",
+                required: true,
+              },
+              {
+                key: "serpent",
+                placement: "coiled at the neck",
+                required: true,
+              },
+            ],
+            schemaVersion: "genie-character-identity-manifest.v2",
+            skin: {
+              formRules: ["ageless adult", "ash-blue divine adult form"],
+              toneRules: ["ash-blue complexion"],
+            },
+            wardrobe: {
+              prohibited: ["modern clothing"],
+              required: ["tiger-skin drape and rudraksha beads"],
+            },
+          },
           lightingMode: "soft predawn blue with warm divine rim light",
           physicalDescription: "tall balanced build, ash-blue complexion",
-          sacredAttributes: ["trident", "crescent moon", "serpent at neck"],
-          subjectPose: "seated in stable meditation with hands at rest",
+          sacredAttributes: [
+            {
+              depictionKind: "weapon",
+              description: "trident",
+              key: "trident",
+              required: true,
+            },
+            {
+              depictionKind: "ornament",
+              description: "crescent moon",
+              key: "crescent-moon",
+              required: true,
+            },
+            {
+              depictionKind: "ornament",
+              description: "rudraksha beads",
+              key: "rudraksha",
+              required: true,
+            },
+            {
+              depictionKind: "ornament",
+              description: "serpent at neck",
+              key: "serpent",
+              required: true,
+            },
+          ],
+          subjectPose: "seated in meditation, left hand holding the trident",
         },
       ],
     },
@@ -88,7 +207,7 @@ const extraction = {
       visualDescription: "monumental sacred bow with a divine profile",
     },
   ],
-  schemaVersion: "genie.world-extraction.v2",
+  schemaVersion: "genie.world-extraction.v3",
   scopeSignals: {
     containsDialogue: false,
     narrationOnly: true,

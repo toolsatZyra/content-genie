@@ -1,9 +1,22 @@
 import { compileImagePrompt, type LookDefinition } from "@/domain/look/look-registry";
+import {
+  parseCharacterIdentityManifest,
+  type CharacterIdentityManifest,
+} from "@/domain/agent/character-identity-manifest";
 
-export const WORLD_EXTRACTION_SCHEMA_VERSION = "genie.world-extraction.v2";
+export const WORLD_EXTRACTION_SCHEMA_VERSION = "genie.world-extraction.v3";
 
 type ContinuityRole = "incidental" | "primary" | "supporting";
 export type RealWorldSubjectKind = "festival" | "none" | "ritual" | "temple";
+export type SacredAttributeKind =
+  "form_feature" | "held_attribute" | "ornament" | "vahana" | "weapon";
+
+export type ExtractedSacredAttribute = Readonly<{
+  depictionKind: SacredAttributeKind;
+  description: string;
+  key: string;
+  required: boolean;
+}>;
 
 export type ExtractedCharacterForm = Readonly<{
   agePresentation: string;
@@ -17,9 +30,10 @@ export type ExtractedCharacterForm = Readonly<{
   formKey: string;
   framing: string;
   hairAndHeadwear: string;
+  identityManifest: CharacterIdentityManifest;
   lightingMode: string;
   physicalDescription: string;
-  sacredAttributes: readonly string[];
+  sacredAttributes: readonly ExtractedSacredAttribute[];
   subjectPose: string;
 }>;
 
@@ -103,15 +117,16 @@ function exactObject(value: unknown, keys: readonly string[]): value is object {
 }
 
 function text(value: unknown, label: string, maximum = 1_000): string {
+  const normalized = typeof value === "string" ? value.trim().normalize("NFC") : null;
   if (
-    typeof value !== "string" ||
-    value.trim().length < 1 ||
-    value.length > maximum ||
-    /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(value)
+    normalized === null ||
+    normalized.length < 1 ||
+    normalized.length > maximum ||
+    /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(normalized)
   ) {
     throw new WorldExtractionError(`${label} is invalid.`);
   }
-  return value.trim();
+  return normalized;
 }
 
 function key(value: unknown, label: string): string {
@@ -147,6 +162,129 @@ function textArray(
   return Object.freeze(values);
 }
 
+function parseSacredAttributes(
+  value: unknown,
+  label: string,
+): readonly ExtractedSacredAttribute[] {
+  if (!Array.isArray(value) || value.length > 16) {
+    throw new WorldExtractionError(`${label} is invalid.`);
+  }
+  const values = value.map((item, index) => {
+    const itemLabel = `${label}[${index}]`;
+    if (!exactObject(item, ["depictionKind", "description", "key", "required"])) {
+      throw new WorldExtractionError(`${itemLabel} is not exact.`);
+    }
+    const input = item as Record<string, unknown>;
+    const depictionKind = String(input.depictionKind);
+    if (
+      !["form_feature", "held_attribute", "ornament", "vahana", "weapon"].includes(
+        depictionKind,
+      )
+    ) {
+      throw new WorldExtractionError(`${itemLabel}.depictionKind is invalid.`);
+    }
+    return Object.freeze({
+      depictionKind: depictionKind as SacredAttributeKind,
+      description: text(input.description, `${itemLabel}.description`, 500),
+      key: key(input.key, `${itemLabel}.key`),
+      required: boolean(input.required, `${itemLabel}.required`),
+    });
+  });
+  if (new Set(values.map((item) => item.key)).size !== values.length) {
+    throw new WorldExtractionError(`${label} contains duplicate keys.`);
+  }
+  return Object.freeze(values);
+}
+
+function validateFormIdentityBinding(
+  form: ExtractedCharacterForm,
+  label: string,
+): void {
+  const manifest = form.identityManifest;
+  const requiredFormRules = new Set(manifest.form.rules.required);
+  const requiredWardrobe = new Set(manifest.wardrobe.required);
+  const skinFormRules = new Set(manifest.skin.formRules);
+  const requiredDignity = new Set(manifest.dignity.required);
+  const essentialAttributes = new Set(manifest.identity.essentialAttributes);
+  if (
+    !requiredWardrobe.has(form.clothingAndJewellery) ||
+    !skinFormRules.has(form.agePresentation) ||
+    !requiredDignity.has(form.emotionalBaseline) ||
+    ![
+      form.physicalDescription,
+      form.facialIdentity,
+      form.hairAndHeadwear,
+      ...form.continuityDirectives,
+    ].every((rule) => requiredFormRules.has(rule))
+  ) {
+    throw new WorldExtractionError(
+      `${label} identityManifest contradicts its visible identity fields.`,
+    );
+  }
+  const assignments = manifest.deity?.handObjectAssignments ?? [];
+  const weapons = new Set(manifest.deity?.weapons.map((item) => item.key) ?? []);
+  const ornaments = new Set(manifest.ornaments.map((item) => item.key));
+  const sacredBindings = new Set(
+    form.sacredAttributes.map(
+      (attribute) => `${attribute.depictionKind}:${attribute.key}`,
+    ),
+  );
+  for (const attribute of form.sacredAttributes) {
+    if (!essentialAttributes.has(attribute.description)) {
+      throw new WorldExtractionError(
+        `${label} identityManifest omits a sacred attribute.`,
+      );
+    }
+    const assigned = assignments.some(
+      (item) =>
+        item.objectKey === attribute.key &&
+        ((attribute.depictionKind === "weapon" && item.assignmentKind === "weapon") ||
+          (attribute.depictionKind === "held_attribute" &&
+            item.assignmentKind === "attribute")),
+    );
+    const bound =
+      attribute.depictionKind === "form_feature" ||
+      (attribute.depictionKind === "weapon" &&
+        weapons.has(attribute.key) &&
+        assigned) ||
+      (attribute.depictionKind === "held_attribute" && assigned) ||
+      (attribute.depictionKind === "ornament" && ornaments.has(attribute.key)) ||
+      (attribute.depictionKind === "vahana" &&
+        manifest.deity?.vahana.status === "specified" &&
+        manifest.deity.vahana.key === attribute.key);
+    if (!bound) {
+      throw new WorldExtractionError(
+        `${label} identityManifest misbinds a sacred attribute.`,
+      );
+    }
+  }
+  const requiredBindings = [
+    ...(manifest.deity?.weapons
+      .filter((item) => item.required)
+      .map((item) => `weapon:${item.key}`) ?? []),
+    ...assignments.flatMap((item) =>
+      item.objectKey !== null && ["attribute", "weapon"].includes(item.assignmentKind)
+        ? [
+            `${
+              item.assignmentKind === "attribute" ? "held_attribute" : "weapon"
+            }:${item.objectKey}`,
+          ]
+        : [],
+    ),
+    ...manifest.ornaments
+      .filter((item) => item.required)
+      .map((item) => `ornament:${item.key}`),
+    ...(manifest.deity?.vahana.status === "specified"
+      ? [`vahana:${manifest.deity.vahana.key}`]
+      : []),
+  ];
+  if (requiredBindings.some((binding) => !sacredBindings.has(binding))) {
+    throw new WorldExtractionError(
+      `${label} sacredAttributes omit a required identityManifest feature.`,
+    );
+  }
+}
+
 function parseCharacterForm(value: unknown, label: string): ExtractedCharacterForm {
   const keys = [
     "agePresentation",
@@ -160,6 +298,7 @@ function parseCharacterForm(value: unknown, label: string): ExtractedCharacterFo
     "formKey",
     "framing",
     "hairAndHeadwear",
+    "identityManifest",
     "lightingMode",
     "physicalDescription",
     "sacredAttributes",
@@ -169,7 +308,7 @@ function parseCharacterForm(value: unknown, label: string): ExtractedCharacterFo
     throw new WorldExtractionError(`${label} is not exact.`);
   }
   const input = value as Record<string, unknown>;
-  return Object.freeze({
+  const result = Object.freeze({
     agePresentation: text(input.agePresentation, `${label}.agePresentation`, 240),
     cameraAngle: text(input.cameraAngle, `${label}.cameraAngle`, 240),
     clothingAndJewellery: text(
@@ -189,19 +328,21 @@ function parseCharacterForm(value: unknown, label: string): ExtractedCharacterFo
     formKey: key(input.formKey, `${label}.formKey`),
     framing: text(input.framing, `${label}.framing`, 240),
     hairAndHeadwear: text(input.hairAndHeadwear, `${label}.hairAndHeadwear`, 600),
+    identityManifest: parseCharacterIdentityManifest(input.identityManifest),
     lightingMode: text(input.lightingMode, `${label}.lightingMode`, 240),
     physicalDescription: text(
       input.physicalDescription,
       `${label}.physicalDescription`,
       800,
     ),
-    sacredAttributes: textArray(
+    sacredAttributes: parseSacredAttributes(
       input.sacredAttributes,
       `${label}.sacredAttributes`,
-      16,
     ),
     subjectPose: text(input.subjectPose, `${label}.subjectPose`, 400),
   });
+  validateFormIdentityBinding(result, label);
+  return result;
 }
 
 function parseCharacter(value: unknown, index: number): ExtractedCharacter {
@@ -230,11 +371,25 @@ function parseCharacter(value: unknown, index: number): ExtractedCharacter {
   if (new Set(forms.map((form) => form.formKey)).size !== forms.length) {
     throw new WorldExtractionError(`${label}.forms contains duplicate keys.`);
   }
+  const canonicalKey = key(input.canonicalKey, `${label}.canonicalKey`);
+  const displayName = text(input.displayName, `${label}.displayName`, 200);
+  for (const form of forms) {
+    if (
+      form.identityManifest.identity.characterKey !== canonicalKey ||
+      form.identityManifest.identity.canonicalName !== displayName ||
+      form.identityManifest.identity.formKey !== form.formKey ||
+      form.identityManifest.identity.formName !== form.displayName
+    ) {
+      throw new WorldExtractionError(
+        `${label} identityManifest is not bound to its character form.`,
+      );
+    }
+  }
   return Object.freeze({
-    canonicalKey: key(input.canonicalKey, `${label}.canonicalKey`),
+    canonicalKey,
     continuityRole: input.continuityRole as ContinuityRole,
     culturalNotes: textArray(input.culturalNotes, `${label}.culturalNotes`, 12),
-    displayName: text(input.displayName, `${label}.displayName`, 200),
+    displayName,
     forms: Object.freeze(forms),
   });
 }
@@ -505,19 +660,78 @@ export function compileCharacterAnchorPrompt(
   form: ExtractedCharacterForm,
   look: LookDefinition,
 ): Readonly<{ negativePrompt: string; prompt: string }> {
+  const manifest = form.identityManifest;
+  const topology = manifest.form.topology;
+  const sacredDescriptions = new Map(
+    form.sacredAttributes.map((attribute) => [attribute.key, attribute.description]),
+  );
+  const armsByHand = new Map(
+    manifest.deity?.arms.map((arm) => [arm.handId, arm]) ?? [],
+  );
+  const handMap =
+    manifest.deity?.handObjectAssignments
+      .map((assignment) => {
+        const arm = armsByHand.get(assignment.handId);
+        const handLabel = arm ? `${arm.side} hand ${arm.ordinal}` : assignment.handId;
+        if (assignment.assignmentKind === "empty") {
+          return `${handLabel} visibly empty`;
+        }
+        const object =
+          sacredDescriptions.get(assignment.objectKey ?? "") ??
+          assignment.objectKey ??
+          assignment.assignmentKind;
+        return `${handLabel} performs or holds exactly ${assignment.assignmentKind} ${object}`;
+      })
+      .join("; ") || "no divine hand assignment";
+  const requiredOrnaments =
+    manifest.ornaments
+      .filter((ornament) => ornament.required)
+      .map(
+        (ornament) =>
+          `${sacredDescriptions.get(ornament.key) ?? ornament.key} ${ornament.placement}`,
+      )
+      .join("; ") || "none";
+  const requiredRules = [
+    ...manifest.identity.essentialAttributes,
+    ...manifest.skin.formRules,
+    ...manifest.skin.toneRules,
+    ...manifest.wardrobe.required,
+    ...manifest.form.rules.required,
+    ...manifest.dignity.required,
+  ];
+  const prohibitedRules = [
+    ...manifest.wardrobe.prohibited,
+    ...manifest.form.rules.prohibited,
+    ...manifest.dignity.prohibited,
+  ];
   const frame = promptText(
     `Vertical 9:16 canonical character anchor for ${character.displayName}, ${form.displayName}. ` +
       `Pose and action: ${form.subjectPose}. Framing: ${form.framing}. Camera: ${form.cameraAngle}. ` +
       `Lighting: ${form.lightingMode}. Environment: ${form.environment}. ` +
+      `Exact immutable anatomy: ${topology.headCount} head(s), ${topology.armCount} arm(s), ${topology.handCount} hand(s), ${topology.legCount} leg(s). ` +
+      `Exact hand map: ${handMap}. Required ornaments and placement: ${requiredOrnaments}. ` +
       `Unchanging identity: ${form.agePresentation}; ${form.physicalDescription}; ${form.facialIdentity}; ` +
       `${form.hairAndHeadwear}; ${form.clothingAndJewellery}. Sacred attributes: ` +
-      `${form.sacredAttributes.join("; ") || "none specified"}. Emotional baseline: ${form.emotionalBaseline}. ` +
+      `${
+        form.sacredAttributes
+          .map(
+            (attribute) =>
+              `${attribute.description} [${attribute.depictionKind}:${attribute.key}]`,
+          )
+          .join("; ") || "none specified"
+      }. Emotional baseline: ${form.emotionalBaseline}. ` +
       `Continuity locks: ${form.continuityDirectives.join("; ") || "preserve every stated identity feature"}. ` +
+      `Manifest-required visible rules: ${[...new Set(requiredRules)].join("; ")}. ` +
+      `Never depict these manifest-prohibited features: ${[...new Set(prohibitedRules)].join("; ") || "none"}. ` +
       STANDALONE_IMAGE_CONTRACT +
       `Respectful Hindu devotional-film depiction, anatomically coherent, no typography, no watermark.`,
   );
   return Object.freeze({
-    negativePrompt: look.negativePolicy.promptTail,
+    negativePrompt: promptText(
+      `${look.negativePolicy.promptTail} Character-manifest exclusions: ${
+        [...new Set(prohibitedRules)].join("; ") || "none"
+      }.`,
+    ),
     prompt: compileImagePrompt(frame, look),
   });
 }

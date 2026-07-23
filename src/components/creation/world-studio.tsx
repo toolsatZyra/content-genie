@@ -169,6 +169,7 @@ export function WorldStudio({
       (item.itemKind !== "system" || item.state === "extracting"),
   );
   const failedProgress = projection.progress.filter((item) => item.state === "failed");
+  const worldRunFailed = activeProgress.length === 0 && failedProgress.length > 0;
   const focusedProgress =
     activeProgress.find((item) => item.state === "secure_ingest") ??
     activeProgress.find((item) => item.state === "generating") ??
@@ -372,9 +373,9 @@ export function WorldStudio({
             </button>
           </div>
         </div>
-      ) : allEntities.length === 0 &&
-        activeProgress.length === 0 &&
-        failedProgress.length > 0 ? (
+      ) : null}
+
+      {worldRunFailed ? (
         <div className="world-empty">
           <div className="monica-orbit" aria-hidden="true">
             <i />
@@ -399,7 +400,9 @@ export function WorldStudio({
             </button>
           </div>
         </div>
-      ) : allEntities.length > 0 ? (
+      ) : null}
+
+      {allEntities.length > 0 ? (
         <div className="world-constellation">
           {allEntities.map((entity, index) => {
             const item = entity.item;
