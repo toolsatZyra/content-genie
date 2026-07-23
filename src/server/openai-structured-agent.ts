@@ -175,6 +175,15 @@ function collectResponseContent(response: Record<string, unknown>): {
   return { outputTexts, refusals };
 }
 
+function safeIncompleteReason(response: Record<string, unknown>): string | null {
+  const details = response.incomplete_details;
+  if (!details || typeof details !== "object" || Array.isArray(details)) return null;
+  const reason = (details as Record<string, unknown>).reason;
+  return typeof reason === "string" && /^[a-z][a-z0-9_.-]{2,63}$/u.test(reason)
+    ? reason
+    : null;
+}
+
 export function prepareOpenAiStructuredAgentRequest(
   request: OpenAiStructuredAgentRequest,
 ): PreparedOpenAiStructuredAgentRequest {
@@ -314,6 +323,7 @@ export async function runPreparedOpenAiStructuredAgent(
     throw new OpenAiStructuredAgentError(
       "OpenAI response did not complete.",
       "incomplete",
+      safeIncompleteReason(envelope),
     );
   }
   const content = collectResponseContent(envelope);

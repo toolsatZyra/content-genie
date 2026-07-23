@@ -437,6 +437,7 @@ function canonicalizeDeityWeaponBindings(value: unknown): unknown {
       const manifest = record(form?.identityManifest);
       const deity = record(manifest?.deity);
       if (
+        !form ||
         !deity ||
         !Array.isArray(deity.weapons) ||
         !Array.isArray(deity.handObjectAssignments)
@@ -449,13 +450,25 @@ function canonicalizeDeityWeaponBindings(value: unknown): unknown {
           return typeof weapon?.key === "string" ? [weapon.key] : [];
         }),
       );
+      const sacredWeaponKeys = new Set(
+        Array.isArray(form.sacredAttributes)
+          ? form.sacredAttributes.flatMap((attributeValue) => {
+              const attribute = record(attributeValue);
+              return attribute?.depictionKind === "weapon" &&
+                typeof attribute.key === "string"
+                ? [attribute.key]
+                : [];
+            })
+          : [],
+      );
       const heldWeaponKeys: string[] = [];
       for (const assignmentValue of deity.handObjectAssignments) {
         const assignment = record(assignmentValue);
         if (!assignment || typeof assignment.objectKey !== "string") continue;
         if (
           assignment.assignmentKind === "weapon" ||
-          listedWeaponKeys.has(assignment.objectKey)
+          listedWeaponKeys.has(assignment.objectKey) ||
+          sacredWeaponKeys.has(assignment.objectKey)
         ) {
           assignment.assignmentKind = "weapon";
           if (!heldWeaponKeys.includes(assignment.objectKey)) {
@@ -464,6 +477,170 @@ function canonicalizeDeityWeaponBindings(value: unknown): unknown {
         }
       }
       deity.weapons = heldWeaponKeys.map((key) => ({ key, required: true }));
+      if (Array.isArray(form.sacredAttributes)) {
+        for (const attributeValue of form.sacredAttributes) {
+          const attribute = record(attributeValue);
+          if (
+            attribute &&
+            typeof attribute.key === "string" &&
+            heldWeaponKeys.includes(attribute.key)
+          ) {
+            attribute.depictionKind = "weapon";
+          }
+        }
+      }
+    }
+  }
+  return output;
+}
+
+function dedupeStringArray(target: Record<string, unknown>, key: string): void {
+  const existing = target[key];
+  if (!Array.isArray(existing)) return;
+  target[key] = existing.filter(
+    (value, index) => typeof value !== "string" || existing.indexOf(value) === index,
+  );
+}
+
+function appendUniqueStrings(
+  target: Record<string, unknown>,
+  key: string,
+  values: readonly unknown[],
+): void {
+  const existing = target[key];
+  if (!Array.isArray(existing)) return;
+  for (const value of values) {
+    if (
+      typeof value === "string" &&
+      value.trim().length > 0 &&
+      !existing.includes(value)
+    ) {
+      existing.push(value);
+    }
+  }
+}
+
+/**
+ * The model sometimes emits the right visible identity facts in both halves of
+ * the response but misses an exact copy in one of the manifest binding arrays.
+ * These bindings contain no new creative or cultural decision: the enclosing
+ * character/form is authoritative for its keys and names, and every visible
+ * sacred attribute and continuity field is already present verbatim. Deriving
+ * the redundant manifest fields avoids an expensive second model pass while
+ * retaining deterministic validation for genuinely missing evidence.
+ */
+function canonicalizeCharacterManifestBindings(value: unknown): unknown {
+  const output = canonicalizeDeityWeaponBindings(value);
+  const root = record(output);
+  if (!root || !Array.isArray(root.characters)) return output;
+
+  for (const characterValue of root.characters) {
+    const character = record(characterValue);
+    if (!character || !Array.isArray(character.forms)) continue;
+    dedupeStringArray(character, "culturalNotes");
+    for (const formValue of character.forms) {
+      const form = record(formValue);
+      const manifest = record(form?.identityManifest);
+      const identity = record(manifest?.identity);
+      const manifestForm = record(manifest?.form);
+      const formRules = record(manifestForm?.rules);
+      const wardrobe = record(manifest?.wardrobe);
+      const skin = record(manifest?.skin);
+      const dignity = record(manifest?.dignity);
+      if (!form || !manifest || !identity) continue;
+
+      dedupeStringArray(form, "continuityDirectives");
+      dedupeStringArray(identity, "essentialAttributes");
+      if (formRules) {
+        dedupeStringArray(formRules, "required");
+        dedupeStringArray(formRules, "prohibited");
+      }
+      if (wardrobe) {
+        dedupeStringArray(wardrobe, "required");
+        dedupeStringArray(wardrobe, "prohibited");
+      }
+      if (skin) {
+        dedupeStringArray(skin, "formRules");
+        dedupeStringArray(skin, "toneRules");
+      }
+      if (dignity) {
+        dedupeStringArray(dignity, "required");
+        dedupeStringArray(dignity, "prohibited");
+      }
+
+      if (typeof character.canonicalKey === "string") {
+        identity.characterKey = character.canonicalKey;
+      }
+      if (typeof character.displayName === "string") {
+        identity.canonicalName = character.displayName;
+      }
+      if (typeof form.formKey === "string") {
+        identity.formKey = form.formKey;
+      }
+      if (typeof form.displayName === "string") {
+        identity.formName = form.displayName;
+      }
+
+      const sacredDescriptions = Array.isArray(form.sacredAttributes)
+        ? form.sacredAttributes.flatMap((attributeValue) => {
+            const attribute = record(attributeValue);
+            return typeof attribute?.description === "string"
+              ? [attribute.description]
+              : [];
+          })
+        : [];
+      appendUniqueStrings(identity, "essentialAttributes", sacredDescriptions);
+      if (formRules) {
+        appendUniqueStrings(formRules, "required", [
+          form.physicalDescription,
+          form.facialIdentity,
+          form.hairAndHeadwear,
+          ...(Array.isArray(form.continuityDirectives)
+            ? form.continuityDirectives
+            : []),
+        ]);
+      }
+      if (wardrobe) {
+        appendUniqueStrings(wardrobe, "required", [form.clothingAndJewellery]);
+      }
+      if (skin) {
+        appendUniqueStrings(skin, "formRules", [form.agePresentation]);
+      }
+      if (dignity) {
+        appendUniqueStrings(dignity, "required", [form.emotionalBaseline]);
+      }
+    }
+  }
+  dedupeStringArray(root, "culturalReviewNotes");
+  if (Array.isArray(root.locations)) {
+    for (const locationValue of root.locations) {
+      const location = record(locationValue);
+      if (!location) continue;
+      dedupeStringArray(location, "continuityDirectives");
+      dedupeStringArray(location, "sacredDetails");
+      if (location.realWorldSubjectKind === "none") {
+        location.namedTemple = false;
+        location.researchRequired = false;
+        location.realPlaceName = null;
+      } else if (location.realWorldSubjectKind === "temple") {
+        location.namedTemple = true;
+        location.researchRequired = true;
+      } else if (
+        location.realWorldSubjectKind === "festival" ||
+        location.realWorldSubjectKind === "ritual"
+      ) {
+        location.namedTemple = false;
+        location.researchRequired = true;
+      }
+    }
+  }
+  if (Array.isArray(root.props)) {
+    for (const propValue of root.props) {
+      const prop = record(propValue);
+      if (!prop) continue;
+      dedupeStringArray(prop, "continuityDirectives");
+      dedupeStringArray(prop, "culturalNotes");
+      dedupeStringArray(prop, "sacredOrFunctionalDetails");
     }
   }
   return output;
@@ -477,7 +654,7 @@ function canonicalizeDeityWeaponBindings(value: unknown): unknown {
  * blocking.
  */
 function canonicalizeResolvedCharacterIdentityAmbiguities(value: unknown): unknown {
-  const output = canonicalizeDeityWeaponBindings(value);
+  const output = canonicalizeCharacterManifestBindings(value);
   const root = record(output);
   if (!root || !Array.isArray(root.characters) || !Array.isArray(root.ambiguities)) {
     return output;
@@ -593,7 +770,7 @@ export async function extractWorldFromLockedScript(
         instructions: repairInstructions,
         maxOutputTokens: 16_000,
         model: "gpt-5.6-sol",
-        reasoningEffort: "medium",
+        reasoningEffort: "low",
         schema: WORLD_EXTRACTION_JSON_SCHEMA,
         schemaName: "genie_world_extraction",
       },

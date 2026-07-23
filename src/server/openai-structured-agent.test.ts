@@ -114,6 +114,40 @@ describe("OpenAI strict structured agent", () => {
     }
   });
 
+  it("records only the bounded provider incomplete reason", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "resp_incomplete",
+          incomplete_details: { reason: "max_output_tokens" },
+          output: [],
+          status: "incomplete",
+        }),
+        {
+          headers: { "content-type": "application/json" },
+          status: 200,
+        },
+      ),
+    );
+    await expect(
+      runOpenAiStructuredAgent(
+        {
+          input: "data",
+          instructions: "analyze",
+          schema,
+          schemaName: "safe_answer",
+        },
+        {
+          apiKey: "openai-test-secret-that-is-long-enough",
+          fetchImplementation: fetchMock,
+        },
+      ),
+    ).rejects.toMatchObject({
+      kind: "incomplete",
+      providerCode: "max_output_tokens",
+    });
+  });
+
   it("does not expose provider response bodies in errors", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockImplementation(
       async () =>

@@ -267,14 +267,32 @@ describe("ledgered World Extraction", () => {
       characters: [
         {
           ...extraction.characters[0],
+          culturalNotes: [
+            ...extraction.characters[0].culturalNotes,
+            extraction.characters[0].culturalNotes[0],
+          ],
           forms: [
             {
               ...form,
+              sacredAttributes: form.sacredAttributes.map((attribute) =>
+                attribute.key === "trident"
+                  ? { ...attribute, depictionKind: "held_attribute" as const }
+                  : attribute,
+              ),
               identityManifest: {
                 ...form.identityManifest,
                 deity: {
                   ...deity,
-                  weapons: [{ key: "unassigned-bow", required: true }],
+                  handObjectAssignments: deity.handObjectAssignments.map(
+                    (assignment) =>
+                      assignment.objectKey === "trident"
+                        ? { ...assignment, assignmentKind: "attribute" as const }
+                        : assignment,
+                  ),
+                  weapons: [
+                    { key: "trident", required: true },
+                    { key: "unassigned-bow", required: true },
+                  ],
                 },
               },
             },
@@ -301,6 +319,12 @@ describe("ledgered World Extraction", () => {
     expect(
       result.extraction.characters[0]?.forms[0]?.identityManifest.deity?.weapons,
     ).toEqual([{ key: "trident", required: true }]);
+    expect(
+      result.extraction.characters[0]?.forms[0]?.sacredAttributes[0]?.depictionKind,
+    ).toBe("weapon");
+    expect(result.extraction.characters[0]?.culturalNotes).toEqual([
+      "Preserve Shaiva iconography.",
+    ]);
   });
 
   it("keeps one validated character candidate reviewable without blocking images", async () => {
@@ -352,7 +376,7 @@ describe("ledgered World Extraction", () => {
     expect(mocks.agent).toHaveBeenCalledTimes(1);
   });
 
-  it("repairs a non-canonicalizable cross-binding once within the same fence", async () => {
+  it("derives redundant manifest copies from the exact visible identity fields", async () => {
     const script = "Vishnu entered the cave after the battle.";
     const scriptSha256 = createHash("sha256").update(script).digest("hex");
     const form = extraction.characters[0].forms[0];
@@ -379,10 +403,52 @@ describe("ledgered World Extraction", () => {
         },
       ],
     };
+    mocks.agent.mockResolvedValue({
+      output: inconsistentExtraction,
+      requestHash: "f".repeat(64),
+      responseId: "resp_world_normalized",
+      responseRequestId: "req_world_normalized",
+    });
+
+    const result = await extractWorldFromLockedScript({
+      authority,
+      script,
+      scriptSha256,
+    });
+
+    expect(result.responseId).toBe("resp_world_normalized");
+    expect(result.modelRequestHash).toBe("f".repeat(64));
+    expect(mocks.agent).toHaveBeenCalledTimes(1);
+    expect(
+      result.extraction.characters[0]?.forms[0]?.identityManifest.identity
+        .essentialAttributes,
+    ).toContain("trident");
+  });
+
+  it("repairs genuinely missing cross-bound evidence once within the same fence", async () => {
+    const script = "Vishnu entered the cave after the battle.";
+    const scriptSha256 = createHash("sha256").update(script).digest("hex");
+    const form = extraction.characters[0].forms[0];
+    const inconsistentExtraction = {
+      ...extraction,
+      characters: [
+        {
+          ...extraction.characters[0],
+          forms: [
+            {
+              ...form,
+              sacredAttributes: form.sacredAttributes.filter(
+                (item) => item.key !== "trident",
+              ),
+            },
+          ],
+        },
+      ],
+    };
     mocks.agent
       .mockResolvedValueOnce({
         output: inconsistentExtraction,
-        requestHash: "f".repeat(64),
+        requestHash: "0".repeat(64),
         responseId: "resp_world_invalid",
         responseRequestId: "req_world_invalid",
       })
@@ -412,6 +478,7 @@ describe("ledgered World Extraction", () => {
         "VALIDATION_FAILURE_CODE=world_extraction_cross_binding",
       ),
       instructions: expect.stringContaining("deity.weapons must equal the exact set"),
+      reasoningEffort: "low",
     });
   });
 
