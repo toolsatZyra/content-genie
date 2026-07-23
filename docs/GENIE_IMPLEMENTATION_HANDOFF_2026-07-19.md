@@ -1437,3 +1437,63 @@ same-commit precheckpoint/database/live/browser gate, obtain the independent
 manifest-delta review, promote only the production-missing approved migrations,
 run post-DDL verification/advisors, push `main` explicitly, and verify the
 automatic Vercel deployment plus live owner path.
+
+## 29. 2026-07-23 frozen owner-MVP release and software-complete proof
+
+The corrected candidate is frozen at executable commit
+`d8eb09aec142fcffcebd3c41452d6dda9acff985` with tree
+`75e6186d4e9002d61da518c6c71e1a7d918d5496`. Its complete same-commit
+`pnpm precheckpoint-gates` run passed in 1,066,664 ms and produced
+`.tmp/artifacts/precheckpoint-gate.v1.json`; the bound log SHA-256 is
+`eb56d559dfbd8a4c0f9ab755a2bbdaa9ee4f400f2d994b75371642b03296d052`.
+The runner confirmed the tracked worktree was clean at both candidate and
+post-run boundaries.
+
+The frozen local gate includes formatting, lint, route-aware TypeScript,
+integration `5/5` with the intentional live-scanner skip, unit `114/114` files
+and `720/720` tests, aggregate coverage of 94.73% statements, 91.89% branches,
+96.77% functions and 96.51% lines, Chromium `64/64`, all 117 looks, production
+and secret-canary builds, security, RLS/policy, bundle and licence checks, and
+an 829-component SBOM. There are no high-severity dependency advisories; three
+moderate notices remain non-blocking. The bounded browser servers were stopped
+and ports 4173, 4174 and 4175 were verified closed.
+
+The hardened preview database composite passes all nine suites and `790/790`
+assertions. Production now contains the four independently approved corrective
+migrations: `hindi_duration_profile_reconciliation`,
+`hindi_duration_profile_v2_activation`,
+`hindi_duration_profile_legacy_constraint_cleanup`, and
+`script_rubric_legacy_waiver_scope`. Post-DDL production verification proves
+the historical v1 duration profile remains immutable at 60.67 seconds, the
+correct Unicode v2 profile is active at 61.09 seconds, both duration writers
+pin v2, and the private compatibility waiver is exact, immutable and unreadable
+to application roles. The final production recheck passes the affected
+zero-spend and workspace suites `217/217`; combined with the seven previously
+passed transactional production suites, all `790/790` assertions have been
+exercised with rollback-safe fixtures. Database advisors report no errors. The
+remaining warnings are existing authenticated security-definer command RPCs,
+the platform leaked-password setting, five existing auth RLS init-plan notices,
+and three immaterial unindexed-FK notices on the one-row private waiver table.
+
+One independent context-minimized adversarial review inspected the exact HEAD,
+index, manifest, precheckpoint artifact, log, package state and four production
+migrations. Its final disposition is no P0, P1 or P2 findings, with explicit
+approval for production promotion. The server-only FAL Admin credential remains
+sensitive in Vercel Preview and Production, and the real read-only billing
+canary still proves the seven-field reconciliation contract without exposing
+the key.
+
+The executable commit was pushed explicitly to GitHub `main` without adding a
+persistent remote. Git-connected Vercel deployment
+`dpl_5SL6o22Zrwb9iG6AKF9c1Gb2zTxm` reached READY from that exact commit, owns
+`content-genie-three.vercel.app`, and has no alias error. The public root returns
+HTTP 200 and contains the Genie agentic-AI-crew shell; the errors-only build log
+and post-deploy runtime-error query are empty.
+
+Phases 2, 3 and 4 are therefore software-complete for the owner-operated MVP:
+World and cultural authority, uploaded or ElevenLabs V3 narration, autonomous
+shot-list/storyboard/clip/edit production, exact cost observation without an
+MVP pause, durable recovery, Monica's grounded repair loop, asset downloads and
+final human release authority are implemented and gated. This does not claim
+the later owner-supplied 10-20 Episode pilot or the larger calibration/holdout
+contract; those remain post-software product-validation work.
