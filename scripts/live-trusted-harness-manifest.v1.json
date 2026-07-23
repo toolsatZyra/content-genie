@@ -113,7 +113,7 @@
     {
       "path": "scripts/run-phase1-live-suite.mjs",
       "role": "candidate-runner",
-      "sha256": "c49f8e1e7ffcde56623c3becf4a8868d3a7110fcfef006a5e7a2e676cef2c2c3"
+      "sha256": "03aba1edec0e7ffcebf6c7c452e46452d659052f1b63800df193c112b7dca62d"
     },
     {
       "path": "scripts/transient-failure-policy.mjs",
@@ -148,7 +148,7 @@
     {
       "path": "src/server/live-sandbox-control.ts",
       "role": "broker-controller",
-      "sha256": "1eba471a2bab5b37743f1dacf0fa5103251925b1a23c1b5138d165f9aaebab34"
+      "sha256": "95aee775d11e43d0a7a831f9129fedadd7a8707f45662c9ecf9883ee240b833f"
     },
     {
       "path": "supabase/migrations/20260717121500_phase2_scripts_and_sidecars.sql",

@@ -77,6 +77,7 @@ function assertPolicy({
     /await trustedDatabaseEvidence\(control\.branch, "terminal"\)/,
     /parsePreflightDatabaseEvidence/,
     /parseTerminalDatabaseEvidence/,
+    /duration_estimation_profile = 'genie-hindi-conversational-expressive-duration\.v2'/,
     /genie-trusted-live-harness-evidence\.v1/,
     /boundedCandidateCommandProgram/,
     /COMMAND_OUTPUT_MAX_BYTES = 8 \* 1024 \* 1024/,
@@ -231,6 +232,7 @@ function assertPolicy({
     /loadPhase2CandidateMigrationInventory/,
     /candidateMigrationVersion/,
     /expectedPhase2MigrationPaths/,
+    /"genie-hindi-conversational-expressive-duration\.v2"/,
   ]);
   if (/exact fifteen-file|expectedPhase2MigrationFiles\s*=\s*\[/u.test(runner)) {
     errors.push("candidate runner still hard-codes the obsolete migration inventory");
@@ -385,6 +387,16 @@ const mutations = [
     key: "wrapper",
     from: "tree !== headTree",
     to: "false",
+  },
+  {
+    key: "sandbox",
+    from: "genie-hindi-conversational-expressive-duration.v2",
+    to: "genie-hindi-conversational-expressive-duration.v1",
+  },
+  {
+    key: "runner",
+    from: "genie-hindi-conversational-expressive-duration.v2",
+    to: "genie-hindi-conversational-expressive-duration.v1",
   },
 ];
 

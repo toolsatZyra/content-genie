@@ -389,7 +389,7 @@ async function verifyPhase2Persistence(episodeId) {
   );
   assert.equal(
     row.duration_estimation_profile,
-    "genie-hindi-conversational-expressive-duration.v1",
+    "genie-hindi-conversational-expressive-duration.v2",
   );
   const episodeVersion = strictDatabaseInteger(
     row.episode_version,

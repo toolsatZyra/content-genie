@@ -27,7 +27,7 @@ export type GenieLaunchPerformanceProfile = typeof GENIE_LAUNCH_PERFORMANCE_PROF
 
 export const NARRATION_DURATION_PROFILE = {
   clausePauseSeconds: 0.18,
-  id: "genie-hindi-conversational-expressive-duration.v1",
+  id: "genie-hindi-conversational-expressive-duration.v2",
   lineBreakPauseSeconds: 0.25,
   performanceBreathEveryWords: 18,
   performanceBreathSeconds: 0.32,

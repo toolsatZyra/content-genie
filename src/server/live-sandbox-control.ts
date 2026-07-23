@@ -720,7 +720,7 @@ async function trustedDatabaseEvidence(
           where octet_length(raw_utf8) = 8192
             and coordinate_map ->> 'v' = '2'
             and coordinate_map_verifier = 'postgres-structural-v2'
-            and duration_estimation_profile = 'genie-hindi-conversational-expressive-duration.v1'
+            and duration_estimation_profile = 'genie-hindi-conversational-expressive-duration.v2'
         ) as boundary_scripts
     `;
     const row = rows[0];

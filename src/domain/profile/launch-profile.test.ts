@@ -63,7 +63,7 @@ describe("the Genie launch profile", () => {
       estimatedSeconds: 59.52,
       lineBreaks: 0,
       performanceBreaths: 6,
-      profileId: "genie-hindi-conversational-expressive-duration.v1",
+      profileId: "genie-hindi-conversational-expressive-duration.v2",
       sentenceMarks: 0,
       words: 120,
     });
