@@ -16,6 +16,7 @@ export type PreparedAnthropicStructuredAgentRequest = Readonly<{
   promptHash: string;
   requestHash: string;
   schemaName: string;
+  usesStringEnvelope: boolean;
 }>;
 
 export class AnthropicStructuredAgentError extends Error {
@@ -27,6 +28,56 @@ export class AnthropicStructuredAgentError extends Error {
   ) {
     super(message);
   }
+}
+
+const unsupportedSchemaConstraints = new Set([
+  "exclusiveMaximum",
+  "exclusiveMinimum",
+  "maxContains",
+  "maxItems",
+  "maxLength",
+  "maxProperties",
+  "maximum",
+  "minContains",
+  "minItems",
+  "minLength",
+  "minProperties",
+  "minimum",
+  "multipleOf",
+  "uniqueItems",
+]);
+
+function constraintDescription(constraints: readonly [string, unknown][]): string {
+  return constraints
+    .map(([keyword, value]) => `${keyword}=${JSON.stringify(value)}`)
+    .join(", ");
+}
+
+export function normalizeAnthropicStructuredSchema(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeAnthropicStructuredSchema(item));
+  }
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+  const source = value as Readonly<Record<string, unknown>>;
+  const constraints = Object.entries(source).filter(([keyword]) =>
+    unsupportedSchemaConstraints.has(keyword),
+  );
+  const normalized = Object.fromEntries(
+    Object.entries(source)
+      .filter(([keyword]) => !unsupportedSchemaConstraints.has(keyword))
+      .map(([keyword, item]) => [keyword, normalizeAnthropicStructuredSchema(item)]),
+  );
+  if (constraints.length > 0) {
+    const existingDescription =
+      typeof normalized.description === "string" ? normalized.description.trim() : "";
+    const validationNote = `Application validation: ${constraintDescription(constraints)}.`;
+    normalized.description = existingDescription
+      ? `${existingDescription} ${validationNote}`
+      : validationNote;
+  }
+  return normalized;
 }
 
 function boundedText(value: string, label: string, maximum: number): string {
@@ -78,10 +129,32 @@ export function prepareAnthropicStructuredAgentRequest(
 ): PreparedAnthropicStructuredAgentRequest {
   const instructions = boundedText(request.instructions, "Agent instructions", 24_000);
   const input = boundedText(request.input, "Agent input", 100_000);
-  const schemaJson = JSON.stringify(request.schema);
-  if (schemaJson.length < 2 || schemaJson.length > 64_000) {
+  const schema = normalizeAnthropicStructuredSchema(request.schema);
+  const applicationSchemaJson = JSON.stringify(request.schema);
+  if (applicationSchemaJson.length < 2 || applicationSchemaJson.length > 64_000) {
     throw new AnthropicStructuredAgentError("Agent schema is invalid.", "contract");
   }
+  const usesStringEnvelope = applicationSchemaJson.length > 4_000;
+  const providerSchema = usesStringEnvelope
+    ? {
+        additionalProperties: false,
+        properties: {
+          payload: {
+            description:
+              "A JSON-serialized value that satisfies the application schema in the system instructions.",
+            type: "string",
+          },
+        },
+        required: ["payload"],
+        type: "object",
+      }
+    : schema;
+  const providerInstructions = usesStringEnvelope
+    ? `${instructions}
+
+The application schema is too complex for the provider grammar. Return exactly one object property named payload. Its value must be a JSON string whose decoded value satisfies APPLICATION_SCHEMA_JSON. Do not omit, rename, summarize, or wrap any application field.
+APPLICATION_SCHEMA_JSON=${applicationSchemaJson}`
+    : instructions;
   const maximumTokens = request.maxOutputTokens ?? 8_000;
   if (
     !Number.isSafeInteger(maximumTokens) ||
@@ -100,11 +173,11 @@ export function prepareAnthropicStructuredAgentRequest(
     model,
     output_config: {
       format: {
-        schema: request.schema,
+        schema: providerSchema,
         type: "json_schema",
       },
     },
-    system: instructions,
+    system: providerInstructions,
   });
   return Object.freeze({
     bodyText,
@@ -112,9 +185,10 @@ export function prepareAnthropicStructuredAgentRequest(
     maximumResponseBytes: 131_072 as const,
     maximumTokens,
     model,
-    promptHash: createHash("sha256").update(instructions).digest("hex"),
+    promptHash: createHash("sha256").update(providerInstructions).digest("hex"),
     requestHash: createHash("sha256").update(bodyText).digest("hex"),
     schemaName: request.schemaName,
+    usesStringEnvelope,
   });
 }
 
@@ -216,6 +290,30 @@ export async function runPreparedAnthropicStructuredAgent(
       "Anthropic structured output is not JSON.",
       "provider",
     );
+  }
+  if (prepared.usesStringEnvelope) {
+    const structuredEnvelope = output as Record<string, unknown> | null;
+    const payload = structuredEnvelope?.payload;
+    if (
+      !structuredEnvelope ||
+      typeof structuredEnvelope !== "object" ||
+      Array.isArray(structuredEnvelope) ||
+      Object.keys(structuredEnvelope).length !== 1 ||
+      typeof payload !== "string"
+    ) {
+      throw new AnthropicStructuredAgentError(
+        "Anthropic structured output envelope is malformed.",
+        "provider",
+      );
+    }
+    try {
+      output = JSON.parse(payload) as unknown;
+    } catch {
+      throw new AnthropicStructuredAgentError(
+        "Anthropic structured output payload is not JSON.",
+        "provider",
+      );
+    }
   }
   const usage =
     envelope.usage &&
