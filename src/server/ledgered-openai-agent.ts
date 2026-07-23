@@ -4,11 +4,18 @@ import { createHash } from "node:crypto";
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import {
+  AnthropicStructuredAgentError,
+  prepareAnthropicStructuredAgentRequest,
+  runPreparedAnthropicStructuredAgent,
+  type PreparedAnthropicStructuredAgentRequest,
+} from "@/server/anthropic-structured-agent";
+import {
   OpenAiStructuredAgentError,
   prepareOpenAiStructuredAgentRequest,
   runPreparedOpenAiStructuredAgent,
   type OpenAiStructuredAgentRequest,
   type OpenAiStructuredAgentResult,
+  type PreparedOpenAiStructuredAgentRequest,
 } from "@/server/openai-structured-agent";
 import { postgresJsonbText } from "@/server/world-anchor-provider";
 
@@ -70,14 +77,26 @@ async function rpc(name: string, parameters: Readonly<Record<string, unknown>>) 
 }
 
 function safeFailureClass(error: unknown) {
-  return error instanceof OpenAiStructuredAgentError ? error.kind : "unknown";
+  return error instanceof OpenAiStructuredAgentError ||
+    error instanceof AnthropicStructuredAgentError
+    ? error.kind
+    : "unknown";
 }
 
-export async function runLedgeredOpenAiStructuredAgent(
+function safeProviderCode(error: unknown): string | null {
+  return error instanceof OpenAiStructuredAgentError ? error.providerCode : null;
+}
+
+type PreparedLedgeredStructuredAgentRequest =
+  PreparedAnthropicStructuredAgentRequest | PreparedOpenAiStructuredAgentRequest;
+
+async function runLedgeredPreparedStructuredAgent<
+  TPrepared extends PreparedLedgeredStructuredAgentRequest,
+>(
   authority: LedgeredOpenAiAuthority,
-  request: OpenAiStructuredAgentRequest,
+  prepared: TPrepared,
+  runner: (prepared: TPrepared) => Promise<OpenAiStructuredAgentResult>,
 ): Promise<LedgeredOpenAiResult> {
-  const prepared = prepareOpenAiStructuredAgentRequest(request);
   const toolCallId = uuid(
     await rpc("command_record_agent_model_call", {
       p_arguments_hash: prepared.requestHash,
@@ -102,13 +121,14 @@ export async function runLedgeredOpenAiStructuredAgent(
   );
   let result: OpenAiStructuredAgentResult;
   try {
-    result = await runPreparedOpenAiStructuredAgent(prepared);
+    result = await runner(prepared);
   } catch (error) {
     try {
       await rpc("command_reject_agent_model_call", {
         p_arguments_hash: prepared.requestHash,
         p_failure_class: safeFailureClass(error),
         p_safe_failure_summary: {
+          providerCode: safeProviderCode(error),
           requestHash: prepared.requestHash,
           schemaName: prepared.schemaName,
         },
@@ -139,4 +159,31 @@ export async function runLedgeredOpenAiStructuredAgent(
     p_tool_call_id: toolCallId,
   });
   return Object.freeze({ ...result, toolCallId });
+}
+
+export async function runLedgeredOpenAiStructuredAgent(
+  authority: LedgeredOpenAiAuthority,
+  request: OpenAiStructuredAgentRequest,
+): Promise<LedgeredOpenAiResult> {
+  const preparedOpenAi = prepareOpenAiStructuredAgentRequest(request);
+  try {
+    return await runLedgeredPreparedStructuredAgent(
+      authority,
+      preparedOpenAi,
+      runPreparedOpenAiStructuredAgent,
+    );
+  } catch (error) {
+    if (
+      !(error instanceof OpenAiStructuredAgentError) ||
+      error.providerCode !== "insufficient_quota" ||
+      (process.env.ANTHROPIC_API_KEY ?? "").trim().length < 20
+    ) {
+      throw error;
+    }
+  }
+  return runLedgeredPreparedStructuredAgent(
+    authority,
+    prepareAnthropicStructuredAgentRequest(request),
+    runPreparedAnthropicStructuredAgent,
+  );
 }

@@ -142,6 +142,7 @@
     "supabase/migrations/20260723052156_fal_world_edit_capability_canary_binding.sql",
     "supabase/migrations/20260723053702_world_build_active_intent_retry_reuse.sql",
     "supabase/migrations/20260723054803_research_fetch_claimed_attempt_authority.sql",
-    "supabase/migrations/20260723062700_provider_recovery_manifest_states.sql"
+    "supabase/migrations/20260723062700_provider_recovery_manifest_states.sql",
+    "supabase/migrations/20260723072000_anthropic_agent_fallback_authority.sql"
   ]
 }

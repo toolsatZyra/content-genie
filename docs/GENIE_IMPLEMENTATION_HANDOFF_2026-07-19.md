@@ -1535,7 +1535,7 @@ Vercel's bounded 800-second Pro function limit instead of the five-minute
 default.
 
 Current affected evidence is green: formatting, lint, route-aware TypeScript,
-115 unit files / 724 tests, integration `5/5` with the intentional live-scanner
+116 unit files / 728 tests, integration `5/5` with the intentional live-scanner
 skip, the focused empty-World Chromium regression, the Phase 2
 preflight/provider policy and hostile controls, and the regenerated trusted
 harness. Database advisors found no new migration-specific error. The two
@@ -1554,10 +1554,23 @@ waiting-first, 800-second candidate was deployed from commit `fca5789` as
 Fresh run 5 (`0188d32f-a9b5-4941-a8d8-95a76aab2942`) then started correctly
 from the live recovery action but exhausted its three fenced attempts on an
 external OpenAI HTTP 429 during extraction, before research, preparation, FAL
-submission, or spend. The provider adapter candidate now performs at most four
-bounded retries for HTTP 429 and transient 5xx responses, honors safe
-`retry-after-ms` or `retry-after` guidance up to sixty seconds, uses bounded
-fallback delays, and never exposes provider response bodies. Its focused and
-complete unit gates pass. Deploy that adapter, allow the provider window to
-cool, then start one final fresh World run and follow all 11 anchors through
-secured review readiness.
+submission, or spend. A safe direct probe confirmed the configured OpenAI
+project reports `insufficient_quota`, not a temporary rate window. The provider
+adapter performs at most four bounded retries only for genuinely transient HTTP
+429/5xx responses, honors safe `retry-after-ms` or `retry-after` guidance up to
+sixty seconds, never exposes provider response bodies, and does not retry
+`insufficient_quota`.
+
+The repository's prequalified Anthropic replacement path is now implemented as
+a typed `claude-sonnet-4-6` structured-output adapter with the same exact JSON
+Schema, response-size, token, timeout and immutable-input bounds. An OpenAI
+quota rejection is sealed first, then a separately authorized Anthropic call is
+recorded and completed; the two provider identities are never mixed.
+`20260723072000_anthropic_agent_fallback_authority.sql` preserves every existing
+stage/fencing/tool check while admitting only that exact fallback model and
+recording `model_family=anthropic`. It is applied to preview and production;
+both live definitions retain `audio.delivery`, and the trusted harness/policy
+negative controls pass. The real Anthropic key and exact structured-output
+request were also verified successfully without logging credentials or model
+content. Deploy this candidate, then start one final fresh World run and follow
+all 11 anchors through secured review readiness.

@@ -196,4 +196,36 @@ describe("OpenAI strict structured agent", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(sleepMock).toHaveBeenCalledWith(25);
   });
+
+  it("does not retry a quota-exhausted project", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: { code: "insufficient_quota", message: "private billing detail" },
+        }),
+        {
+          headers: { "content-type": "application/json" },
+          status: 429,
+        },
+      ),
+    );
+    const sleepMock = vi.fn(async () => {});
+    await expect(
+      runOpenAiStructuredAgent(
+        {
+          input: "data",
+          instructions: "analyze",
+          schema,
+          schemaName: "safe_answer",
+        },
+        {
+          apiKey: "openai-test-secret-that-is-long-enough",
+          fetchImplementation: fetchMock,
+          sleepImplementation: sleepMock,
+        },
+      ),
+    ).rejects.toMatchObject({ providerCode: "insufficient_quota" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sleepMock).not.toHaveBeenCalled();
+  });
 });

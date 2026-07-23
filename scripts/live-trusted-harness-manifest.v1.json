@@ -73,7 +73,7 @@
     {
       "path": "scripts/phase2-candidate-migrations.v1.json",
       "role": "candidate-migration-inventory",
-      "sha256": "57befe650039b1e7f2c8e58cd0ae67d2a8ce57eca7fe3f9d6a6f9a2459b49af0"
+      "sha256": "0e6ae2c11ebbc4cbaf84dd8ce50325956f8c1438ea1d2d06c19a40488a0c0626"
     },
     {
       "path": "scripts/phase2-coordinate-upgrade-drill.mjs",
@@ -861,6 +861,11 @@
       "sha256": "e6531ba89c3466d1999bcd1d574bb761621cf0be4d369fa1e837e3184d6f85a0"
     },
     {
+      "path": "supabase/migrations/20260723072000_anthropic_agent_fallback_authority.sql",
+      "role": "phase2-migration",
+      "sha256": "f1270b96b2ba1461f383c3cc10233d380a5b077af58df1f2d341286f4b84ea6b"
+    },
+    {
       "path": "supabase/tests/fixtures/phase2_coordinate_v1_verifiers.sql",
       "role": "predecessor-fixture",
       "sha256": "2df42a28cd04b193b0eaf97c882a17edfb13688cad7aca9bf8845408e9d7ec1c"
@@ -1130,7 +1135,8 @@
     "supabase/migrations/20260723052156_fal_world_edit_capability_canary_binding.sql",
     "supabase/migrations/20260723053702_world_build_active_intent_retry_reuse.sql",
     "supabase/migrations/20260723054803_research_fetch_claimed_attempt_authority.sql",
-    "supabase/migrations/20260723062700_provider_recovery_manifest_states.sql"
+    "supabase/migrations/20260723062700_provider_recovery_manifest_states.sql",
+    "supabase/migrations/20260723072000_anthropic_agent_fallback_authority.sql"
   ],
   "predecessorFixture": {
     "capturedAt": "2026-07-18",

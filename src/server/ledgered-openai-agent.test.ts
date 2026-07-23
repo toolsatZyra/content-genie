@@ -1,8 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  prepareAnthropic: vi.fn(),
   prepare: vi.fn(),
   rpc: vi.fn(),
+  runAnthropic: vi.fn(),
   run: vi.fn(),
 }));
 
@@ -15,6 +17,7 @@ vi.mock("@/server/openai-structured-agent", () => {
       message: string,
       readonly kind:
         "configuration" | "contract" | "incomplete" | "provider" | "refusal",
+      readonly providerCode: string | null = null,
     ) {
       super(message);
     }
@@ -23,6 +26,22 @@ vi.mock("@/server/openai-structured-agent", () => {
     OpenAiStructuredAgentError,
     prepareOpenAiStructuredAgentRequest: mocks.prepare,
     runPreparedOpenAiStructuredAgent: mocks.run,
+  };
+});
+vi.mock("@/server/anthropic-structured-agent", () => {
+  class AnthropicStructuredAgentError extends Error {
+    constructor(
+      message: string,
+      readonly kind:
+        "configuration" | "contract" | "incomplete" | "provider" | "refusal",
+    ) {
+      super(message);
+    }
+  }
+  return {
+    AnthropicStructuredAgentError,
+    prepareAnthropicStructuredAgentRequest: mocks.prepareAnthropic,
+    runPreparedAnthropicStructuredAgent: mocks.runAnthropic,
   };
 });
 
@@ -54,6 +73,10 @@ const request = Object.freeze({
 });
 
 describe("ledgered OpenAI model calls", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.prepare.mockReturnValue({
@@ -64,6 +87,16 @@ describe("ledgered OpenAI model calls", () => {
       model: "gpt-5.6-sol",
       promptHash: "d".repeat(64),
       requestHash,
+      schemaName: "test_plan",
+    });
+    mocks.prepareAnthropic.mockReturnValue({
+      bodyText: "{}",
+      maximumDurationMs: 180_000,
+      maximumResponseBytes: 131_072,
+      maximumTokens: 8_000,
+      model: "claude-sonnet-4-6",
+      promptHash: "e".repeat(64),
+      requestHash: "f".repeat(64),
       schemaName: "test_plan",
     });
     mocks.rpc.mockImplementation(async (name: string) => ({
@@ -125,5 +158,41 @@ describe("ledgered OpenAI model calls", () => {
       "Agent ledger rejected",
     );
     expect(mocks.run).not.toHaveBeenCalled();
+  });
+
+  it("records an exact Anthropic successor after OpenAI quota exhaustion", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "anthropic-test-secret-that-is-long-enough");
+    mocks.run.mockRejectedValue(
+      new OpenAiStructuredAgentError(
+        "OpenAI request failed with 429.",
+        "provider",
+        "insufficient_quota",
+      ),
+    );
+    mocks.runAnthropic.mockResolvedValue({
+      inputTokens: 21,
+      output: { safe: true },
+      outputTokens: 11,
+      requestHash: "f".repeat(64),
+      responseId: "msg-safe",
+      responseRequestId: "req-anthropic-safe",
+    });
+    const result = await runLedgeredOpenAiStructuredAgent(authority, request);
+    expect(result.output).toEqual({ safe: true });
+    expect(mocks.rpc.mock.calls.map(([name]) => name)).toEqual([
+      "command_record_agent_model_call",
+      "command_reject_agent_model_call",
+      "command_record_agent_model_call",
+      "command_complete_agent_tool_call",
+    ]);
+    expect(mocks.rpc.mock.calls[1]![1].p_safe_failure_summary).toMatchObject({
+      providerCode: "insufficient_quota",
+      requestHash,
+    });
+    expect(mocks.rpc.mock.calls[2]![1]).toMatchObject({
+      p_model_version: "claude-sonnet-4-6",
+      p_arguments_hash: "f".repeat(64),
+    });
+    expect(mocks.runAnthropic).toHaveBeenCalledTimes(1);
   });
 });

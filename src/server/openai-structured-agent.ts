@@ -42,9 +42,31 @@ export class OpenAiStructuredAgentError extends Error {
   constructor(
     message: string,
     readonly kind: "configuration" | "contract" | "incomplete" | "provider" | "refusal",
+    readonly providerCode: string | null = null,
   ) {
     super(message);
   }
+}
+
+function safeProviderErrorCode(bytes: Buffer): string | null {
+  try {
+    const value = JSON.parse(bytes.toString("utf8")) as unknown;
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const error = (value as Record<string, unknown>).error;
+    if (!error || typeof error !== "object" || Array.isArray(error)) return null;
+    const record = error as Record<string, unknown>;
+    for (const candidate of [record.code, record.type]) {
+      if (
+        typeof candidate === "string" &&
+        /^[a-z][a-z0-9_.-]{2,63}$/u.test(candidate)
+      ) {
+        return candidate;
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 function parseRetryDelayMs(response: Response, attempt: number): number {
@@ -228,6 +250,7 @@ export async function runPreparedOpenAiStructuredAgent(
   const fetchImplementation = options.fetchImplementation ?? fetch;
   const sleepImplementation = options.sleepImplementation ?? defaultSleep;
   let response: Response | null = null;
+  let responseBytes: Buffer | null = null;
   for (let attempt = 0; attempt < 4; attempt += 1) {
     response = await fetchImplementation("https://api.openai.com/v1/responses", {
       body: prepared.bodyText,
@@ -243,19 +266,26 @@ export async function runPreparedOpenAiStructuredAgent(
     if (!isRetryableProviderStatus(response.status) || attempt === 3) {
       break;
     }
-    await boundedResponseBytes(response, prepared.maximumResponseBytes);
+    responseBytes = await boundedResponseBytes(response, prepared.maximumResponseBytes);
+    if (safeProviderErrorCode(responseBytes) === "insufficient_quota") {
+      break;
+    }
     await sleepImplementation(parseRetryDelayMs(response, attempt));
+    responseBytes = null;
   }
   if (response === null) {
     throw new OpenAiStructuredAgentError("OpenAI request did not start.", "provider");
   }
   const responseRequestId = response.headers.get("x-request-id");
   const contentType = response.headers.get("content-type")?.split(";", 1)[0];
-  const bytes = await boundedResponseBytes(response, prepared.maximumResponseBytes);
+  const bytes =
+    responseBytes ??
+    (await boundedResponseBytes(response, prepared.maximumResponseBytes));
   if (!response.ok || contentType !== "application/json") {
     throw new OpenAiStructuredAgentError(
       `OpenAI request failed with ${response.status}.`,
       "provider",
+      safeProviderErrorCode(bytes),
     );
   }
   let value: unknown;
