@@ -464,7 +464,20 @@ function canonicalizeDeityWeaponBindings(value: unknown): unknown {
       const heldWeaponKeys: string[] = [];
       for (const assignmentValue of deity.handObjectAssignments) {
         const assignment = record(assignmentValue);
-        if (!assignment || typeof assignment.objectKey !== "string") continue;
+        if (!assignment) continue;
+        if (assignment.objectKey === null) {
+          // A hand with no bound object cannot carry an attribute, weapon, or
+          // named mudra. Treat the model's empty binding as visibly empty
+          // rather than inventing an unsupported object key.
+          assignment.assignmentKind = "empty";
+          continue;
+        }
+        if (typeof assignment.objectKey !== "string") continue;
+        if (assignment.assignmentKind === "empty") {
+          assignment.assignmentKind = sacredWeaponKeys.has(assignment.objectKey)
+            ? "weapon"
+            : "attribute";
+        }
         if (
           assignment.assignmentKind === "weapon" ||
           listedWeaponKeys.has(assignment.objectKey) ||

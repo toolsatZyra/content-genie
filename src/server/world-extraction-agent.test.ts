@@ -284,10 +284,19 @@ describe("ledgered World Extraction", () => {
                 deity: {
                   ...deity,
                   handObjectAssignments: deity.handObjectAssignments.map(
-                    (assignment) =>
-                      assignment.objectKey === "trident"
-                        ? { ...assignment, assignmentKind: "attribute" as const }
-                        : assignment,
+                    (assignment) => {
+                      if (assignment.objectKey === "trident") {
+                        return {
+                          ...assignment,
+                          assignmentKind: "attribute" as const,
+                        };
+                      }
+                      return {
+                        ...assignment,
+                        assignmentKind: "mudra" as const,
+                        objectKey: null,
+                      };
+                    },
                   ),
                   weapons: [
                     { key: "trident", required: true },
@@ -325,6 +334,10 @@ describe("ledgered World Extraction", () => {
     expect(result.extraction.characters[0]?.culturalNotes).toEqual([
       "Preserve Shaiva iconography.",
     ]);
+    expect(
+      result.extraction.characters[0]?.forms[0]?.identityManifest.deity
+        ?.handObjectAssignments[1],
+    ).toMatchObject({ assignmentKind: "empty", objectKey: null });
   });
 
   it("keeps one validated character candidate reviewable without blocking images", async () => {
