@@ -1422,9 +1422,15 @@ inventory even though the application calls their RPCs:
 `mvp_media_receipt_convergence` and `mvp_media_callback_slot_binding`. The
 candidate inventory and trusted harness now include both in dependency order;
 the regenerated trusted-manifest SHA-256 is
-`40bf7c48ce7a654505f66b94500cce073b779c0460142d92cfabc61e1a96aaba`.
+`a59e4fd04c3abea13befe5d8b3dcbd2658a7e3416304371e3fae384e903c969c`.
 Preview already contains both migrations. Production is still unchanged while
 this corrected exact candidate is re-gated and independently reviewed.
+
+The first corrected-candidate gate then caught four newly published high-
+severity advisories affecting Next.js 16.2.10. The minimal framework pair is
+now pinned to `next` and `eslint-config-next` 16.2.11. The high-severity audit,
+lint, route-aware type check and canary production build pass; three moderate
+dependency notices remain non-blocking.
 
 Immediate sequence: commit the corrected inventory, run the complete
 same-commit precheckpoint/database/live/browser gate, obtain the independent

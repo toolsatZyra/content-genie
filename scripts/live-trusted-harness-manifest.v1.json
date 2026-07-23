@@ -8,7 +8,7 @@
     {
       "path": "package.json",
       "role": "package-manifest",
-      "sha256": "dcfe3af80bbe3cfdb5d2613ccfab2bcde448e9b24f4b4ea81dffac2557b0abf0"
+      "sha256": "68f4b91d1730bf69d1fae20694fdd88f7edec518df7480d29c76f29b2a96354b"
     },
     {
       "path": "playwright.live.config.ts",
@@ -18,7 +18,7 @@
     {
       "path": "pnpm-lock.yaml",
       "role": "dependency-lock",
-      "sha256": "81a4e37fb09b624ecd968bc30e9189a0feb65d8194d66db0425d3061f00c8ecf"
+      "sha256": "e592bbc7344b8b19df2263ad9a17625c3b4eb4755dcd89ec107fe05fcd111539"
     },
     {
       "path": "pnpm-workspace.yaml",
