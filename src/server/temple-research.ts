@@ -164,19 +164,45 @@ function searchable(value: string): string {
 
 function distinctiveTokens(placeName: string): readonly string[] {
   const ignored = new Set([
+    "fast",
+    "fasting",
     "festival",
     "india",
     "mandir",
+    "observance",
+    "puja",
     "ritual",
     "shrine",
     "temple",
     "the",
     "of",
+    "vrat",
+    "vrata",
   ]);
   return Object.freeze(
     searchable(placeName)
       .split(" ")
       .filter((token) => token.length >= 3 && !ignored.has(token)),
+  );
+}
+
+export function buildResearchSearchTerms(
+  placeName: string,
+  subjectKind: RealWorldSubjectKind,
+): readonly string[] {
+  const exact = placeName.trim();
+  const distinctive = distinctiveTokens(exact).join(" ");
+  return Object.freeze(
+    [
+      exact,
+      ...(["festival", "ritual"].includes(subjectKind) &&
+      distinctive.length > 0 &&
+      searchable(exact) !== distinctive
+        ? [distinctive]
+        : []),
+    ].filter(
+      (value, index, values) => value.length > 0 && values.indexOf(value) === index,
+    ),
   );
 }
 
@@ -276,7 +302,8 @@ function parseReferencePage(
   const kindEvidence = {
     festival: /festival|puja|celebration|procession|utsav/u,
     none: /$a/u,
-    ritual: /ritual|worship|prayer|ceremony|aarti|arti|puja|abhishek/u,
+    ritual:
+      /ritual|worship|prayer|ceremony|aarti|arti|puja|abhishek|fast|fasting|observance|vrat|vrata/u,
     temple: /temple|mandir|shrine|devasthan/u,
   }[subjectKind];
   if (!kindEvidence.test(evidenceText)) return null;
@@ -315,92 +342,104 @@ async function fetchReferenceMetadata(
     references: readonly ReferenceMetadata[];
   }>
 > {
-  const url = new URL(SOURCE_API);
-  url.search = new URLSearchParams({
-    action: "query",
-    format: "json",
-    formatversion: "2",
-    generator: "search",
-    gsrlimit: "50",
-    gsrnamespace: "6",
-    gsrsearch: placeName,
-    iiprop: "url|mime|size|sha1|extmetadata",
-    iiurlwidth: "1600",
-    prop: "imageinfo",
-  }).toString();
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30_000);
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      cache: "no-store",
-      credentials: "omit",
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "Zyra-Genie-Real-World-Research/1.0",
-      },
-      redirect: "error",
-      signal: controller.signal,
-    });
-  } catch {
-    throw new TempleResearchError(
-      "Temple reference metadata could not be reached.",
-      true,
-    );
-  } finally {
-    clearTimeout(timer);
-  }
-  const declaredLength = Number(response.headers.get("content-length") ?? "0");
-  if (
-    !response.ok ||
-    !response.headers
-      .get("content-type")
-      ?.toLowerCase()
-      .startsWith("application/json") ||
-    (declaredLength > 0 && declaredLength > MAX_API_BYTES)
-  ) {
-    throw new TempleResearchError(
-      "Temple reference metadata was rejected.",
-      response.status >= 500,
-    );
-  }
-  const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.length < 2 || bytes.length > MAX_API_BYTES) {
-    throw new TempleResearchError("Temple reference metadata size was invalid.");
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(bytes.toString("utf8"));
-  } catch {
-    throw new TempleResearchError("Temple reference metadata was malformed.");
-  }
-  const pages =
-    parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>).query
-      : null;
-  const pageList =
-    pages && typeof pages === "object" && !Array.isArray(pages)
-      ? (pages as Record<string, unknown>).pages
-      : null;
-  if (!Array.isArray(pageList)) {
-    throw new TempleResearchError(
-      "No verifiable temple-reference candidates were found.",
-    );
-  }
   const unique = new Map<
     string,
     Readonly<{ rank: number; reference: ReferenceMetadata }>
   >();
-  for (const page of pageList) {
-    const reference = parseReferencePage(page, placeName, subjectKind);
-    const rank =
-      page &&
-      typeof page === "object" &&
-      !Array.isArray(page) &&
-      Number.isSafeInteger((page as Record<string, unknown>).index)
-        ? Number((page as Record<string, unknown>).index)
-        : Number.MAX_SAFE_INTEGER;
-    if (reference) unique.set(reference.sourcePageUrl, { rank, reference });
+  const responseEvidence: {
+    querySha256: string;
+    responseSha256: string;
+    searchTerm: string;
+  }[] = [];
+  const searchTerms = buildResearchSearchTerms(placeName, subjectKind);
+  for (const [queryIndex, searchTerm] of searchTerms.entries()) {
+    const url = new URL(SOURCE_API);
+    url.search = new URLSearchParams({
+      action: "query",
+      format: "json",
+      formatversion: "2",
+      generator: "search",
+      gsrlimit: "50",
+      gsrnamespace: "6",
+      gsrsearch: searchTerm,
+      iiprop: "url|mime|size|sha1|extmetadata",
+      iiurlwidth: "1600",
+      prop: "imageinfo",
+    }).toString();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30_000);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        cache: "no-store",
+        credentials: "omit",
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "Zyra-Genie-Real-World-Research/1.0",
+        },
+        redirect: "error",
+        signal: controller.signal,
+      });
+    } catch {
+      throw new TempleResearchError(
+        "Temple reference metadata could not be reached.",
+        true,
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+    const declaredLength = Number(response.headers.get("content-length") ?? "0");
+    if (
+      !response.ok ||
+      !response.headers
+        .get("content-type")
+        ?.toLowerCase()
+        .startsWith("application/json") ||
+      (declaredLength > 0 && declaredLength > MAX_API_BYTES)
+    ) {
+      throw new TempleResearchError(
+        "Temple reference metadata was rejected.",
+        response.status >= 500,
+      );
+    }
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length < 2 || bytes.length > MAX_API_BYTES) {
+      throw new TempleResearchError("Temple reference metadata size was invalid.");
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(bytes.toString("utf8"));
+    } catch {
+      throw new TempleResearchError("Temple reference metadata was malformed.");
+    }
+    const pages =
+      parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>).query
+        : null;
+    const pageList =
+      pages && typeof pages === "object" && !Array.isArray(pages)
+        ? (pages as Record<string, unknown>).pages
+        : null;
+    responseEvidence.push({
+      querySha256: sha256(url.toString()),
+      responseSha256: sha256(bytes),
+      searchTerm,
+    });
+    if (!Array.isArray(pageList)) continue;
+    for (const page of pageList) {
+      const reference = parseReferencePage(page, placeName, subjectKind);
+      const sourceRank =
+        page &&
+        typeof page === "object" &&
+        !Array.isArray(page) &&
+        Number.isSafeInteger((page as Record<string, unknown>).index)
+          ? Number((page as Record<string, unknown>).index)
+          : 999;
+      const rank = queryIndex * 1_000 + sourceRank;
+      if (reference && !unique.has(reference.sourcePageUrl)) {
+        unique.set(reference.sourcePageUrl, { rank, reference });
+      }
+    }
   }
   const references = [...unique.values()]
     .sort((left, right) => {
@@ -425,8 +464,21 @@ async function fetchReferenceMetadata(
     );
   }
   return Object.freeze({
-    apiResponseSha256: sha256(bytes),
-    querySha256: sha256(url.toString()),
+    apiResponseSha256:
+      responseEvidence.length === 1
+        ? responseEvidence[0]!.responseSha256
+        : sha256(postgresJsonbText(responseEvidence)),
+    querySha256:
+      responseEvidence.length === 1
+        ? responseEvidence[0]!.querySha256
+        : sha256(
+            postgresJsonbText(
+              responseEvidence.map(({ querySha256, searchTerm }) => ({
+                querySha256,
+                searchTerm,
+              })),
+            ),
+          ),
     references: Object.freeze(references),
   });
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildResearchSearchTerms,
   buildResearchRemoteFetchCommand,
   RESEARCH_QUARANTINE_SOURCE_KIND,
 } from "./temple-research";
@@ -8,6 +9,16 @@ import {
 describe("temple research quarantine contract", () => {
   it("uses the durable research-fetch source kind for licensed references", () => {
     expect(RESEARCH_QUARANTINE_SOURCE_KIND).toBe("research_fetch");
+  });
+
+  it("falls back from a ritual label to its distinctive public subject name", () => {
+    expect(buildResearchSearchTerms("Ekadashi Vrata", "ritual")).toEqual([
+      "Ekadashi Vrata",
+      "ekadashi",
+    ]);
+    expect(buildResearchSearchTerms("Kashi Vishwanath Temple", "temple")).toEqual([
+      "Kashi Vishwanath Temple",
+    ]);
   });
 
   it("binds the exact environment and accepted fetched state to the ledger RPC", () => {
