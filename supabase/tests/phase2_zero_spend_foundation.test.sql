@@ -3548,10 +3548,17 @@ select throws_ok(
   'a script-rubric gate cannot be promoted into production authority'
 );
 
+reset role;
+update public.episode_configuration_candidates
+set voice_confirmed_by='92000000-0000-4000-8000-000000000001',
+    voice_confirmed_at=statement_timestamp(),
+    look_confirmed_by='92000000-0000-4000-8000-000000000001',
+    look_confirmed_at=statement_timestamp()
+where episode_id='94000000-0000-4000-8000-000000000004';
 select set_config('request.jwt.claims','{"role":"service_role"}',true);
 select set_config('request.jwt.claim.role','service_role',true);
 set local role service_role;
-select throws_ok(
+select lives_ok(
   $command$
     select public.command_create_preflight_run(
       '91100000-0000-4000-8000-000000000001',
@@ -3566,9 +3573,7 @@ select throws_ok(
       'rubric-plan-missing-0001',repeat('c',64)
     )
   $command$,
-  '55000',
-  'completed advisory script rubric is required before planning',
-  'planning fails closed until completed advisory script-rubric evidence exists'
+  'planning proceeds when optional advisory script-rubric evidence is absent'
 );
 select is(
   (
@@ -3587,6 +3592,29 @@ select is(
   ),
   null::uuid,
   'an absent advisory rubric is represented honestly rather than fabricated'
+);
+select public.command_transition_preflight_run(
+  (
+    select id
+    from public.preflight_runs
+    where workspace_id='91100000-0000-4000-8000-000000000001'
+      and episode_id='94000000-0000-4000-8000-000000000004'
+      and kind='plan_evaluation'
+      and script_rubric_run_id is null
+    order by run_number desc
+    limit 1
+  ),
+  (
+    select aggregate_version
+    from public.preflight_runs
+    where workspace_id='91100000-0000-4000-8000-000000000001'
+      and episode_id='94000000-0000-4000-8000-000000000004'
+      and kind='plan_evaluation'
+      and script_rubric_run_id is null
+    order by run_number desc
+    limit 1
+  ),
+  'fail',null
 );
 select lives_ok(
   $command$
@@ -3636,12 +3664,6 @@ select ok(
   'script-rubric rewrite advice leaves the immutable user source unchanged'
 );
 reset role;
-update public.episode_configuration_candidates
-set voice_confirmed_by='92000000-0000-4000-8000-000000000001',
-    voice_confirmed_at=statement_timestamp(),
-    look_confirmed_by='92000000-0000-4000-8000-000000000001',
-    look_confirmed_at=statement_timestamp()
-where episode_id='94000000-0000-4000-8000-000000000004';
 select set_config('request.jwt.claims','{"role":"service_role"}',true);
 select set_config('request.jwt.claim.role','service_role',true);
 set local role service_role;
@@ -3670,6 +3692,7 @@ select ok(
       on r.script_revision_id=p.script_revision_id
     where p.episode_id='94000000-0000-4000-8000-000000000004'
       and p.kind='plan_evaluation'
+      and p.script_rubric_run_id is not null
   ),
   'the plan run pins the exact script-rubric evidence it consumed'
 );

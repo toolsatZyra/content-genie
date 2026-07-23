@@ -73,7 +73,7 @@
     {
       "path": "scripts/phase2-candidate-migrations.v1.json",
       "role": "candidate-migration-inventory",
-      "sha256": "c21b67b43bcb477a70ba576703a4e6272659b9d855edcbf0b6aeadd3e32e89b6"
+      "sha256": "24a0284e74a0ac2040a8525111cef1ae38bae265d2de510387ca7c7593547cde"
     },
     {
       "path": "scripts/phase2-coordinate-upgrade-drill.mjs",
@@ -821,6 +821,11 @@
       "sha256": "e69c78ac7819b8167c710d9c0f3e3e91b30b9ab5782f488dee8fcb9ec650ece6"
     },
     {
+      "path": "supabase/migrations/20260723031500_hindi_duration_profile_reconciliation.sql",
+      "role": "phase2-migration",
+      "sha256": "4c630718d8fbd89f3363411f9b8096613ea5dee0811b97db304d05ab3b49ddf6"
+    },
+    {
       "path": "supabase/tests/fixtures/phase2_coordinate_v1_verifiers.sql",
       "role": "predecessor-fixture",
       "sha256": "2df42a28cd04b193b0eaf97c882a17edfb13688cad7aca9bf8845408e9d7ec1c"
@@ -863,7 +868,7 @@
     {
       "path": "supabase/tests/phase2_zero_spend_foundation.test.sql",
       "role": "pgtap-source",
-      "sha256": "b93b0cce1ee3d76d0a164d72da530118f887aaa942f7119cbd9b4e880eb2a490"
+      "sha256": "1f5c275313c1097d387e904822029970054aa22524ee0fad6b0fdab97cf00843"
     },
     {
       "path": "supabase/tests/workspace_authority_profile.test.sql",
@@ -936,9 +941,9 @@
       "testFile": "phase2_world_cultural.test.sql"
     },
     {
-      "hardenedQuerySha256": "d23b5d41c74e290682cbe282d3bb92d247b934731fd88b5942c34a2aabe96b01",
+      "hardenedQuerySha256": "f735afbdf57e26d2125b0ad0533fb73deb01f0bafa34e3199e48e85f6e46ab51",
       "plannedAssertions": 179,
-      "sourceSha256": "b93b0cce1ee3d76d0a164d72da530118f887aaa942f7119cbd9b4e880eb2a490",
+      "sourceSha256": "1f5c275313c1097d387e904822029970054aa22524ee0fad6b0fdab97cf00843",
       "testFile": "phase2_zero_spend_foundation.test.sql"
     },
     {
@@ -1082,7 +1087,8 @@
     "supabase/migrations/20260722194400_mvp_provider_billing_event_receipts.sql",
     "supabase/migrations/20260722194500_owner_uploaded_narration_recovery_scan_audit.sql",
     "supabase/migrations/20260722194600_mvp_legacy_storyboard_owner_authority.sql",
-    "supabase/migrations/20260722194700_mvp_legacy_storyboard_owner_start_authority.sql"
+    "supabase/migrations/20260722194700_mvp_legacy_storyboard_owner_start_authority.sql",
+    "supabase/migrations/20260723031500_hindi_duration_profile_reconciliation.sql"
   ],
   "predecessorFixture": {
     "capturedAt": "2026-07-18",
