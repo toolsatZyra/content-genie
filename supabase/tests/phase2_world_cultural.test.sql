@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions,auth,storage,private,audit,pg_catalog;
-select plan(107);
+select plan(109);
 
 create temp table world_fixture(key text primary key,value text not null) on commit drop;
 grant select,insert,update,delete on world_fixture to authenticated,service_role;
@@ -290,6 +290,26 @@ cross join lateral (
 ) fixture
 where script.id='b1500000-0000-4000-8000-000000000001'
   and configuration.id='b1600000-0000-4000-8000-000000000002';
+insert into public.world_build_progress_items(
+ id,workspace_id,configuration_candidate_id,preflight_run_id,item_key,
+ item_kind,display_name,state,sort_order,safe_detail
+) values
+(
+ 'b24c0000-0000-4000-8000-000000000001',
+ 'b1100000-0000-4000-8000-000000000001',
+ 'b1600000-0000-4000-8000-000000000002',
+ 'b2460000-0000-4000-8000-000000000002',
+ 'system.cross-run-research','system','Cross-run research','researching',0,
+ 'Researching factual references'
+),
+(
+ 'b24c0000-0000-4000-8000-000000000002',
+ 'b1100000-0000-4000-8000-000000000001',
+ 'b1600000-0000-4000-8000-000000000002',
+ 'b2460000-0000-4000-8000-000000000002',
+ 'character.cross-run-ready','character','Ready anchor','review_ready',100,
+ 'Secure image is ready for review'
+);
 set local session_replication_role=origin;
 
 create function pg_temp.record_contract_character_manifest(
@@ -353,6 +373,23 @@ select throws_ok(
  '40001',
  'world extraction replay authority is stale',
  'a mismatched input manifest cannot replay prior World evidence'
+);
+reset role;
+update public.preflight_runs
+set state='failed',completed_at=statement_timestamp()
+where id='b2460000-0000-4000-8000-000000000002';
+set local role service_role;
+select is(
+ (select state from public.world_build_progress_items
+  where id='b24c0000-0000-4000-8000-000000000001'),
+ 'failed',
+ 'a terminal World run projects its failure into active studio progress'
+);
+select is(
+ (select state from public.world_build_progress_items
+  where id='b24c0000-0000-4000-8000-000000000002'),
+ 'review_ready',
+ 'terminal reconciliation preserves secure candidates already ready for review'
 );
 select lives_ok(format(
  'select public.command_record_character_candidate(%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L::jsonb,%L,null)',

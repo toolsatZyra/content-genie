@@ -73,7 +73,7 @@
     {
       "path": "scripts/phase2-candidate-migrations.v1.json",
       "role": "candidate-migration-inventory",
-      "sha256": "67947acd1786e08bbec3bb1501ec385b8f42112793e7606017424f9501b9ca48"
+      "sha256": "6dcf35f432b6b962b2e0268f8fbc1bad621d7dfe38277b2298ce017e097645e0"
     },
     {
       "path": "scripts/phase2-coordinate-upgrade-drill.mjs",
@@ -926,6 +926,11 @@
       "sha256": "e9435e2c6611f99be5ba91d14e0a29b84136344feebc4f87890e4d236e61fb5d"
     },
     {
+      "path": "supabase/migrations/20260723150500_terminal_world_progress_projection.sql",
+      "role": "phase2-migration",
+      "sha256": "4c0cb865b0bdd17875de5095070861cf6ed324017154db59f95388391b4fe906"
+    },
+    {
       "path": "supabase/tests/fixtures/phase2_coordinate_v1_verifiers.sql",
       "role": "predecessor-fixture",
       "sha256": "2df42a28cd04b193b0eaf97c882a17edfb13688cad7aca9bf8845408e9d7ec1c"
@@ -963,7 +968,7 @@
     {
       "path": "supabase/tests/phase2_world_cultural.test.sql",
       "role": "pgtap-source",
-      "sha256": "e96ec1b017c18fb1314c3d65fcc78b97dc0deea984c79912030dbe6cb94e1846"
+      "sha256": "13270fcb1811aa1ab0d2bb4aadad8ac20399f1bed61daec8ac43cdc74c65f907"
     },
     {
       "path": "supabase/tests/phase2_zero_spend_foundation.test.sql",
@@ -1035,9 +1040,9 @@
       "testFile": "phase2_preflight_provider_ingest.test.sql"
     },
     {
-      "hardenedQuerySha256": "e2247c87adb588754b0833f3ddde4bba0d257e423af284669ada13f428aa91d4",
-      "plannedAssertions": 107,
-      "sourceSha256": "e96ec1b017c18fb1314c3d65fcc78b97dc0deea984c79912030dbe6cb94e1846",
+      "hardenedQuerySha256": "41d8232885e8bbe27a672b9a3d64058d53a478bd4b731f7bd551d685c28be1d5",
+      "plannedAssertions": 109,
+      "sourceSha256": "13270fcb1811aa1ab0d2bb4aadad8ac20399f1bed61daec8ac43cdc74c65f907",
       "testFile": "phase2_world_cultural.test.sql"
     },
     {
@@ -1208,7 +1213,8 @@
     "supabase/migrations/20260723101500_world_extraction_model_provenance.sql",
     "supabase/migrations/20260723102000_fal_credential_poll_claim_release.sql",
     "supabase/migrations/20260723134500_world_retry_review_candidate_replacement.sql",
-    "supabase/migrations/20260723143000_world_extraction_cross_run_replay.sql"
+    "supabase/migrations/20260723143000_world_extraction_cross_run_replay.sql",
+    "supabase/migrations/20260723150500_terminal_world_progress_projection.sql"
   ],
   "predecessorFixture": {
     "capturedAt": "2026-07-18",
