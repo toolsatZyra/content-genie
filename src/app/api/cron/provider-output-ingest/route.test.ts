@@ -194,7 +194,7 @@ describe("provider output secure-ingest cron", () => {
     );
   });
 
-  it("securely ingests a bounded World batch in one invocation", async () => {
+  it("keeps one expensive World scan inside each bounded invocation", async () => {
     mocks.claim
       .mockReset()
       .mockResolvedValueOnce({
@@ -213,15 +213,16 @@ describe("provider output secure-ingest cron", () => {
     const result = await GET(request());
 
     await expect(result.json()).resolves.toMatchObject({
-      claimed: 3,
-      completed: 3,
+      claimed: 1,
+      completed: 1,
       failed: 0,
       ok: true,
     });
-    expect(mocks.fetch).toHaveBeenCalledTimes(3);
-    expect(mocks.quarantine).toHaveBeenCalledTimes(3);
-    expect(mocks.scan).toHaveBeenCalledTimes(3);
-    expect(mocks.promote).toHaveBeenCalledTimes(3);
+    expect(mocks.claim).toHaveBeenCalledTimes(1);
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
+    expect(mocks.quarantine).toHaveBeenCalledTimes(1);
+    expect(mocks.scan).toHaveBeenCalledTimes(1);
+    expect(mocks.promote).toHaveBeenCalledTimes(1);
     expect(mocks.falRecovery).not.toHaveBeenCalled();
   });
 

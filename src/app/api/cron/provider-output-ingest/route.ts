@@ -42,10 +42,10 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 export const runtime = "nodejs";
 
-// Generated World images are independent, fenced candidates. Processing a
-// small bounded batch keeps a normal multi-anchor World visibly moving without
-// weakening the per-candidate quarantine, scan, and promotion boundary.
-const MAX_CANDIDATES_PER_INVOCATION = 3;
+// A sandbox scan can use most of a serverless invocation. The one-minute cron
+// cadence already provides bounded cross-invocation concurrency, so claim one
+// candidate here and leave enough time for receipt-aware promotion recovery.
+const MAX_CANDIDATES_PER_INVOCATION = 1;
 const LEASE_SECONDS = 300;
 const imageContentTypes = ["image/jpeg", "image/png", "image/webp"] as const;
 
