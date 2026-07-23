@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildResearchSearchTerms,
   buildResearchRemoteFetchCommand,
+  RESEARCH_REFERENCE_BATCH_SIZE,
   RESEARCH_QUARANTINE_SOURCE_KIND,
+  researchReferenceBatches,
 } from "./temple-research";
 
 describe("temple research quarantine contract", () => {
@@ -18,6 +20,15 @@ describe("temple research quarantine contract", () => {
     ]);
     expect(buildResearchSearchTerms("Kashi Vishwanath Temple", "temple")).toEqual([
       "Kashi Vishwanath Temple",
+    ]);
+  });
+
+  it("processes licensed reference candidates in bounded parallel batches", () => {
+    expect(RESEARCH_REFERENCE_BATCH_SIZE).toBe(4);
+    expect(researchReferenceBatches([1, 2, 3, 4, 5, 6, 7, 8, 9])).toEqual([
+      [1, 2, 3, 4],
+      [5, 6, 7, 8],
+      [9],
     ]);
   });
 

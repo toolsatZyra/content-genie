@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions,auth,storage,private,audit,pg_catalog;
-select plan(104);
+select plan(107);
 
 create temp table world_fixture(key text primary key,value text not null) on commit drop;
 grant select,insert,update,delete on world_fixture to authenticated,service_role;
@@ -154,6 +154,142 @@ from (values
  ('b1720000-0000-4000-8000-000000000003'::uuid,'b1700000-0000-4000-8000-000000000003'::uuid,'b1730000-0000-4000-8000-000000000003'::uuid,'location_anchor','3','c'),
  ('b1720000-0000-4000-8000-000000000004'::uuid,'b1700000-0000-4000-8000-000000000004'::uuid,'b1730000-0000-4000-8000-000000000004'::uuid,'character_anchor','4','d')
 ) as media(version_id,asset_id,quarantine_id,kind,hash_char,prov_char);
+
+insert into public.episode_configuration_candidates(
+ id,workspace_id,episode_id,candidate_number,script_revision_id,narrator_gender,
+ voice_version_id,look_version_id,state,selected_by,superseded_at
+)
+select
+ 'b1600000-0000-4000-8000-000000000002',
+ 'b1100000-0000-4000-8000-000000000001',
+ 'b1400000-0000-4000-8000-000000000001',
+ 2,
+ 'b1500000-0000-4000-8000-000000000001',
+ 'male',
+ voice_version_id,
+ look_version_id,
+ 'superseded',
+ 'b1200000-0000-4000-8000-000000000001',
+ statement_timestamp()
+from public.episode_configuration_candidates
+where id='b1600000-0000-4000-8000-000000000001';
+
+insert into public.preflight_runs(
+ id,workspace_id,episode_id,configuration_candidate_id,script_revision_id,
+ kind,run_number,authority_epoch,state,requires_micro_authority,trigger_run_id,
+ completed_at
+) values
+(
+ 'b2460000-0000-4000-8000-000000000001',
+ 'b1100000-0000-4000-8000-000000000001',
+ 'b1400000-0000-4000-8000-000000000001',
+ 'b1600000-0000-4000-8000-000000000002',
+ 'b1500000-0000-4000-8000-000000000001',
+ 'world_anchor',97,1,'failed',false,null,statement_timestamp()
+),
+(
+ 'b2460000-0000-4000-8000-000000000002',
+ 'b1100000-0000-4000-8000-000000000001',
+ 'b1400000-0000-4000-8000-000000000001',
+ 'b1600000-0000-4000-8000-000000000002',
+ 'b1500000-0000-4000-8000-000000000001',
+ 'world_anchor',98,2,'running',false,'trigger-cross-run-replay',null
+);
+insert into public.preflight_stage_runs(
+ id,workspace_id,preflight_run_id,stage_key,queue_key,state,
+ next_attempt_no,highest_fencing_token,input_manifest_id,input_manifest_hash,
+ completed_at
+) values
+(
+ 'b2470000-0000-4000-8000-000000000001',
+ 'b1100000-0000-4000-8000-000000000001',
+ 'b2460000-0000-4000-8000-000000000001',
+ 'world_anchor.root','genie-preflight-world-images','failed_terminal',
+ 2,1,'b24b0000-0000-4000-8000-000000000001',repeat('7',64),
+ statement_timestamp()
+),
+(
+ 'b2470000-0000-4000-8000-000000000002',
+ 'b1100000-0000-4000-8000-000000000001',
+ 'b2460000-0000-4000-8000-000000000002',
+ 'world_anchor.root','genie-preflight-world-images','claimed',
+ 2,1,'b24b0000-0000-4000-8000-000000000002',repeat('7',64),
+ null
+);
+insert into public.preflight_stage_attempts(
+ id,workspace_id,preflight_run_id,preflight_stage_run_id,attempt_no,
+ authority_epoch,fencing_token,input_manifest_id,input_manifest_hash,state,
+ safe_error_class,completed_at
+) values
+(
+ 'b2480000-0000-4000-8000-000000000001',
+ 'b1100000-0000-4000-8000-000000000001',
+ 'b2460000-0000-4000-8000-000000000001',
+ 'b2470000-0000-4000-8000-000000000001',
+ 1,1,1,'b24b0000-0000-4000-8000-000000000001',repeat('7',64),
+ 'failed_terminal','candidate_review_conflict',statement_timestamp()
+),
+(
+ 'b2480000-0000-4000-8000-000000000002',
+ 'b1100000-0000-4000-8000-000000000001',
+ 'b2460000-0000-4000-8000-000000000002',
+ 'b2470000-0000-4000-8000-000000000002',
+ 1,2,1,'b24b0000-0000-4000-8000-000000000002',repeat('7',64),
+ 'claimed',null,null
+);
+insert into public.preflight_stage_leases(
+ id,workspace_id,preflight_run_id,stage_attempt_id,lease_owner,fencing_token,
+ state,issued_at,heartbeat_at,expires_at
+) values (
+ 'b2490000-0000-4000-8000-000000000002',
+ 'b1100000-0000-4000-8000-000000000001',
+ 'b2460000-0000-4000-8000-000000000002',
+ 'b2480000-0000-4000-8000-000000000002',
+ 'pgtap-cross-run-replay',1,'active',statement_timestamp(),
+ statement_timestamp(),statement_timestamp() + interval '10 minutes'
+);
+insert into private.world_extraction_results(
+ id,workspace_id,preflight_run_id,stage_attempt_id,
+ configuration_candidate_id,script_revision_id,script_sha256,look_version_id,
+ schema_version,extraction_json,extraction_hash,model_key,model_request_hash,
+ provider_response_id_hash,provider_request_id_hash
+)
+select
+ 'b24a0000-0000-4000-8000-000000000001',
+ 'b1100000-0000-4000-8000-000000000001',
+ 'b2460000-0000-4000-8000-000000000001',
+ 'b2480000-0000-4000-8000-000000000001',
+ 'b1600000-0000-4000-8000-000000000002',
+ 'b1500000-0000-4000-8000-000000000001',
+ script.raw_utf8_sha256,
+ configuration.look_version_id,
+ 'genie.world-extraction.v3',
+ fixture.extraction_json,
+ encode(extensions.digest(convert_to(fixture.extraction_json::text,'UTF8'),'sha256'),'hex'),
+ 'gpt-5.6',repeat('8',64),repeat('9',64),repeat('a',64)
+from public.script_revisions script
+join public.episode_configuration_candidates configuration
+  on configuration.script_revision_id=script.id
+cross join lateral (
+  select '{
+    "schemaVersion":"genie.world-extraction.v3",
+    "characters":[{
+      "characterKey":"fixture",
+      "canonicalName":"Fixture",
+      "forms":[{
+        "formKey":"standard",
+        "formName":"Standard",
+        "identityManifest":{
+          "schemaVersion":"genie-character-identity-manifest.v2"
+        }
+      }]
+    }],
+    "locations":[{"locationKey":"fixture","canonicalName":"Fixture"}],
+    "props":[]
+  }'::jsonb as extraction_json
+) fixture
+where script.id='b1500000-0000-4000-8000-000000000001'
+  and configuration.id='b1600000-0000-4000-8000-000000000002';
 set local session_replication_role=origin;
 
 create function pg_temp.record_contract_character_manifest(
@@ -189,6 +325,34 @@ select ok(
  not has_function_privilege('authenticated','public.command_record_character_candidate(uuid,uuid,uuid,uuid,text,text,text,text,uuid,text,text,text,text,uuid,jsonb,text,uuid)','execute')
  and has_function_privilege('service_role','public.command_record_character_candidate(uuid,uuid,uuid,uuid,text,text,text,text,uuid,text,text,text,text,uuid,jsonb,text,uuid)','execute'),
  'world candidate creation is service-only'
+);
+select lives_ok(
+ $$select public.get_world_extraction_replay_result(
+   'b2480000-0000-4000-8000-000000000002',2,1,repeat('7',64)
+ )$$,
+ 'a fenced retry replays an exact prior-run World extraction'
+);
+select ok(
+ exists(
+   select 1
+   from private.world_extraction_results replay
+   join private.world_extraction_results source
+     on source.id=replay.source_extraction_result_id
+   where replay.preflight_run_id='b2460000-0000-4000-8000-000000000002'
+     and replay.stage_attempt_id='b2480000-0000-4000-8000-000000000002'
+     and replay.source_extraction_result_id='b24a0000-0000-4000-8000-000000000001'
+     and replay.extraction_hash=source.extraction_hash
+     and replay.extraction_json=source.extraction_json
+ ),
+ 'the replay is current-run evidence with explicit immutable source lineage'
+);
+select throws_ok(
+ $$select public.get_world_extraction_replay_result(
+   'b2480000-0000-4000-8000-000000000002',2,1,repeat('6',64)
+ )$$,
+ '40001',
+ 'world extraction replay authority is stale',
+ 'a mismatched input manifest cannot replay prior World evidence'
 );
 select lives_ok(format(
  'select public.command_record_character_candidate(%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L::jsonb,%L,null)',

@@ -10,11 +10,15 @@ import type {
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import {
   fetchRemoteToQuarantineBuffer,
+  RemoteFetchPolicyError,
   type RemoteFetchResult,
 } from "@/security/remote-fetch";
 import { getActiveRemoteFetchPolicy } from "@/server/provider-broker-ledger";
 import { retainDistinctResearchReference } from "@/server/research-reference-selection";
-import { scanAndReencodeWorldImage } from "@/server/sandbox-media-scanner";
+import {
+  SandboxMediaScannerError,
+  scanAndReencodeWorldImage,
+} from "@/server/sandbox-media-scanner";
 import type { PreflightTaskEnvelope } from "../../trigger/preflight-contract";
 
 const SOURCE_API = "https://en.wikipedia.org/w/api.php";
@@ -22,6 +26,7 @@ const MAX_API_BYTES = 2 * 1024 * 1024;
 const MAX_REFERENCE_BYTES = 25 * 1024 * 1024;
 const SIGNED_REFERENCE_SECONDS = 15 * 60;
 const eligibleMimeTypes = ["image/jpeg", "image/png", "image/webp"] as const;
+export const RESEARCH_REFERENCE_BATCH_SIZE = 4;
 
 export class TempleResearchError extends Error {
   override readonly name = "TempleResearchError";
@@ -204,6 +209,16 @@ export function buildResearchSearchTerms(
       (value, index, values) => value.length > 0 && values.indexOf(value) === index,
     ),
   );
+}
+
+export function researchReferenceBatches<T>(
+  values: readonly T[],
+): readonly (readonly T[])[] {
+  const batches: T[][] = [];
+  for (let index = 0; index < values.length; index += RESEARCH_REFERENCE_BATCH_SIZE) {
+    batches.push(values.slice(index, index + RESEARCH_REFERENCE_BATCH_SIZE));
+  }
+  return Object.freeze(batches.map((batch) => Object.freeze(batch)));
 }
 
 function extValue(metadata: unknown, key: string, maximum = 4_000): string | null {
@@ -801,31 +816,57 @@ export async function researchRealWorldSubject(input: {
     objectName: string;
   }[] = [];
   const fetchedContentHashes = new Set<string>();
-  for (const reference of metadata.references) {
-    const fetched = await fetchRemoteToQuarantineBuffer(reference.sourceFileUrl, {
-      allowedContentTypes: eligibleMimeTypes,
-      allowedHosts: policy.allowedHosts,
-      fetchClass: "research_reference",
-      maximumBytes: MAX_REFERENCE_BYTES,
-      maximumRedirects: 2,
-      timeoutMs: 60_000,
-    });
-    if (fetchedContentHashes.has(fetched.sha256)) continue;
-    fetchedContentHashes.add(fetched.sha256);
-    const asset = await promoteReference({
-      envelope: input.envelope,
-      fetchResult: fetched,
-      metadata: reference,
-      policy,
-    });
-    if (!retainDistinctResearchReference(promoted, { ...asset, metadata: reference })) {
-      continue;
+  let recoverableCandidateFailure = false;
+  for (const batch of researchReferenceBatches(metadata.references)) {
+    const settled = await Promise.allSettled(
+      batch.map(async (reference) => {
+        const fetched = await fetchRemoteToQuarantineBuffer(reference.sourceFileUrl, {
+          allowedContentTypes: eligibleMimeTypes,
+          allowedHosts: policy.allowedHosts,
+          fetchClass: "research_reference",
+          maximumBytes: MAX_REFERENCE_BYTES,
+          maximumRedirects: 2,
+          timeoutMs: 60_000,
+        });
+        if (fetchedContentHashes.has(fetched.sha256)) return null;
+        fetchedContentHashes.add(fetched.sha256);
+        return {
+          asset: await promoteReference({
+            envelope: input.envelope,
+            fetchResult: fetched,
+            metadata: reference,
+            policy,
+          }),
+          reference,
+        };
+      }),
+    );
+    for (const candidate of settled) {
+      if (candidate.status === "rejected") {
+        if (
+          candidate.reason instanceof RemoteFetchPolicyError ||
+          candidate.reason instanceof SandboxMediaScannerError
+        ) {
+          recoverableCandidateFailure ||=
+            candidate.reason instanceof RemoteFetchPolicyError
+              ? candidate.reason.retryable
+              : candidate.reason.safeClass.startsWith("scanner.");
+          continue;
+        }
+        throw candidate.reason;
+      }
+      if (!candidate.value) continue;
+      retainDistinctResearchReference(promoted, {
+        ...candidate.value.asset,
+        metadata: candidate.value.reference,
+      });
     }
     if (promoted.length === 4) break;
   }
   if (promoted.length < 2) {
     throw new TempleResearchError(
       "Two content-distinct licensed photographs of the real-world subject were not found.",
+      recoverableCandidateFailure,
     );
   }
   const referenceManifest = promoted.map(({ assetVersionId, metadata: reference }) => ({

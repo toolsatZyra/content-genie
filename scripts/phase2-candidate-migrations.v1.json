@@ -154,6 +154,7 @@
     "supabase/migrations/20260723101000_fal_poll_candidate_arrival_guard.sql",
     "supabase/migrations/20260723101500_world_extraction_model_provenance.sql",
     "supabase/migrations/20260723102000_fal_credential_poll_claim_release.sql",
-    "supabase/migrations/20260723134500_world_retry_review_candidate_replacement.sql"
+    "supabase/migrations/20260723134500_world_retry_review_candidate_replacement.sql",
+    "supabase/migrations/20260723143000_world_extraction_cross_run_replay.sql"
   ]
 }
