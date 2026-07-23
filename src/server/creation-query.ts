@@ -212,6 +212,38 @@ function projectWorldProgress(
   }));
 }
 
+export function scopeWorldEntitiesToLatestRun<
+  TCharacter extends Readonly<{ formId: string }>,
+  TLocation extends Readonly<{ entityId: string }>,
+>(input: {
+  characters: readonly TCharacter[];
+  locations: readonly TLocation[];
+  progress: readonly Pick<CreationWorldProgressItem, "worldEntityId">[];
+}): Readonly<{
+  characters: readonly TCharacter[];
+  locations: readonly TLocation[];
+}> {
+  const currentEntityIds = new Set(
+    input.progress
+      .map(({ worldEntityId }) => worldEntityId)
+      .filter((worldEntityId): worldEntityId is string => worldEntityId !== null),
+  );
+  if (currentEntityIds.size === 0) {
+    return Object.freeze({
+      characters: input.characters,
+      locations: input.locations,
+    });
+  }
+  return Object.freeze({
+    characters: Object.freeze(
+      input.characters.filter(({ formId }) => currentEntityIds.has(formId)),
+    ),
+    locations: Object.freeze(
+      input.locations.filter(({ entityId }) => currentEntityIds.has(entityId)),
+    ),
+  });
+}
+
 type VoiceAvailabilityStatus =
   CreationConfiguration["voiceAvailabilityByVersionId"][string];
 
@@ -505,6 +537,11 @@ export async function loadCreationProjection(
   const progress = projectWorldProgress(
     (worldProgressResult.data ?? []) as readonly WorldProgressRow[],
   );
+  const currentWorld = scopeWorldEntitiesToLatestRun({
+    characters: readinessBase.world.characters,
+    locations: readinessBase.world.locations,
+    progress,
+  });
   const objectKindByWorldEntityId = new Map(
     progress
       .filter(
@@ -518,7 +555,8 @@ export async function loadCreationProjection(
     ...readinessBase,
     world: {
       ...readinessBase.world,
-      locations: readinessBase.world.locations.map((location) => ({
+      characters: currentWorld.characters,
+      locations: currentWorld.locations.map((location) => ({
         ...location,
         worldObjectKind:
           objectKindByWorldEntityId.get(location.entityId) === "prop"

@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { LOOKS } from "@/domain/look/look-registry";
 
-import { loadCreationProjection } from "./creation-query";
+import {
+  loadCreationProjection,
+  scopeWorldEntitiesToLatestRun,
+} from "./creation-query";
 
 interface FakeResult {
   readonly data: unknown;
@@ -166,6 +169,44 @@ function successfulResults(
 }
 
 describe("the creation projection query", () => {
+  it("scopes retry projections to the latest World run", () => {
+    const currentCharacter = { formId: "current-character", name: "Current" };
+    const staleCharacter = { formId: "stale-character", name: "Stale" };
+    const currentLocation = { entityId: "current-location", name: "Current" };
+    const staleLocation = { entityId: "stale-location", name: "Stale" };
+
+    expect(
+      scopeWorldEntitiesToLatestRun({
+        characters: [staleCharacter, currentCharacter],
+        locations: [staleLocation, currentLocation],
+        progress: [
+          { worldEntityId: null },
+          { worldEntityId: currentCharacter.formId },
+          { worldEntityId: currentLocation.entityId },
+        ],
+      }),
+    ).toEqual({
+      characters: [currentCharacter],
+      locations: [currentLocation],
+    });
+  });
+
+  it("preserves durable World selections when no scoped run exists", () => {
+    const character = { formId: "durable-character" };
+    const location = { entityId: "durable-location" };
+
+    expect(
+      scopeWorldEntitiesToLatestRun({
+        characters: [character],
+        locations: [location],
+        progress: [],
+      }),
+    ).toEqual({
+      characters: [character],
+      locations: [location],
+    });
+  });
+
   it("projects exact script, configuration, availability, and numeric versions", async () => {
     const { client } = fakeClient(successfulResults());
     const projection = await loadCreationProjection(client, user, episodeId);
