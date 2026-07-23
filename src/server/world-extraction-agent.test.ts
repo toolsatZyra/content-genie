@@ -256,7 +256,7 @@ describe("ledgered World Extraction", () => {
     });
   });
 
-  it("repairs one structurally inconsistent identity manifest within the same fenced attempt", async () => {
+  it("derives the weapon summary from exact held-object assignments", async () => {
     const script = "Vishnu entered the cave after the battle.";
     const scriptSha256 = createHash("sha256").update(script).digest("hex");
     const form = extraction.characters[0].forms[0];
@@ -282,16 +282,64 @@ describe("ledgered World Extraction", () => {
         },
       ],
     };
+    mocks.agent.mockResolvedValue({
+      output: inconsistentExtraction,
+      requestHash: "e".repeat(64),
+      responseId: "resp_world_normalized",
+      responseRequestId: "req_world_normalized",
+    });
+
+    const result = await extractWorldFromLockedScript({
+      authority,
+      script,
+      scriptSha256,
+    });
+
+    expect(result.responseId).toBe("resp_world_normalized");
+    expect(result.modelRequestHash).toBe("e".repeat(64));
+    expect(mocks.agent).toHaveBeenCalledTimes(1);
+    expect(
+      result.extraction.characters[0]?.forms[0]?.identityManifest.deity?.weapons,
+    ).toEqual([{ key: "trident", required: true }]);
+  });
+
+  it("repairs a non-canonicalizable cross-binding once within the same fence", async () => {
+    const script = "Vishnu entered the cave after the battle.";
+    const scriptSha256 = createHash("sha256").update(script).digest("hex");
+    const form = extraction.characters[0].forms[0];
+    const inconsistentExtraction = {
+      ...extraction,
+      characters: [
+        {
+          ...extraction.characters[0],
+          forms: [
+            {
+              ...form,
+              identityManifest: {
+                ...form.identityManifest,
+                identity: {
+                  ...form.identityManifest.identity,
+                  essentialAttributes:
+                    form.identityManifest.identity.essentialAttributes.filter(
+                      (item) => item !== "trident",
+                    ),
+                },
+              },
+            },
+          ],
+        },
+      ],
+    };
     mocks.agent
       .mockResolvedValueOnce({
         output: inconsistentExtraction,
-        requestHash: "e".repeat(64),
+        requestHash: "f".repeat(64),
         responseId: "resp_world_invalid",
         responseRequestId: "req_world_invalid",
       })
       .mockResolvedValueOnce({
         output: extraction,
-        requestHash: "f".repeat(64),
+        requestHash: "1".repeat(64),
         responseId: "resp_world_repaired",
         responseRequestId: "req_world_repaired",
       });
@@ -303,7 +351,7 @@ describe("ledgered World Extraction", () => {
     });
 
     expect(result.responseId).toBe("resp_world_repaired");
-    expect(result.modelRequestHash).toBe("f".repeat(64));
+    expect(result.modelRequestHash).toBe("1".repeat(64));
     expect(mocks.agent).toHaveBeenCalledTimes(2);
     expect(mocks.agent.mock.calls[1]?.[0]).toMatchObject({
       maximumFanOut: 2,
@@ -312,7 +360,7 @@ describe("ledgered World Extraction", () => {
     });
     expect(mocks.agent.mock.calls[1]?.[1]).toMatchObject({
       input: expect.stringContaining(
-        "VALIDATION_FAILURE_CODE=character_identity_manifest_cross_binding",
+        "VALIDATION_FAILURE_CODE=world_extraction_cross_binding",
       ),
       instructions: expect.stringContaining("deity.weapons must equal the exact set"),
     });
