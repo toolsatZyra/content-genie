@@ -76,7 +76,7 @@
     "@playwright/test": "1.61.1",
     "@tailwindcss/postcss": "4.3.3",
     "@trigger.dev/build": "4.5.4",
-    "@types/node": "22.20.1",
+    "@types/node": "26.1.1",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "@vitest/coverage-v8": "4.1.10",
