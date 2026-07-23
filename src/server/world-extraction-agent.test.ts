@@ -303,6 +303,55 @@ describe("ledgered World Extraction", () => {
     ).toEqual([{ key: "trident", required: true }]);
   });
 
+  it("keeps one validated character candidate reviewable without blocking images", async () => {
+    const script = "A single conventional divine form appears.";
+    const scriptSha256 = createHash("sha256").update(script).digest("hex");
+    mocks.agent.mockResolvedValue({
+      output: {
+        ...extraction,
+        ambiguities: [
+          {
+            affectedKeys: ["shiva"],
+            blocksGeneration: true,
+            description:
+              "The script omits non-conflicting presentational detail; one restrained conventional form is provided for human review.",
+            kind: "identity",
+          },
+          {
+            affectedKeys: ["shiva"],
+            blocksGeneration: true,
+            description:
+              "The source traditions materially conflict on this cultural depiction.",
+            kind: "cultural",
+          },
+        ],
+      },
+      requestHash: "2".repeat(64),
+      responseId: "resp_world_reviewable",
+      responseRequestId: "req_world_reviewable",
+    });
+
+    const result = await extractWorldFromLockedScript({
+      authority,
+      script,
+      scriptSha256,
+    });
+
+    expect(result.extraction.ambiguities).toEqual([
+      expect.objectContaining({
+        affectedKeys: ["shiva"],
+        blocksGeneration: false,
+        kind: "identity",
+      }),
+      expect.objectContaining({
+        affectedKeys: ["shiva"],
+        blocksGeneration: true,
+        kind: "cultural",
+      }),
+    ]);
+    expect(mocks.agent).toHaveBeenCalledTimes(1);
+  });
+
   it("repairs a non-canonicalizable cross-binding once within the same fence", async () => {
     const script = "Vishnu entered the cave after the battle.";
     const scriptSha256 = createHash("sha256").update(script).digest("hex");
