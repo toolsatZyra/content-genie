@@ -113,6 +113,8 @@
     "supabase/migrations/20260721220500_phase2_p2_09_cultural_claim_contract.sql",
     "supabase/migrations/20260721220600_phase2_p2_09_cultural_claim_runtime_correction.sql",
     "supabase/migrations/20260721220700_phase2_p2_09_service_grant_authority_correction.sql",
+    "supabase/migrations/20260722003755_mvp_media_receipt_convergence.sql",
+    "supabase/migrations/20260722115341_mvp_media_callback_slot_binding.sql",
     "supabase/migrations/20260722125600_owner_uploaded_narration_source_enum.sql",
     "supabase/migrations/20260722125603_owner_uploaded_narration_source.sql",
     "supabase/migrations/20260722125830_owner_uploaded_narration_qc_authority.sql",

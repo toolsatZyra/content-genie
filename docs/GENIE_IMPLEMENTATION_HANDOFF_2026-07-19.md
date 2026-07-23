@@ -1404,3 +1404,30 @@ next steps are to bind the candidate to a local commit, run the exact-commit
 precheckpoint gate, provision `FAL_ADMIN_KEY` without printing or committing
 it, run the live billing canary, promote the approved migrations, push `main`
 explicitly, and verify the Git-connected Vercel deployment and live owner path.
+
+## 28. 2026-07-23 FAL billing proof and promotion-manifest correction
+
+The server-only FAL Admin credential is now provisioned as a sensitive Vercel
+environment variable for Production and Preview. A bounded read-only canary
+against a real recent media request returned HTTP 200, matched exactly one
+billing event, and exposed the seven fields consumed by Genie's reconciler:
+request identity, endpoint identity, timestamp, output units, unit price,
+discount and nano-USD cost. The credential value was never committed or
+printed, all one-time local copies were removed, and the superseded invalid key
+was revoked.
+
+The live production migration audit also found that two already committed and
+preview-proven media recovery migrations were absent from the frozen candidate
+inventory even though the application calls their RPCs:
+`mvp_media_receipt_convergence` and `mvp_media_callback_slot_binding`. The
+candidate inventory and trusted harness now include both in dependency order;
+the regenerated trusted-manifest SHA-256 is
+`40bf7c48ce7a654505f66b94500cce073b779c0460142d92cfabc61e1a96aaba`.
+Preview already contains both migrations. Production is still unchanged while
+this corrected exact candidate is re-gated and independently reviewed.
+
+Immediate sequence: commit the corrected inventory, run the complete
+same-commit precheckpoint/database/live/browser gate, obtain the independent
+manifest-delta review, promote only the production-missing approved migrations,
+run post-DDL verification/advisors, push `main` explicitly, and verify the
+automatic Vercel deployment plus live owner path.
