@@ -170,6 +170,55 @@ describe("FAL authenticated result recovery", () => {
     );
   });
 
+  it("recovers edit results from the parent control route returned by FAL", async () => {
+    mocks.manifest.mockResolvedValue({
+      modelKey: "fal-ai/nano-banana-2/edit",
+      operation: "edit_image",
+      payload: { targetAssetId },
+      provider: "fal",
+    });
+    const fetchImplementation = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            images: [
+              {
+                content_type: "image/png",
+                height: 1792,
+                url: "https://v3.fal.media/files/result.png",
+                width: 1024,
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+      );
+
+    await expect(
+      recoverNextCompletedFalResult({
+        environment: "production",
+        falKey: "f".repeat(32),
+        fetchImplementation,
+      }),
+    ).resolves.toEqual({
+      checked: true,
+      providerRequestId,
+      recovered: true,
+    });
+    expect(fetchImplementation).toHaveBeenNthCalledWith(
+      1,
+      "https://queue.fal.run/fal-ai/nano-banana-2/edit/requests/fal-job-123",
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(fetchImplementation).toHaveBeenNthCalledWith(
+      2,
+      "https://queue.fal.run/fal-ai/nano-banana-2/requests/fal-job-123",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
   it("leaves an unfinished queue result for the next bounded poll", async () => {
     await expect(
       recoverNextCompletedFalResult({
@@ -192,7 +241,7 @@ describe("FAL authenticated result recovery", () => {
       empty: false,
       externalJobId: "fal-job-123",
       ok: true,
-      pollAttemptCount: 5,
+      pollAttemptCount: 100,
       providerRequestId,
     });
     await expect(
@@ -231,7 +280,7 @@ describe("FAL authenticated result recovery", () => {
       empty: false,
       externalJobId: "fal-job-123",
       ok: true,
-      pollAttemptCount: 5,
+      pollAttemptCount: 100,
       providerRequestId,
     });
     await expect(

@@ -23,7 +23,11 @@ const pendingStatuses = new Set([400, 404, 409, 422, 425]);
 const credentialStatuses = new Set([401, 403]);
 const terminalStatuses = new Set([410]);
 const METHOD_NOT_ALLOWED = 405;
-const MAXIMUM_POLL_ATTEMPTS = 5;
+// FAL queue requests are durable and can remain in progress while runners
+// scale or retry. The ledger already bounds authenticated claims at 100, so
+// use that same terminal budget instead of failing a valid long-running job
+// after only five cron passes.
+const MAXIMUM_POLL_ATTEMPTS = 100;
 
 export class FalResultRecoveryError extends Error {
   override readonly name = "FalResultRecoveryError";
@@ -63,6 +67,21 @@ async function fetchFalQueueResult(
   };
   const direct = await input.fetchImplementation(baseUrl, request);
   if (direct.status !== METHOD_NOT_ALLOWED) return direct;
+
+  // FAL can expose an input subpath such as `nano-banana-2/edit` while its
+  // submission receipt points status/result retrieval at the parent model
+  // route. We currently persist the verified request id and endpoint id, so
+  // recover that documented receipt shape deterministically when the subpath
+  // rejects GET. Do not broaden beyond one exact trailing path segment.
+  const modelSegments = input.modelKey.split("/");
+  if (modelSegments.length === 3) {
+    const parentModelKey = modelSegments.slice(0, 2).join("/");
+    const parent = await input.fetchImplementation(
+      `https://queue.fal.run/${parentModelKey}/requests/${input.externalJobId}`,
+      request,
+    );
+    if (parent.status !== METHOD_NOT_ALLOWED) return parent;
+  }
 
   // FAL receipts have used both the direct request URL and an explicit
   // `/response` URL across queue/model versions. A bounded authenticated
