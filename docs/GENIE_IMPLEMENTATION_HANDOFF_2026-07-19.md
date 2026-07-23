@@ -1501,7 +1501,7 @@ contract; those remain post-software product-validation work.
 ## 30. 2026-07-23 Ekadashi 1 World recovery candidate
 
 Owner testing of Episode `e4df69dd-9b10-4dd1-b2b0-98b44f4694d9`
-(`Ekadashi 1`, Series `Test 2`) exposed three latent World-start defects before
+(`Ekadashi 1`, Series `Test 2`) exposed four latent World-start defects before
 any FAL image request or provider spend was created:
 
 - the FAL World edit-capability registration omitted its required verified
@@ -1512,7 +1512,11 @@ any FAL image request or provider spend was created:
   attempt while it is `claimed`, but the remote-fetch evidence command allowed
   only `running` or `waiting_external`. Its next quarantine handoff also used
   the research fetch class rather than the database's `research_fetch` source
-  kind.
+  kind;
+- the research RPC omitted its required bound environment and sent
+  `succeeded`, which is not one of the ledger's accepted terminal states. It
+  now sends all sixteen named parameters with the exact policy environment and
+  terminal state `fetched`.
 
 Forward migrations
 `20260723052156_fal_world_edit_capability_canary_binding.sql`,

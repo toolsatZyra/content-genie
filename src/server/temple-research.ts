@@ -36,6 +36,39 @@ export class TempleResearchError extends Error {
 
 export const RESEARCH_QUARANTINE_SOURCE_KIND = "research_fetch";
 
+export function buildResearchRemoteFetchCommand(input: {
+  allowlistVersionHash: string;
+  allowlistVersionId: string;
+  environment: "development" | "preview" | "production" | "test";
+  envelope: Pick<
+    PreflightTaskEnvelope,
+    "preflightRunId" | "stageAttemptId" | "workspaceId"
+  >;
+  result: Pick<
+    RemoteFetchResult,
+    "canonicalUrl" | "redirectCount" | "resolvedAddressHashes" | "sha256"
+  >;
+}): Readonly<Record<string, unknown>> {
+  return Object.freeze({
+    p_allowlist_version_hash: input.allowlistVersionHash,
+    p_allowlist_version_id: input.allowlistVersionId,
+    p_canonical_url_hash: sha256(input.result.canonicalUrl),
+    p_environment: input.environment,
+    p_exact_hostname: new URL(input.result.canonicalUrl).hostname.toLowerCase(),
+    p_fetch_class: "research_reference",
+    p_maximum_bytes: MAX_REFERENCE_BYTES,
+    p_preflight_run_id: input.envelope.preflightRunId,
+    p_redirect_count: input.result.redirectCount,
+    p_resolved_address_hashes: input.result.resolvedAddressHashes,
+    p_response_sha256: input.result.sha256,
+    p_safe_failure_class: null,
+    p_stage_attempt_id: input.envelope.stageAttemptId,
+    p_status: "fetched",
+    p_timeout_ms: 60_000,
+    p_workspace_id: input.envelope.workspaceId,
+  });
+}
+
 type ReferenceMetadata = Readonly<{
   attributionRequired: boolean;
   authorCredit: string;
@@ -403,23 +436,16 @@ async function recordRemoteFetch(input: {
   policy: Awaited<ReturnType<typeof getActiveRemoteFetchPolicy>>;
   result: RemoteFetchResult;
 }): Promise<string> {
-  const value = await rpc("command_record_remote_fetch", {
-    p_allowlist_version_hash: input.policy.manifestHash,
-    p_allowlist_version_id: input.policy.allowlistVersionId,
-    p_canonical_url_hash: sha256(input.result.canonicalUrl),
-    p_exact_hostname: new URL(input.result.canonicalUrl).hostname.toLowerCase(),
-    p_fetch_class: "research_reference",
-    p_maximum_bytes: MAX_REFERENCE_BYTES,
-    p_preflight_run_id: input.envelope.preflightRunId,
-    p_redirect_count: input.result.redirectCount,
-    p_resolved_address_hashes: input.result.resolvedAddressHashes,
-    p_response_sha256: input.result.sha256,
-    p_safe_failure_class: null,
-    p_stage_attempt_id: input.envelope.stageAttemptId,
-    p_status: "succeeded",
-    p_timeout_ms: 60_000,
-    p_workspace_id: input.envelope.workspaceId,
-  });
+  const value = await rpc(
+    "command_record_remote_fetch",
+    buildResearchRemoteFetchCommand({
+      allowlistVersionHash: input.policy.manifestHash,
+      allowlistVersionId: input.policy.allowlistVersionId,
+      environment: input.policy.environment,
+      envelope: input.envelope,
+      result: input.result,
+    }),
+  );
   if (typeof value !== "string") {
     throw new TempleResearchError("Temple remote-fetch evidence was malformed.");
   }
