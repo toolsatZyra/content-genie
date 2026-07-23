@@ -34,6 +34,8 @@ export class TempleResearchError extends Error {
   }
 }
 
+export const RESEARCH_QUARANTINE_SOURCE_KIND = "research_fetch";
+
 type ReferenceMetadata = Readonly<{
   attributionRequired: boolean;
   authorCredit: string;
@@ -98,6 +100,10 @@ function exactObject(value: unknown, keys: readonly string[]): value is object {
 async function rpc(name: string, parameters: Record<string, unknown>) {
   const { data, error } = await createAdminSupabaseClient().rpc(name, parameters);
   if (error) {
+    console.error("Temple research ledger RPC rejected work.", {
+      code: error.code,
+      command: name,
+    });
     throw new TempleResearchError("The temple-research ledger rejected work.");
   }
   return data;
@@ -537,7 +543,7 @@ async function promoteReference(input: {
     p_provider_request_id: null,
     p_quarantine_version_id: quarantineAssetVersionId,
     p_remote_fetch_request_id: remoteFetchRequestId,
-    p_source_kind: "research_reference",
+    p_source_kind: RESEARCH_QUARANTINE_SOURCE_KIND,
     p_source_sha256: input.fetchResult.sha256,
     p_stable_asset_id: stableAssetId,
     p_workspace_id: input.envelope.workspaceId,

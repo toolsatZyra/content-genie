@@ -47,7 +47,7 @@ vi.mock("@/lib/supabase/admin", () => ({
   }),
 }));
 
-import { POST } from "./route";
+import { maxDuration, POST } from "./route";
 
 const episodeId = "10000000-0000-4000-8000-000000000011";
 const workspaceId = "10000000-0000-4000-8000-000000000012";
@@ -75,6 +75,10 @@ function request(
 }
 
 describe("world-build dispatch route", () => {
+  it("keeps the immediate autonomous worker inside the durable route budget", () => {
+    expect(maxDuration).toBe(300);
+  });
+
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.getUser.mockResolvedValue({

@@ -73,7 +73,7 @@
     {
       "path": "scripts/phase2-candidate-migrations.v1.json",
       "role": "candidate-migration-inventory",
-      "sha256": "9488a8928575b015451a095db7649ef768d4c2aa4ba038076dbf13b14876f70e"
+      "sha256": "d23e2b749346ee9b256c1c720d6fdcc0665f99b06e3c2c99795dda02133fd260"
     },
     {
       "path": "scripts/phase2-coordinate-upgrade-drill.mjs",
@@ -841,6 +841,21 @@
       "sha256": "a968c9e86bb543f5242628b95e87c62341c8dd31338ef499a9cc68d56d95854f"
     },
     {
+      "path": "supabase/migrations/20260723052156_fal_world_edit_capability_canary_binding.sql",
+      "role": "phase2-migration",
+      "sha256": "69787bb3d36b40b9762834709c60ff061763ad2fb8d6fdc3f970c266fdd5cd6f"
+    },
+    {
+      "path": "supabase/migrations/20260723053702_world_build_active_intent_retry_reuse.sql",
+      "role": "phase2-migration",
+      "sha256": "5d34ab07ce82764c9fb9d5c57a1b102e13cd846333d46750c92503955cc17bcb"
+    },
+    {
+      "path": "supabase/migrations/20260723054803_research_fetch_claimed_attempt_authority.sql",
+      "role": "phase2-migration",
+      "sha256": "64e273b50396bcb1699bb81d805337058cba25517598f8be9e062b7b6cd224b8"
+    },
+    {
       "path": "supabase/tests/fixtures/phase2_coordinate_v1_verifiers.sql",
       "role": "predecessor-fixture",
       "sha256": "2df42a28cd04b193b0eaf97c882a17edfb13688cad7aca9bf8845408e9d7ec1c"
@@ -848,7 +863,7 @@
     {
       "path": "supabase/tests/mvp_cinematic_pipeline.test.sql",
       "role": "pgtap-source",
-      "sha256": "99b69942f0ff3e7a78bc0f353632e01027bbfc29e948d60f883fca47d1727321"
+      "sha256": "fad83f6dcf802471e625d8f272c307ea3f1635ed544f82608d7f50719b5b5ce7"
     },
     {
       "path": "supabase/tests/mvp_repair_feedback_grounding.test.sql",
@@ -873,7 +888,7 @@
     {
       "path": "supabase/tests/phase2_preflight_provider_ingest.test.sql",
       "role": "pgtap-source",
-      "sha256": "8e44f84b53716f7be0eea6a083d4c78379e37b90868d24ecb36e434f7120864f"
+      "sha256": "15270a57808037c3059dfb7f1b12c7a55ad7d508d298c06e91a14f5e415c212b"
     },
     {
       "path": "supabase/tests/phase2_world_cultural.test.sql",
@@ -914,9 +929,9 @@
   },
   "pgTapSuites": [
     {
-      "hardenedQuerySha256": "04f34ac0c0882f3a4b61a7f247059b6446995e65f79700d20f36426603ef3367",
+      "hardenedQuerySha256": "552ddcd329f64958c8d3fa9da700a904ddfe97cbe91f83b56a2d2ce15542db08",
       "plannedAssertions": 120,
-      "sourceSha256": "99b69942f0ff3e7a78bc0f353632e01027bbfc29e948d60f883fca47d1727321",
+      "sourceSha256": "fad83f6dcf802471e625d8f272c307ea3f1635ed544f82608d7f50719b5b5ce7",
       "testFile": "mvp_cinematic_pipeline.test.sql"
     },
     {
@@ -944,9 +959,9 @@
       "testFile": "phase2_p2_09_cultural_claim_contract.test.sql"
     },
     {
-      "hardenedQuerySha256": "a0c616fe258e8ee4c4fe248179c99bbacc5e774698310fceb3669a048a2ec2bd",
+      "hardenedQuerySha256": "b1da5a40cf62b7e6afb8765736c359626a6f08a2730e7d1578a8f279c5df790c",
       "plannedAssertions": 100,
-      "sourceSha256": "8e44f84b53716f7be0eea6a083d4c78379e37b90868d24ecb36e434f7120864f",
+      "sourceSha256": "15270a57808037c3059dfb7f1b12c7a55ad7d508d298c06e91a14f5e415c212b",
       "testFile": "phase2_preflight_provider_ingest.test.sql"
     },
     {
@@ -1106,7 +1121,10 @@
     "supabase/migrations/20260723031500_hindi_duration_profile_reconciliation.sql",
     "supabase/migrations/20260723033000_hindi_duration_profile_v2_activation.sql",
     "supabase/migrations/20260723033050_hindi_duration_profile_legacy_constraint_cleanup.sql",
-    "supabase/migrations/20260723033100_script_rubric_legacy_waiver_scope.sql"
+    "supabase/migrations/20260723033100_script_rubric_legacy_waiver_scope.sql",
+    "supabase/migrations/20260723052156_fal_world_edit_capability_canary_binding.sql",
+    "supabase/migrations/20260723053702_world_build_active_intent_retry_reuse.sql",
+    "supabase/migrations/20260723054803_research_fetch_claimed_attempt_authority.sql"
   ],
   "predecessorFixture": {
     "capturedAt": "2026-07-18",

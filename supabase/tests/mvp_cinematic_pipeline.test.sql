@@ -2781,22 +2781,48 @@ select set_config('request.jwt.claim.role','authenticated',true);
 set local role authenticated;
 select lives_ok(
   $sql$
-  select public.command_authorize_world_build_intent(
-    'c1100000-0000-4000-8000-000000000001',
-    'd1400000-0000-4000-8000-000000000001',
-    'd1500000-0000-4000-8000-000000000001',
-    (
-      select aggregate_version
-      from public.episode_configuration_candidates
-      where id = 'd1500000-0000-4000-8000-000000000001'
-    ),
-    500,
-    'd2b00000-0000-4000-8000-000000000011',
-    'uploaded-world-intent-0001',
-    repeat('1', 64)
+  with initial as materialized (
+    select public.command_authorize_world_build_intent(
+      'c1100000-0000-4000-8000-000000000001',
+      'd1400000-0000-4000-8000-000000000001',
+      'd1500000-0000-4000-8000-000000000001',
+      (
+        select aggregate_version
+        from public.episode_configuration_candidates
+        where id = 'd1500000-0000-4000-8000-000000000001'
+      ),
+      500,
+      'd2b00000-0000-4000-8000-000000000011',
+      'uploaded-world-intent-0001',
+      repeat('1', 64)
+    ) result
+  ),
+  retried as materialized (
+    select public.command_authorize_world_build_intent(
+      'c1100000-0000-4000-8000-000000000001',
+      'd1400000-0000-4000-8000-000000000001',
+      'd1500000-0000-4000-8000-000000000001',
+      (
+        select aggregate_version
+        from public.episode_configuration_candidates
+        where id = 'd1500000-0000-4000-8000-000000000001'
+      ),
+      500,
+      'd2b00000-0000-4000-8000-000000000012',
+      'uploaded-world-intent-0002',
+      repeat('2', 64)
+    ) result
+    from initial
   )
+  select case
+    when initial.result->>'intentId'=retried.result->>'intentId'
+      and retried.result->>'reusedActiveIntent'='true'
+    then 1
+    else 1/0
+  end
+  from initial,retried
   $sql$,
-  'a confirmed uploaded source reaches the real World authority command with null voice confirmation'
+  'a confirmed uploaded source reaches World authority and retry reuses its exact active intent'
 );
 reset role;
 set local session_replication_role = replica;

@@ -23,6 +23,7 @@ export type WorldEntity =
   | Readonly<{ entityKind: "location"; item: CreationWorldLocation }>;
 
 interface WorldStudioProps {
+  readonly autoStart: boolean;
   readonly canEdit: boolean;
   readonly onAccept: (entity: WorldEntity) => void;
   readonly onContinue: () => void;
@@ -107,6 +108,7 @@ function reconstructPrompt(composition: string, lookTail: string): string {
 }
 
 export function WorldStudio({
+  autoStart,
   canEdit,
   onAccept,
   onContinue,
@@ -122,6 +124,7 @@ export function WorldStudio({
   const [editing, setEditing] = useState<WorldEntity | null>(null);
   const [composition, setComposition] = useState("");
   const editorRef = useRef<HTMLTextAreaElement>(null);
+  const automaticStartIssuedRef = useRef(false);
   const uploadRef = useRef<HTMLInputElement>(null);
   const [uploadTarget, setUploadTarget] = useState<WorldEntity | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -221,6 +224,28 @@ export function WorldStudio({
     const timer = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(timer);
   }, [activeProgress.length]);
+
+  useEffect(() => {
+    if (
+      !autoStart ||
+      !canEdit ||
+      working ||
+      automaticStartIssuedRef.current ||
+      allEntities.length > 0 ||
+      projection.progress.length > 0
+    ) {
+      return;
+    }
+    automaticStartIssuedRef.current = true;
+    onStart();
+  }, [
+    allEntities.length,
+    autoStart,
+    canEdit,
+    onStart,
+    projection.progress.length,
+    working,
+  ]);
 
   function openEditor(entity: WorldEntity): void {
     setComposition(promptParts(entity.item.promptText).composition);

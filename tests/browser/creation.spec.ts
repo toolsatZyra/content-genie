@@ -1875,6 +1875,38 @@ test.describe("Living Cinema creation flow", () => {
     );
   });
 
+  test("starts World analysis automatically when an empty World stage opens", async ({
+    page,
+  }) => {
+    let worldBuildRequests = 0;
+    await page.route(`**/api/episodes/${episodeId}/world-build`, async (route) => {
+      worldBuildRequests += 1;
+      await route.fulfill({
+        json: {
+          ok: true,
+          result: {
+            preflightRunId: "20000000-0000-4000-8000-000000000499",
+            spendCeilingUsd: 5,
+            state: "queued",
+            triggerRunId: null,
+          },
+        },
+        status: 202,
+      });
+    });
+
+    await page.goto(
+      `/episodes/${episodeId}/create?fixture=phase2-world-empty&resumeCreation=world`,
+    );
+
+    await expect(
+      page.getByRole("heading", { name: "Cast once. Keep forever." }),
+    ).toBeVisible();
+    await expect.poll(() => worldBuildRequests, { timeout: 10_000 }).toBe(1);
+    await page.waitForTimeout(1_500);
+    expect(worldBuildRequests).toBe(1);
+  });
+
   test("shows Monica's evidence and autonomously seals only the exact quote ceiling", async ({
     page,
   }) => {

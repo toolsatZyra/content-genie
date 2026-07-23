@@ -209,6 +209,7 @@ export default async function CreationPage({
       "phase2-canceled",
       "phase2-delivered",
       "phase2-read-only-no-script",
+      "phase2-world-empty",
       "phase2-world",
       "phase2-world-ready",
       "phase2-preflight",
@@ -251,6 +252,17 @@ export default async function CreationPage({
             state: "prepared",
             transcriptionText: null,
           },
+        },
+      };
+    } else if (query.fixture === "phase2-world-empty") {
+      const readyProjection = deterministicReadyCreationProjection("review");
+      fixtureProjection = {
+        ...readyProjection,
+        world: {
+          characters: [],
+          locations: [],
+          progress: [],
+          referencePack: null,
         },
       };
     } else if (query.fixture === "phase2-world") {

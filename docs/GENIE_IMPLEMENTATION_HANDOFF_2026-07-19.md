@@ -1497,3 +1497,40 @@ MVP pause, durable recovery, Monica's grounded repair loop, asset downloads and
 final human release authority are implemented and gated. This does not claim
 the later owner-supplied 10-20 Episode pilot or the larger calibration/holdout
 contract; those remain post-software product-validation work.
+
+## 30. 2026-07-23 Ekadashi 1 World recovery candidate
+
+Owner testing of Episode `e4df69dd-9b10-4dd1-b2b0-98b44f4694d9`
+(`Ekadashi 1`, Series `Test 2`) exposed three latent World-start defects before
+any FAL image request or provider spend was created:
+
+- the FAL World edit-capability registration omitted its required verified
+  canary-evidence binding;
+- a retry attempted to create a second active World spend intent instead of
+  reusing the exact still-valid authority;
+- licensed temple/festival research runs inside the highest-fencing root
+  attempt while it is `claimed`, but the remote-fetch evidence command allowed
+  only `running` or `waiting_external`. Its next quarantine handoff also used
+  the research fetch class rather than the database's `research_fetch` source
+  kind.
+
+Forward migrations
+`20260723052156_fal_world_edit_capability_canary_binding.sql`,
+`20260723053702_world_build_active_intent_retry_reuse.sql` and
+`20260723054803_research_fetch_claimed_attempt_authority.sql` correct those
+contracts. All three are applied to preview and production. The application
+candidate also starts an empty World automatically when Stage 3 advances,
+guards the start by the exact configuration identity, raises the bounded World
+route duration from 60 to 300 seconds, uses `research_fetch` at quarantine, and
+records only sanitized ledger command/error codes.
+
+Current affected evidence is green: formatting, lint, route-aware TypeScript,
+115 unit files / 722 tests, integration `5/5` with the intentional live-scanner
+skip, the focused empty-World Chromium regression, the Phase 2
+preflight/provider policy and hostile controls, and the regenerated trusted
+harness. Database advisors found no new migration-specific error. The two
+failed Episode runs remain sealed, and there are still zero FAL requests for
+this Episode. The candidate must now be committed, pushed and allowed to reach
+READY through the Git-connected Vercel deployment before one fresh World run is
+started and followed through research, preparation, dispatch and review-ready
+anchor evidence.

@@ -487,6 +487,7 @@ export function CreationStudio({
   );
   const lookIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
   const worldBuildIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
+  const worldBuildStartedConfigurationRef = useRef<string | null>(null);
   const worldFinalizeIdempotencyKey = useRef<RetainedIdempotencyAttempt | null>(null);
   const worldIdempotencyKeys = useRef(new Map<string, RetainedIdempotencyAttempt>());
   const worldUploadIdempotencyKeys = useRef(
@@ -1768,6 +1769,7 @@ export function CreationStudio({
       requestBody,
     );
     worldBuildIdempotencyKey.current = attempt;
+    worldBuildStartedConfigurationRef.current = projection.configuration.id;
     setChamber("world");
     setWorking(true);
     setSaveState("saving");
@@ -3103,6 +3105,9 @@ export function CreationStudio({
 
         {chamber === "world" ? (
           <WorldStudio
+            autoStart={
+              worldBuildStartedConfigurationRef.current !== projection.configuration?.id
+            }
             canEdit={canEditCreation}
             onAccept={(entity) => void decideWorldCandidate(entity, "accept", null)}
             onContinue={() => void continueToPreflight()}

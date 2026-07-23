@@ -295,6 +295,61 @@ select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000000', true);
 select set_config('request.jwt.claim.role', 'service_role', true);
 
+insert into fixture_values(key,value)
+select 'fal_world_edit_capability_id', result->>'capabilityId'
+from (
+  select public.command_ensure_fal_world_edit_capability(
+    'a1100000-0000-4000-8000-000000000001',
+    'test',
+    repeat('d',64),
+    repeat('e',64),
+    repeat('f',64),
+    repeat('0',64),
+    statement_timestamp(),
+    statement_timestamp()+interval '1 day'
+  ) result
+) registered;
+
+do $test$
+declare
+  capability private.provider_capabilities%rowtype;
+  replayed jsonb;
+begin
+  select * into capability
+  from private.provider_capabilities
+  where id=(
+    select value::uuid from fixture_values
+    where key='fal_world_edit_capability_id'
+  );
+  if capability.id is null
+    or capability.capability<>'edit_image'
+    or capability.canary_evidence_snapshot_id is null
+    or not exists(
+      select 1
+      from private.provider_evidence_snapshots canary
+      where canary.id=capability.canary_evidence_snapshot_id
+        and canary.evidence_kind='canary'
+        and canary.verification_state='verified'
+    )
+  then
+    raise exception 'fal edit capability is not bound to verified canary evidence';
+  end if;
+  replayed:=public.command_ensure_fal_world_edit_capability(
+    'a1100000-0000-4000-8000-000000000001',
+    'test',
+    repeat('d',64),
+    repeat('e',64),
+    repeat('f',64),
+    repeat('0',64),
+    capability.verified_at,
+    capability.expires_at
+  );
+  if replayed->>'capabilityId'<>capability.id::text then
+    raise exception 'fal edit capability replay drifted';
+  end if;
+end;
+$test$;
+
 select ok(
   not has_function_privilege(
     'authenticated',
@@ -948,21 +1003,56 @@ select throws_ok(
   'a test allowlist cannot authorize a preview-environment fetch'
 );
 
+insert into fixture_values(key,value)
+select 'provider_remote_fetch_id',public.command_record_remote_fetch(
+  'a1100000-0000-4000-8000-000000000001',
+  (select value::uuid from fixture_values where key='preflight_run_id'),
+  ((select value::jsonb from fixture_values where key='claim_response')
+    ->>'stageAttemptId')::uuid,
+  'test','provider_output','cdn.fal.media',
+  (select value::uuid from fixture_values where key='allowlist_v2'),
+  repeat('3',64),repeat('2',64),jsonb_build_array(repeat('4',64)),
+  0,1048576,10000,'fetched',repeat('5',64),null
+)::text;
+
+insert into fixture_values(key,value)
+select 'research_allowlist',public.command_activate_remote_fetch_allowlist(
+  'test','research_reference',repeat('6',64),'["upload.wikimedia.org"]'
+)::text;
+
+set local session_replication_role=replica;
+update public.preflight_stage_attempts
+set state='claimed'
+where id=(
+  ((select value::jsonb from fixture_values where key='claim_response')
+    ->>'stageAttemptId')::uuid
+);
+set local session_replication_role=origin;
+
 select lives_ok(
   format(
-    'select public.command_record_remote_fetch(%L,%L,%L,%L,%L,%L,%L,%L,%L,%L::jsonb,0,1048576,10000,%L,%L,null)',
+    'select public.command_record_remote_fetch(%L,%L,%L,%L,%L,%L,%L,%L,%L,%L::jsonb,0,26214400,60000,%L,%L,null)',
     'a1100000-0000-4000-8000-000000000001',
-    (select value from fixture_values where key = 'preflight_run_id'),
-    ((select value::jsonb from fixture_values where key = 'claim_response')
-      ->> 'stageAttemptId'),
-    'test', 'provider_output', 'cdn.fal.media',
-    (select value from fixture_values where key = 'allowlist_v2'),
-    repeat('3', 64), repeat('2', 64),
-    jsonb_build_array(repeat('4', 64))::text,
-    'fetched', repeat('5', 64)
+    (select value from fixture_values where key='preflight_run_id'),
+    ((select value::jsonb from fixture_values where key='claim_response')
+      ->>'stageAttemptId'),
+    'test','research_reference','upload.wikimedia.org',
+    (select value from fixture_values where key='research_allowlist'),
+    repeat('7',64),repeat('6',64),
+    jsonb_build_array(repeat('8',64))::text,
+    'fetched',repeat('9',64)
   ),
-  'the exact current environment and hostname produce immutable fetch evidence'
+  'a highest-fencing claimed World attempt may record licensed research fetch evidence'
 );
+
+set local session_replication_role=replica;
+update public.preflight_stage_attempts
+set state='running'
+where id=(
+  ((select value::jsonb from fixture_values where key='claim_response')
+    ->>'stageAttemptId')::uuid
+);
+set local session_replication_role=origin;
 
 insert into fixture_values (key, value)
 select 'provider_request_id', public.command_claim_micro_provider_slot(

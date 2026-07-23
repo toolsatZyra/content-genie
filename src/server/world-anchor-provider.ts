@@ -88,7 +88,13 @@ export function postgresJsonbText(value: unknown): string {
 
 async function rpc(name: string, parameters: Record<string, unknown>) {
   const { data, error } = await createAdminSupabaseClient().rpc(name, parameters);
-  if (error) throw new WorldAnchorProviderError("World anchor ledger rejected work.");
+  if (error) {
+    console.error("World anchor ledger RPC rejected work.", {
+      code: error.code,
+      command: name,
+    });
+    throw new WorldAnchorProviderError("World anchor ledger rejected work.");
+  }
   return data;
 }
 
