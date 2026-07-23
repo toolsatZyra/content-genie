@@ -14,7 +14,7 @@ const schema = {
 } as const;
 
 describe("OpenAI strict structured agent", () => {
-  it("keeps the provider timeout inside the 300-second durable worker fence", () => {
+  it("keeps the provider timeout within the ledgered worker authority", () => {
     expect(
       prepareOpenAiStructuredAgentRequest({
         input: "data",
@@ -22,7 +22,7 @@ describe("OpenAI strict structured agent", () => {
         schema,
         schemaName: "safe_answer",
       }).maximumDurationMs,
-    ).toBe(240_000);
+    ).toBe(180_000);
   });
 
   it("uses Responses strict JSON Schema and parses one completed output", async () => {
