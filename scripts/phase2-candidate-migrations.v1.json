@@ -135,6 +135,9 @@
     "supabase/migrations/20260722194500_owner_uploaded_narration_recovery_scan_audit.sql",
     "supabase/migrations/20260722194600_mvp_legacy_storyboard_owner_authority.sql",
     "supabase/migrations/20260722194700_mvp_legacy_storyboard_owner_start_authority.sql",
-    "supabase/migrations/20260723031500_hindi_duration_profile_reconciliation.sql"
+    "supabase/migrations/20260723031500_hindi_duration_profile_reconciliation.sql",
+    "supabase/migrations/20260723033000_hindi_duration_profile_v2_activation.sql",
+    "supabase/migrations/20260723033050_hindi_duration_profile_legacy_constraint_cleanup.sql",
+    "supabase/migrations/20260723033100_script_rubric_legacy_waiver_scope.sql"
   ]
 }

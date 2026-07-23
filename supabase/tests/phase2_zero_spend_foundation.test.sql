@@ -3,10 +3,10 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, auth, storage, private, audit, pg_catalog;
 
-select plan(179);
+select plan(183);
 
 select is(
-  private.estimate_hindi_narration_duration_v1(
+  private.estimate_hindi_narration_duration_v2(
     pg_catalog.repeat('शिव ', 119) || 'शिव'
   ),
   59.520::numeric,
@@ -14,11 +14,20 @@ select is(
 );
 
 select is(
-  private.estimate_hindi_narration_duration_v1(
+  private.estimate_hindi_narration_duration_v2(
     pg_catalog.repeat('शिव ', 119) || E'शिव।\nकथा?'
   ),
   61.090::numeric,
   'punctuation and line direction can cross the launch acknowledgement boundary'
+);
+
+select is(
+  private.estimate_hindi_narration_duration_v1(
+    pg_catalog.repeat(U&'\0936\093f\0935 ', 119) ||
+      U&'\0936\093f\0935\0964\000a\0915\0925\093e?'
+  ),
+  60.670::numeric,
+  'the historical v1 duration profile remains exactly reconstructible'
 );
 
 insert into public.organizations (id, name, slug)
@@ -3555,6 +3564,64 @@ set voice_confirmed_by='92000000-0000-4000-8000-000000000001',
     look_confirmed_by='92000000-0000-4000-8000-000000000001',
     look_confirmed_at=statement_timestamp()
 where episode_id='94000000-0000-4000-8000-000000000004';
+
+select has_table(
+  'private',
+  'script_rubric_legacy_waivers',
+  'the legacy script-rubric exception is an explicit private relation'
+);
+select ok(
+  not has_table_privilege(
+    'authenticated',
+    'private.script_rubric_legacy_waivers',
+    'select'
+  ) and not has_table_privilege(
+    'service_role',
+    'private.script_rubric_legacy_waivers',
+    'select'
+  ),
+  'application roles cannot read or extend the legacy waiver allowlist'
+);
+
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
+select set_config('request.jwt.claim.role','service_role',true);
+set local role service_role;
+select throws_ok(
+  $command$
+    select public.command_create_preflight_run(
+      '91100000-0000-4000-8000-000000000001',
+      '94000000-0000-4000-8000-000000000004',
+      (select id from public.episode_configuration_candidates
+       where episode_id='94000000-0000-4000-8000-000000000004'
+       order by created_at desc limit 1),
+      (select id from public.script_revisions
+       where episode_id='94000000-0000-4000-8000-000000000004'),
+      'plan_evaluation',false,null,null,null,
+      '9e000000-0000-4000-8000-000000000001',
+      'rubric-plan-unwaived-0001',repeat('b',64)
+    )
+  $command$,
+  '55000',
+  'completed advisory script rubric is required before planning',
+  'a new unwaived configuration cannot plan without script-rubric evidence'
+);
+
+reset role;
+insert into private.script_rubric_legacy_waivers (
+  workspace_id,
+  episode_id,
+  configuration_candidate_id,
+  script_revision_id,
+  waiver_reason
+)
+select
+  configuration.workspace_id,
+  configuration.episode_id,
+  configuration.id,
+  configuration.script_revision_id,
+  'captured-existing-world-lock-before-required-rubric.v1'
+from public.episode_configuration_candidates configuration
+where configuration.episode_id = '94000000-0000-4000-8000-000000000004';
 select set_config('request.jwt.claims','{"role":"service_role"}',true);
 select set_config('request.jwt.claim.role','service_role',true);
 set local role service_role;
@@ -3573,7 +3640,7 @@ select lives_ok(
       'rubric-plan-missing-0001',repeat('c',64)
     )
   $command$,
-  'planning proceeds when optional advisory script-rubric evidence is absent'
+  'only a migration-captured legacy configuration can resume without rubric evidence'
 );
 select is(
   (
@@ -3591,7 +3658,7 @@ select is(
     limit 1
   ),
   null::uuid,
-  'an absent advisory rubric is represented honestly rather than fabricated'
+  'the scoped legacy waiver is represented honestly rather than fabricated'
 );
 select public.command_transition_preflight_run(
   (

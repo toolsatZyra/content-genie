@@ -73,7 +73,7 @@
     {
       "path": "scripts/phase2-candidate-migrations.v1.json",
       "role": "candidate-migration-inventory",
-      "sha256": "24a0284e74a0ac2040a8525111cef1ae38bae265d2de510387ca7c7593547cde"
+      "sha256": "9488a8928575b015451a095db7649ef768d4c2aa4ba038076dbf13b14876f70e"
     },
     {
       "path": "scripts/phase2-coordinate-upgrade-drill.mjs",
@@ -823,7 +823,22 @@
     {
       "path": "supabase/migrations/20260723031500_hindi_duration_profile_reconciliation.sql",
       "role": "phase2-migration",
-      "sha256": "4c630718d8fbd89f3363411f9b8096613ea5dee0811b97db304d05ab3b49ddf6"
+      "sha256": "410bd6b6a05b6cd362ffa7f18f066c81703ec67edbaef6ebc93fc4f6d31cbae3"
+    },
+    {
+      "path": "supabase/migrations/20260723033000_hindi_duration_profile_v2_activation.sql",
+      "role": "phase2-migration",
+      "sha256": "01530f1e778b131c19bbbdf01bc26049429cf46b90d3be92a81f5cc9f0b7361c"
+    },
+    {
+      "path": "supabase/migrations/20260723033050_hindi_duration_profile_legacy_constraint_cleanup.sql",
+      "role": "phase2-migration",
+      "sha256": "578021cd7fc4b319b5fd823133ba7648b6af94642a3a0df1bd783ea48e7faf83"
+    },
+    {
+      "path": "supabase/migrations/20260723033100_script_rubric_legacy_waiver_scope.sql",
+      "role": "phase2-migration",
+      "sha256": "a968c9e86bb543f5242628b95e87c62341c8dd31338ef499a9cc68d56d95854f"
     },
     {
       "path": "supabase/tests/fixtures/phase2_coordinate_v1_verifiers.sql",
@@ -868,7 +883,7 @@
     {
       "path": "supabase/tests/phase2_zero_spend_foundation.test.sql",
       "role": "pgtap-source",
-      "sha256": "1f5c275313c1097d387e904822029970054aa22524ee0fad6b0fdab97cf00843"
+      "sha256": "586c1117de3121315ca804442c19d7391d524ac8f18722dcf2a6ef52b44eeedb"
     },
     {
       "path": "supabase/tests/workspace_authority_profile.test.sql",
@@ -941,9 +956,9 @@
       "testFile": "phase2_world_cultural.test.sql"
     },
     {
-      "hardenedQuerySha256": "f735afbdf57e26d2125b0ad0533fb73deb01f0bafa34e3199e48e85f6e46ab51",
-      "plannedAssertions": 179,
-      "sourceSha256": "1f5c275313c1097d387e904822029970054aa22524ee0fad6b0fdab97cf00843",
+      "hardenedQuerySha256": "e64dad2cafbb89f871f685e5c16912cad75d65203843e83953ce1aeeafadefb7",
+      "plannedAssertions": 183,
+      "sourceSha256": "586c1117de3121315ca804442c19d7391d524ac8f18722dcf2a6ef52b44eeedb",
       "testFile": "phase2_zero_spend_foundation.test.sql"
     },
     {
@@ -1088,7 +1103,10 @@
     "supabase/migrations/20260722194500_owner_uploaded_narration_recovery_scan_audit.sql",
     "supabase/migrations/20260722194600_mvp_legacy_storyboard_owner_authority.sql",
     "supabase/migrations/20260722194700_mvp_legacy_storyboard_owner_start_authority.sql",
-    "supabase/migrations/20260723031500_hindi_duration_profile_reconciliation.sql"
+    "supabase/migrations/20260723031500_hindi_duration_profile_reconciliation.sql",
+    "supabase/migrations/20260723033000_hindi_duration_profile_v2_activation.sql",
+    "supabase/migrations/20260723033050_hindi_duration_profile_legacy_constraint_cleanup.sql",
+    "supabase/migrations/20260723033100_script_rubric_legacy_waiver_scope.sql"
   ],
   "predecessorFixture": {
     "capturedAt": "2026-07-18",

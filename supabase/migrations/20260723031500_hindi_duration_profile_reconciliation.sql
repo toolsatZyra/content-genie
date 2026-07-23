@@ -1,7 +1,7 @@
--- Re-pin the tested Hindi narration duration profile for environments that
--- applied an earlier revision under the same historical migration name.
+-- Introduce the corrected Hindi narration duration profile without changing
+-- the semantics of immutable revisions already pinned to the historical v1.
 
-create or replace function private.estimate_hindi_narration_duration_v1(
+create or replace function private.estimate_hindi_narration_duration_v2(
   p_processing_text text
 )
 returns numeric
@@ -56,5 +56,5 @@ begin
 end;
 $$;
 
-revoke all on function private.estimate_hindi_narration_duration_v1(text)
+revoke all on function private.estimate_hindi_narration_duration_v2(text)
 from public, anon, authenticated;

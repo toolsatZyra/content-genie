@@ -218,6 +218,12 @@ Stable rules:
 | `GQC-SCRIPT-005` | No automatic rewrite, paraphrase, deletion, reordering, or shortening is committed. | `hard_block_stage` |
 | `GQC-SCRIPT-006` | Before lock, a deterministic word/punctuation/performance estimate shows whether narration is expected within 60–120 seconds. Out-of-band input requires acknowledgement but is not mutated. | `hard_block_stage` if estimate/acknowledgement is missing |
 
+The only compatibility exception to `GQC-SCRIPT-003` is an exact
+configuration captured in `private.script_rubric_legacy_waivers` by migration
+`20260723033100` because it was already World-locked before this gate became
+required. The allowlist is immutable, private, has no runtime writer, and
+cannot admit any Episode created or World-locked after that migration.
+
 All `RUB-SCRIPT-*` results are `advisory`, including every source gate and
 source verdict. A weak script creates compensating plan requirements:
 
