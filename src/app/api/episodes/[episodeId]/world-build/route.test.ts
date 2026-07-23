@@ -76,7 +76,7 @@ function request(
 
 describe("world-build dispatch route", () => {
   it("keeps the immediate autonomous worker inside the durable route budget", () => {
-    expect(maxDuration).toBe(300);
+    expect(maxDuration).toBe(800);
   });
 
   beforeEach(() => {

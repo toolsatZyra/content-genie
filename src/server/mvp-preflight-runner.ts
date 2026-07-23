@@ -192,14 +192,14 @@ export async function advanceNextMvpPreflight(): Promise<
           triggerRunId,
         });
     if (executed.pendingExternal) {
-      for (const provider of executed.providerDispatches) {
-        await submitProviderDirectly(provider);
-      }
       await markWorldAnchorWaitingExternal({
         envelope: dispatched.envelope,
         taskId,
         triggerRunId,
       });
+      await Promise.all(
+        executed.providerDispatches.map((provider) => submitProviderDirectly(provider)),
+      );
     } else {
       await finalizePreflightControl({ preflightRunId: run.id, triggerRunId });
     }

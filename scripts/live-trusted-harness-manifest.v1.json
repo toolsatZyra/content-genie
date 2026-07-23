@@ -73,7 +73,7 @@
     {
       "path": "scripts/phase2-candidate-migrations.v1.json",
       "role": "candidate-migration-inventory",
-      "sha256": "d23e2b749346ee9b256c1c720d6fdcc0665f99b06e3c2c99795dda02133fd260"
+      "sha256": "57befe650039b1e7f2c8e58cd0ae67d2a8ce57eca7fe3f9d6a6f9a2459b49af0"
     },
     {
       "path": "scripts/phase2-coordinate-upgrade-drill.mjs",
@@ -856,6 +856,11 @@
       "sha256": "64e273b50396bcb1699bb81d805337058cba25517598f8be9e062b7b6cd224b8"
     },
     {
+      "path": "supabase/migrations/20260723062700_provider_recovery_manifest_states.sql",
+      "role": "phase2-migration",
+      "sha256": "e6531ba89c3466d1999bcd1d574bb761621cf0be4d369fa1e837e3184d6f85a0"
+    },
+    {
       "path": "supabase/tests/fixtures/phase2_coordinate_v1_verifiers.sql",
       "role": "predecessor-fixture",
       "sha256": "2df42a28cd04b193b0eaf97c882a17edfb13688cad7aca9bf8845408e9d7ec1c"
@@ -888,7 +893,7 @@
     {
       "path": "supabase/tests/phase2_preflight_provider_ingest.test.sql",
       "role": "pgtap-source",
-      "sha256": "15270a57808037c3059dfb7f1b12c7a55ad7d508d298c06e91a14f5e415c212b"
+      "sha256": "a2c3e91dc5d4a15d71679cb7e8a41f9894ee9e7f24d7ede8983f8e15a3020bcf"
     },
     {
       "path": "supabase/tests/phase2_world_cultural.test.sql",
@@ -959,9 +964,9 @@
       "testFile": "phase2_p2_09_cultural_claim_contract.test.sql"
     },
     {
-      "hardenedQuerySha256": "b1da5a40cf62b7e6afb8765736c359626a6f08a2730e7d1578a8f279c5df790c",
+      "hardenedQuerySha256": "f13bbdb5ecb6344571d732ffbea1dd60bd1f3d67510e46cc4d16ec1b3da53e2a",
       "plannedAssertions": 100,
-      "sourceSha256": "15270a57808037c3059dfb7f1b12c7a55ad7d508d298c06e91a14f5e415c212b",
+      "sourceSha256": "a2c3e91dc5d4a15d71679cb7e8a41f9894ee9e7f24d7ede8983f8e15a3020bcf",
       "testFile": "phase2_preflight_provider_ingest.test.sql"
     },
     {
@@ -1124,7 +1129,8 @@
     "supabase/migrations/20260723033100_script_rubric_legacy_waiver_scope.sql",
     "supabase/migrations/20260723052156_fal_world_edit_capability_canary_binding.sql",
     "supabase/migrations/20260723053702_world_build_active_intent_retry_reuse.sql",
-    "supabase/migrations/20260723054803_research_fetch_claimed_attempt_authority.sql"
+    "supabase/migrations/20260723054803_research_fetch_claimed_attempt_authority.sql",
+    "supabase/migrations/20260723062700_provider_recovery_manifest_states.sql"
   ],
   "predecessorFixture": {
     "capturedAt": "2026-07-18",

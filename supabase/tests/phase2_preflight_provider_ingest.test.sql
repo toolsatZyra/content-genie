@@ -1268,6 +1268,21 @@ select lives_ok(
   'the accepted provider job keeps only safe identity and response hash'
 );
 
+do $test$
+declare
+  manifest jsonb;
+begin
+  manifest:=public.get_provider_dispatch_manifest(
+    (select value::uuid from fixture_values where key='provider_request_id')
+  );
+  if manifest->>'providerRequestId'<>(
+    select value from fixture_values where key='provider_request_id'
+  ) then
+    raise exception 'accepted FAL recovery manifest is unavailable';
+  end if;
+end;
+$test$;
+
 select is(
   public.get_fal_webhook_binding(
     (select value::uuid from fixture_values where key = 'provider_request_id')

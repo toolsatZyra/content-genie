@@ -1522,19 +1522,31 @@ Forward migrations
 `20260723052156_fal_world_edit_capability_canary_binding.sql`,
 `20260723053702_world_build_active_intent_retry_reuse.sql` and
 `20260723054803_research_fetch_claimed_attempt_authority.sql` correct those
-contracts. All three are applied to preview and production. The application
-candidate also starts an empty World automatically when Stage 3 advances,
-guards the start by the exact configuration identity, raises the bounded World
-route duration from 60 to 300 seconds, uses `research_fetch` at quarantine, and
-records only sanitized ledger command/error codes.
+contracts. A fourth forward migration,
+`20260723062700_provider_recovery_manifest_states.sql`, lets the service-only
+FAL poller recover the exact accepted or polling request after webhook loss
+without widening application-role access. All four are applied to preview and
+production. The application candidate also starts an empty World automatically
+when Stage 3 advances, guards the start by the exact configuration identity,
+uses `research_fetch` at quarantine, records only sanitized ledger
+command/error codes, marks the prepared run `waiting_external` before network
+submission, submits its independently authorized jobs concurrently, and uses
+Vercel's bounded 800-second Pro function limit instead of the five-minute
+default.
 
 Current affected evidence is green: formatting, lint, route-aware TypeScript,
 115 unit files / 722 tests, integration `5/5` with the intentional live-scanner
 skip, the focused empty-World Chromium regression, the Phase 2
 preflight/provider policy and hostile controls, and the regenerated trusted
 harness. Database advisors found no new migration-specific error. The two
-failed Episode runs remain sealed, and there are still zero FAL requests for
-this Episode. The candidate must now be committed, pushed and allowed to reach
-READY through the Git-connected Vercel deployment before one fresh World run is
-started and followed through research, preparation, dispatch and review-ready
-anchor evidence.
+initial failed Episode runs remain sealed. Deployment
+`dpl_EYjNQC1y5kwdviQrCk8261P9vEpP` from commit `c6543f4` reached READY and run
+4 then proved the corrected live path through one extraction containing four
+characters, three locations and four story-significant props, a three-photo
+licensed Ekadashi research packet, one 11-job preparation, and 11 exact FAL
+request ledgers. That invocation exposed a separate five-minute submission
+cliff: it reached FAL for two requests but expired while submitting the
+remainder sequentially. The sealed run remains audit evidence; the two accepted
+requests are now recoverable by authenticated polling. The concurrent,
+waiting-first, 800-second candidate must be deployed before one final fresh
+World run is followed through all 11 secured, review-ready anchors.

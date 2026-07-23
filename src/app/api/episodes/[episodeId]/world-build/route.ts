@@ -25,7 +25,7 @@ import { advanceNextMvpPreflight } from "@/server/mvp-preflight-runner";
 import { beginWorldBuildProgress } from "@/server/world-build-progress";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 800;
 export const runtime = "nodejs";
 
 function reply(body: Record<string, unknown>, status: number, requestId: string) {
