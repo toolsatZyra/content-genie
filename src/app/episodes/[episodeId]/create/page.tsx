@@ -128,6 +128,21 @@ function preferredInitialChamber(
       ({ state }) => state === "accepted",
     ) &&
     projection.world.referencePack?.state === "verified";
+  const worldRetryable =
+    projection.world.progress.some(({ state }) => state === "failed") &&
+    !projection.world.progress.some(({ itemKind, state }) =>
+      itemKind === "system"
+        ? state === "extracting"
+        : [
+            "extracting",
+            "identified",
+            "researching",
+            "prompted",
+            "dispatched",
+            "generating",
+            "secure_ingest",
+          ].includes(state),
+    );
   const preflightReady =
     projection.preflight.failure === null &&
     projection.preflight.sourceReview?.status === "approved" &&
@@ -143,7 +158,7 @@ function preferredInitialChamber(
     preflight: worldReady,
     script: true,
     voice: Boolean(projection.script),
-    world: lookReady,
+    world: lookReady || worldRetryable,
   };
 
   if (requested && creationChambers.includes(requested as CreationChamber)) {
@@ -171,7 +186,7 @@ function preferredInitialChamber(
     return "create";
   }
   if (allowed.preflight) return "preflight";
-  if (lookReady) return "world";
+  if (allowed.world) return "world";
   if (
     allowed.look &&
     (projection.configuration?.narrationSourceKind === "uploaded_audio" ||
@@ -272,6 +287,20 @@ export default async function CreationPage({
       const partialProjection = deterministicReadyCreationProjection("review");
       fixtureProjection = {
         ...partialProjection,
+        configuration: partialProjection.configuration
+          ? {
+              ...partialProjection.configuration,
+              // A terminal World attempt already proves the exact
+              // configuration was admitted. Model a stale client-side
+              // confirmation projection so recovery cannot be silently
+              // swallowed before the authoritative endpoint is called.
+              lookConfirmation: {
+                confirmedAt: null,
+                confirmedBy: null,
+                origin: "system_default",
+              },
+            }
+          : null,
         world: {
           ...partialProjection.world,
           progress: partialProjection.world.progress.map((item) =>

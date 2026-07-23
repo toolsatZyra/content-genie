@@ -1907,7 +1907,7 @@ test.describe("Living Cinema creation flow", () => {
     expect(worldBuildRequests).toBe(1);
   });
 
-  test("retains one fresh World recovery key while the terminal projection is unchanged", async ({
+  test("retries a terminal World run despite stale client confirmation and retains one fresh recovery key", async ({
     page,
   }) => {
     const authorityKeys: string[] = [];

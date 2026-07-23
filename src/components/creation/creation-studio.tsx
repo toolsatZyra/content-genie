@@ -1759,16 +1759,19 @@ export function CreationStudio({
     }
   }
 
-  async function beginWorldBuild(): Promise<void> {
+  async function beginWorldBuild(options?: {
+    readonly terminalRetry?: boolean;
+  }): Promise<void> {
+    const terminalRetry = options?.terminalRetry === true;
     if (
       !canEditCreation ||
       !projection.configuration ||
-      !worldConfigurationReady ||
+      (!worldConfigurationReady && !terminalRetry) ||
       working
     ) {
       return;
     }
-    if (worldEntities.length > 0 && !worldGenerationFailed) {
+    if (worldEntities.length > 0 && !worldGenerationFailed && !terminalRetry) {
       setChamber("world");
       return;
     }
@@ -3138,6 +3141,7 @@ export function CreationStudio({
             canEdit={canEditCreation}
             onAccept={(entity) => void decideWorldCandidate(entity, "accept", null)}
             onContinue={() => void continueToPreflight()}
+            onRetry={() => void beginWorldBuild({ terminalRetry: true })}
             onStart={() => void beginWorldBuild()}
             onRegenerate={(entity, revisedPromptText) =>
               void decideWorldCandidate(entity, "regenerate", revisedPromptText)

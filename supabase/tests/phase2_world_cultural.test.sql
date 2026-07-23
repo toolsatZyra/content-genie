@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions,auth,storage,private,audit,pg_catalog;
-select plan(100);
+select plan(104);
 
 create temp table world_fixture(key text primary key,value text not null) on commit drop;
 grant select,insert,update,delete on world_fixture to authenticated,service_role;
@@ -380,6 +380,45 @@ select set_config('request.jwt.claims','{"role":"service_role"}',true);
 select set_config('request.jwt.claim.role','service_role',true);
 set local role service_role;
 select is((select state from public.character_selections),'review_required','the initial character waits for human review');
+select lives_ok(format(
+ 'select public.command_record_character_candidate(%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L::jsonb,%L,null)',
+ 'b1100000-0000-4000-8000-000000000001','b1600000-0000-4000-8000-000000000001',
+ 'b1800000-0000-4000-8000-000000000001','b1810000-0000-4000-8000-000000000001',
+ 'shiva','Shiva','mahadeva','Mahadeva','b1820000-0000-4000-8000-000000000006',
+ 'generated','Retry Shiva portrait',encode(extensions.digest(convert_to('Retry Shiva portrait','UTF8'),'sha256'),'hex'),
+ 'no drift','b1720000-0000-4000-8000-000000000002',
+ (select value from world_fixture where key='shiva_identity_manifest'),
+ encode(extensions.digest(convert_to((select value::jsonb from world_fixture
+   where key='shiva_identity_manifest')::text,'UTF8'),'sha256'),'hex')
+ ),'a fresh fenced World retry can replace an unaccepted generated character candidate');
+select ok(
+  exists(
+    select 1
+    from public.character_selections
+    where configuration_candidate_id='b1600000-0000-4000-8000-000000000001'
+      and character_form_id='b1810000-0000-4000-8000-000000000001'
+      and candidate_version_id='b1820000-0000-4000-8000-000000000006'
+      and selected_version_id is null
+      and state='review_required'
+      and aggregate_version=2
+  ),
+  'the retry replaces only the review candidate and advances its aggregate fence'
+);
+reset role;
+set local session_replication_role=replica;
+update public.character_selections
+set candidate_version_id='b1820000-0000-4000-8000-000000000001',
+  selected_version_id=null,
+  state='review_required',
+  aggregate_version=1
+where configuration_candidate_id='b1600000-0000-4000-8000-000000000001'
+  and character_form_id='b1810000-0000-4000-8000-000000000001';
+delete from public.character_versions
+where id='b1820000-0000-4000-8000-000000000006';
+set local session_replication_role=origin;
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
+select set_config('request.jwt.claim.role','service_role',true);
+set local role service_role;
 
 reset role;
 select set_config('request.jwt.claims','{"sub":"b1200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2","session_id":"b1210000-0000-4000-8000-000000000001"}',true);
@@ -593,8 +632,44 @@ select lives_ok(format(
  'b1840000-0000-4000-8000-000000000001','kedarnath','Kedarnath Temple','Kedarnath, Uttarakhand',
  'b1850000-0000-4000-8000-000000000001','generated','Empty Kedarnath courtyard',
  encode(extensions.digest(convert_to('Empty Kedarnath courtyard','UTF8'),'sha256'),'hex'),'no people',
- 'b1720000-0000-4000-8000-000000000003','{"namedTemple":true}',repeat('c',64),repeat('d',64)
+  'b1720000-0000-4000-8000-000000000003','{"namedTemple":true}',repeat('c',64),repeat('d',64)
  ),'a named temple candidate carries research provenance');
+select lives_ok(format(
+ 'select public.command_record_location_candidate(%L,%L,%L,%L,%L,true,%L,%L,%L,%L,%L,%L,%L,%L::jsonb,%L,%L,null)',
+ 'b1100000-0000-4000-8000-000000000001','b1600000-0000-4000-8000-000000000001',
+ 'b1840000-0000-4000-8000-000000000001','kedarnath','Kedarnath Temple','Kedarnath, Uttarakhand',
+ 'b1850000-0000-4000-8000-000000000002','generated','Retry empty Kedarnath courtyard',
+ encode(extensions.digest(convert_to('Retry empty Kedarnath courtyard','UTF8'),'sha256'),'hex'),'no people',
+ 'b1720000-0000-4000-8000-000000000003','{"namedTemple":true}',repeat('c',64),repeat('d',64)
+ ),'a fresh fenced World retry can replace an unaccepted generated location candidate');
+select ok(
+  exists(
+    select 1
+    from public.location_selections
+    where configuration_candidate_id='b1600000-0000-4000-8000-000000000001'
+      and location_id='b1840000-0000-4000-8000-000000000001'
+      and candidate_version_id='b1850000-0000-4000-8000-000000000002'
+      and selected_version_id is null
+      and state='review_required'
+      and aggregate_version=2
+  ),
+  'the location retry replaces only the review candidate and advances its aggregate fence'
+);
+reset role;
+set local session_replication_role=replica;
+update public.location_selections
+set candidate_version_id='b1850000-0000-4000-8000-000000000001',
+  selected_version_id=null,
+  state='review_required',
+  aggregate_version=1
+where configuration_candidate_id='b1600000-0000-4000-8000-000000000001'
+  and location_id='b1840000-0000-4000-8000-000000000001';
+delete from public.location_versions
+where id='b1850000-0000-4000-8000-000000000002';
+set local session_replication_role=origin;
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
+select set_config('request.jwt.claim.role','service_role',true);
+set local role service_role;
 
 reset role;
 select set_config('request.jwt.claims','{"sub":"b1200000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2","session_id":"b1210000-0000-4000-8000-000000000001"}',true);

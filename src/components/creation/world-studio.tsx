@@ -27,6 +27,7 @@ interface WorldStudioProps {
   readonly canEdit: boolean;
   readonly onAccept: (entity: WorldEntity) => void;
   readonly onContinue: () => void;
+  readonly onRetry: () => void;
   readonly onStart: () => void;
   readonly onRegenerate: (entity: WorldEntity, revisedPromptText: string) => void;
   readonly onUpload: (entity: WorldEntity, file: File) => void;
@@ -112,6 +113,7 @@ export function WorldStudio({
   canEdit,
   onAccept,
   onContinue,
+  onRetry,
   onStart,
   onRegenerate,
   onUpload,
@@ -393,7 +395,7 @@ export function WorldStudio({
             <button
               className="creation-primary"
               disabled={!canEdit || working}
-              onClick={onStart}
+              onClick={onRetry}
               type="button"
             >
               Retry World
