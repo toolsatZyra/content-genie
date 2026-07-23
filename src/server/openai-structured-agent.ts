@@ -25,7 +25,7 @@ export type OpenAiStructuredAgentResult = Readonly<{
 
 export type PreparedOpenAiStructuredAgentRequest = Readonly<{
   bodyText: string;
-  maximumDurationMs: 180_000;
+  maximumDurationMs: 240_000;
   maximumResponseBytes: 131_072;
   maximumTokens: number;
   model: string;
@@ -231,7 +231,7 @@ export function prepareOpenAiStructuredAgentRequest(
   const requestHash = createHash("sha256").update(bodyText).digest("hex");
   return Object.freeze({
     bodyText,
-    maximumDurationMs: 180_000,
+    maximumDurationMs: 240_000,
     maximumResponseBytes: 131_072,
     maximumTokens: maxOutputTokens,
     model,

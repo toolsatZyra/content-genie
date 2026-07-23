@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   OpenAiStructuredAgentError,
+  prepareOpenAiStructuredAgentRequest,
   runOpenAiStructuredAgent,
 } from "./openai-structured-agent";
 
@@ -13,6 +14,17 @@ const schema = {
 } as const;
 
 describe("OpenAI strict structured agent", () => {
+  it("keeps the provider timeout inside the 300-second durable worker fence", () => {
+    expect(
+      prepareOpenAiStructuredAgentRequest({
+        input: "data",
+        instructions: "analyze",
+        schema,
+        schemaName: "safe_answer",
+      }).maximumDurationMs,
+    ).toBe(240_000);
+  });
+
   it("uses Responses strict JSON Schema and parses one completed output", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(
