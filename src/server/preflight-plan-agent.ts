@@ -990,10 +990,10 @@ function parseDirectorOutput(
     const location = input.world.locations.find(
       ({ locationVersionId }) => locationVersionId === locationId,
     );
-    const allowedResearch = new Set(
-      location?.researchReferences.map(({ assetVersionId }) => assetVersionId) ?? [],
-    );
-    const selectedResearch =
+    const availableResearch =
+      location?.researchReferences.map(({ assetVersionId }) => assetVersionId) ?? [];
+    const allowedResearch = new Set(availableResearch);
+    const requestedResearch =
       shot.realWorldReferenceAssetVersionId === null
         ? null
         : String(shot.realWorldReferenceAssetVersionId);
@@ -1026,21 +1026,29 @@ function parseDirectorOutput(
       shot.characterVersionIds.length > 4 ||
       new Set(shot.characterVersionIds).size !== shot.characterVersionIds.length ||
       shot.characterVersionIds.some((id) => !allowedCharacters.has(String(id))) ||
-      (allowedResearch.size === 0 && selectedResearch !== null) ||
-      (allowedResearch.size > 0 &&
-        (selectedResearch === null || !allowedResearch.has(selectedResearch)))
+      (allowedResearch.size === 0 && requestedResearch !== null)
     ) {
       throw new PreflightPlanAgentError("Director shot binding is invalid.");
     }
-    if (selectedResearch !== null && allowedResearch.size > 1) {
+    let selectedResearch =
+      requestedResearch !== null && allowedResearch.has(requestedResearch)
+        ? requestedResearch
+        : null;
+    if (allowedResearch.size > 0) {
       const used = usedResearchByLocation.get(locationId) ?? new Set<string>();
-      if (used.has(selectedResearch) && used.size < allowedResearch.size) {
-        throw new PreflightPlanAgentError(
-          "Director repeated a real-world photograph before using the available alternatives.",
-        );
+      if (
+        selectedResearch === null ||
+        (used.has(selectedResearch) && used.size < allowedResearch.size)
+      ) {
+        selectedResearch =
+          availableResearch.find((assetVersionId) => !used.has(assetVersionId)) ??
+          availableResearch[0]!;
       }
       used.add(selectedResearch);
-      if (used.size === allowedResearch.size) used.clear();
+      if (used.size === allowedResearch.size) {
+        used.clear();
+        used.add(selectedResearch);
+      }
       usedResearchByLocation.set(locationId, used);
     }
     return Object.freeze({
@@ -2370,7 +2378,7 @@ async function recordEvaluator(
 }
 
 async function persistPlan(input: PlanInput, materialized: MaterializedPlan) {
-  await rpc("command_record_preflight_plan", {
+  const parameters = {
     p_component_ids: materialized.componentIds,
     p_configuration_candidate_id: input.configurationCandidateId,
     p_evidence_density: 100,
@@ -2387,7 +2395,59 @@ async function persistPlan(input: PlanInput, materialized: MaterializedPlan) {
     p_source_review_packet_id: input.sourceReview.sourceReviewPacketId,
     p_workspace_id: input.workspaceId,
     p_world_reference_pack_version_id: input.world.worldReferencePackVersionId,
-  });
+  };
+  const reconcileExactPlan = async () => {
+    const { data, error } = await createAdminSupabaseClient().rpc(
+      "get_plan_preflight_resume",
+      {
+        p_preflight_run_id: input.preflightRunId,
+        p_stage_attempt_id: input.stageAttemptId,
+        p_workspace_id: input.workspaceId,
+      },
+    );
+    if (error) {
+      throw new PreflightPlanAgentError(
+        "The cinematic plan receipt could not be reconciled under current authority.",
+        true,
+        "PLAN_LEDGER_RECONCILIATION_FAILED",
+      );
+    }
+    if (data === null) return false;
+    const resume = parseResume(data);
+    if (
+      resume.materialized.planBundleId !== materialized.planBundleId ||
+      resume.materialized.planHash !== materialized.planHash ||
+      resume.materialized.graphHash !== materialized.graphHash ||
+      componentKinds.some(
+        (kind) =>
+          resume.materialized.componentIds[kind] !== materialized.componentIds[kind],
+      )
+    ) {
+      throw new PreflightPlanAgentError(
+        "The persisted cinematic plan conflicts with this exact attempt.",
+        false,
+        "PLAN_LEDGER_CONFLICT",
+      );
+    }
+    return true;
+  };
+  let priorError: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await rpc("command_record_preflight_plan", parameters);
+      return;
+    } catch (error) {
+      priorError = error;
+      if (await reconcileExactPlan()) return;
+      const ambiguousTimeout =
+        error instanceof PreflightPlanAgentError &&
+        error.code === "PLAN_LEDGER_REJECTED" &&
+        /timeout|timed out|canceling statement/iu.test(error.message);
+      if (!ambiguousTimeout || attempt === 1) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+  }
+  throw priorError;
 }
 
 async function loadRepairFeedback(input: PlanInput, materialized: MaterializedPlan) {

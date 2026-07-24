@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions,auth,storage,private,audit,pg_catalog;
-select plan(73);
+select plan(74);
 grant usage on schema private to service_role;
 grant select on all tables in schema private to service_role;
 
@@ -28,6 +28,25 @@ select ok(
     'execute'
   ),
   'authenticated video profiles can only be materialized by the service boundary'
+);
+
+select is(
+  (
+    select regexp_replace(setting,'^statement_timeout=','')
+    from unnest(
+      coalesce(
+        (
+          select proconfig
+          from pg_proc
+          where oid='public.command_record_preflight_plan(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,text,numeric,numeric,numeric,numeric,numeric,jsonb,jsonb)'::regprocedure
+        ),
+        array[]::text[]
+      )
+    ) setting
+    where setting like 'statement_timeout=%'
+  ),
+  '30s',
+  'the bounded plan ledger has a function-local API timeout exemption'
 );
 
 select lives_ok($sql$

@@ -1664,3 +1664,37 @@ canonical health route returns production HTTP 200 with `ok: true`, the
 errors-only build log is clean, and the post-deploy runtime-error query is
 empty. The owner may continue `Ekadashi 1` from World and start a second
 Episode for the fresh end-to-end test.
+
+## 33. 2026-07-24 Ekadashi 1 cinematic-plan persistence hotfix
+
+The live `Ekadashi 1` Preflight proved its cultural review, ElevenLabs V3
+narration, 63.060-second verified master clock, semantic shot-boundary agent
+and Expert Cinematic Director. Four successive plan-evaluation runs then
+failed only while publishing the complete plan through
+`command_record_preflight_plan`: production returned
+`upstream request timeout` and preserved no partial plan rows.
+
+Production inspection showed `service_role` inherits the `authenticator`
+role's eight-second API statement timeout while the bounded plan-ledger
+function had no exemption. Forward migration
+`20260724090000_preflight_plan_rpc_timeout_exemption.sql` sets a function-local
+30-second timeout without relaxing any role or other RPC. It is applied to
+preview and production. Preview executable-plan pgTAP passes `74/74`.
+
+The application now reconciles the exact fully reconstructed plan receipt
+after an ambiguous timeout, including bundle, plan, graph and all eight
+component identities. It retries the identical materialized payload only when
+the receipt lookup succeeds and proves exact absence; stale authority and
+conflicting receipts fail closed. Director output also deterministically
+rotates only the accepted research photographs for each location, avoiding
+model-fragile null or repeated selections without attaching unreferenced
+images.
+
+Current hotfix evidence is green: focused recovery/adversarial unit tests
+`9/9`, full unit `118` files / `767` tests, integration `5/5` with the
+intentional live-scanner skip, formatting, lint, route-aware TypeScript,
+trusted-harness and hostile database-policy checks, production build, and one
+context-minimized independent re-review with no remaining P0/P1/P2 finding.
+The remaining release proof is one production-scale Ekadashi plan commit under
+the 30-second function timeout, followed by autonomous storyboard, clips,
+edit and final playable-video verification.

@@ -73,7 +73,7 @@
     {
       "path": "scripts/phase2-candidate-migrations.v1.json",
       "role": "candidate-migration-inventory",
-      "sha256": "4535d5a7c99ea08ea34a982e47ba86ac25a1f1b8c38fe3207ebd31fd0a68ece6"
+      "sha256": "60f6ea590e6d1a59acf5d424f878d017986464b93362f4349ec36878ce51b286"
     },
     {
       "path": "scripts/phase2-coordinate-upgrade-drill.mjs",
@@ -976,6 +976,11 @@
       "sha256": "ace2bfe75696af76048daeeb1793500a9aa5dd9b5cb4a05446d403ac5a3d4d98"
     },
     {
+      "path": "supabase/migrations/20260724090000_preflight_plan_rpc_timeout_exemption.sql",
+      "role": "phase2-migration",
+      "sha256": "b4043b7ae10bb6037e439dcedbf49497ce1f7e6ad8f75215ae1da29fb72bcd66"
+    },
+    {
       "path": "supabase/tests/fixtures/phase2_coordinate_v1_verifiers.sql",
       "role": "predecessor-fixture",
       "sha256": "2df42a28cd04b193b0eaf97c882a17edfb13688cad7aca9bf8845408e9d7ec1c"
@@ -998,7 +1003,7 @@
     {
       "path": "supabase/tests/phase2_executable_plan.test.sql",
       "role": "pgtap-source",
-      "sha256": "412bf738169e93708ea1445c768bea36a73d0902ffaf2d36af68e9880a1f412d"
+      "sha256": "f101539e5925d8437545fe13ec982621e49269f1995a87cccb669537e84cc597"
     },
     {
       "path": "supabase/tests/phase2_p2_09_cultural_claim_contract.test.sql",
@@ -1067,9 +1072,9 @@
       "testFile": "phase1_foundation.test.sql"
     },
     {
-      "hardenedQuerySha256": "0db16da1e90d2cdf20001868e0f69cadf5ef95b8bdfcde0d194cc08b886f722d",
-      "plannedAssertions": 73,
-      "sourceSha256": "412bf738169e93708ea1445c768bea36a73d0902ffaf2d36af68e9880a1f412d",
+      "hardenedQuerySha256": "15e60345947afb5c72fbb37d5888f94c508cfc53c68bb3b42344439125932bc2",
+      "plannedAssertions": 74,
+      "sourceSha256": "f101539e5925d8437545fe13ec982621e49269f1995a87cccb669537e84cc597",
       "testFile": "phase2_executable_plan.test.sql"
     },
     {
@@ -1268,7 +1273,8 @@
     "supabase/migrations/20260724040000_world_selection_history_preflight_fk_index.sql",
     "supabase/migrations/20260724041500_p2_09_runtime_bundle_reconciliation.sql",
     "supabase/migrations/20260724070000_owner_mvp_script_rubric_deferred_waiver.sql",
-    "supabase/migrations/20260724071000_owner_mvp_script_rubric_preflight_waiver.sql"
+    "supabase/migrations/20260724071000_owner_mvp_script_rubric_preflight_waiver.sql",
+    "supabase/migrations/20260724090000_preflight_plan_rpc_timeout_exemption.sql"
   ],
   "predecessorFixture": {
     "capturedAt": "2026-07-18",

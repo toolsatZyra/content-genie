@@ -584,28 +584,60 @@ describe("executable cinematic plan agent", () => {
     expect(evaluatorInput.plan.references[0]).not.toHaveProperty("contentHash");
   });
 
-  it("rejects a researched photograph repeated before its alternatives", async () => {
-    const data = fixture();
-    mocks.agent
-      .mockReset()
-      .mockResolvedValueOnce({
-        output: semanticBoundaries(data),
-        requestHash: hash("4"),
-        responseId: "resp_boundaries",
-        responseRequestId: "request_boundaries",
-      })
-      .mockResolvedValueOnce({
-        output: {
-          ...data.director,
-          shots: data.director.shots.map((shot) => ({
-            ...shot,
-            realWorldReferenceAssetVersionId: id("31"),
-          })),
-        },
-        requestHash: hash("5"),
-        responseId: "resp_director",
-        responseRequestId: "request_director",
-      });
+  it("retries the exact materialized plan after an absent timeout receipt", async () => {
+    const defaultRpc = mocks.rpc.getMockImplementation()!;
+    let persistenceAttempts = 0;
+    mocks.rpc.mockImplementation(async (name: string, parameters) => {
+      if (name === "command_record_preflight_plan") {
+        persistenceAttempts += 1;
+        if (persistenceAttempts === 1) {
+          return {
+            data: null,
+            error: { message: "upstream request timeout" },
+          };
+        }
+      }
+      if (name === "get_plan_preflight_resume") {
+        return { data: null, error: null };
+      }
+      return defaultRpc(name, parameters);
+    });
+
+    await executePlanPreflight({
+      authorityEpoch: 1,
+      capabilityGrantId: null,
+      fencingToken: 1,
+      inputManifestId: id("90"),
+      inputManifestSha256: hash("a"),
+      preflightRunId: id("6"),
+      schemaVersion: "genie.preflight-task.v1",
+      stageAttemptId: id("9"),
+      stageRunId: id("91"),
+      workspaceId: id("1"),
+    });
+
+    expect(persistenceAttempts).toBe(2);
+  });
+
+  it("does not replay a plan when receipt authority cannot be reconciled", async () => {
+    const defaultRpc = mocks.rpc.getMockImplementation()!;
+    let persistenceAttempts = 0;
+    mocks.rpc.mockImplementation(async (name: string, parameters) => {
+      if (name === "command_record_preflight_plan") {
+        persistenceAttempts += 1;
+        return {
+          data: null,
+          error: { message: "upstream request timeout" },
+        };
+      }
+      if (name === "get_plan_preflight_resume") {
+        return {
+          data: null,
+          error: { message: "plan resume authority is stale" },
+        };
+      }
+      return defaultRpc(name, parameters);
+    });
 
     await expect(
       executePlanPreflight({
@@ -620,7 +652,168 @@ describe("executable cinematic plan agent", () => {
         stageRunId: id("91"),
         workspaceId: id("1"),
       }),
-    ).rejects.toThrow("repeated a real-world photograph");
+    ).rejects.toMatchObject({
+      code: "PLAN_LEDGER_RECONCILIATION_FAILED",
+    });
+    expect(persistenceAttempts).toBe(1);
+  });
+
+  it("reconciles an exact committed plan after an ambiguous timeout", async () => {
+    const defaultRpc = mocks.rpc.getMockImplementation()!;
+    let persisted: PersistedPlanParameters | null = null;
+    let persistenceAttempts = 0;
+    mocks.rpc.mockImplementation(async (name: string, parameters) => {
+      if (name === "command_record_preflight_plan") {
+        persistenceAttempts += 1;
+        persisted = parameters as PersistedPlanParameters;
+        return {
+          data: null,
+          error: { message: "upstream request timeout" },
+        };
+      }
+      if (name === "get_plan_preflight_resume" && persisted) {
+        return {
+          data: {
+            challenges: [],
+            componentIds: persisted.p_component_ids,
+            consensus: null,
+            graphHash: persisted.p_graph_hash,
+            plan: persisted.p_plan,
+            planBundleId: persisted.p_plan_bundle_id,
+            planHash: persisted.p_plan_hash,
+            state: "candidate",
+          },
+          error: null,
+        };
+      }
+      return defaultRpc(name, parameters);
+    });
+
+    await executePlanPreflight({
+      authorityEpoch: 1,
+      capabilityGrantId: null,
+      fencingToken: 1,
+      inputManifestId: id("90"),
+      inputManifestSha256: hash("a"),
+      preflightRunId: id("6"),
+      schemaVersion: "genie.preflight-task.v1",
+      stageAttemptId: id("9"),
+      stageRunId: id("91"),
+      workspaceId: id("1"),
+    });
+
+    expect(persistenceAttempts).toBe(1);
+  });
+
+  it("rejects a timeout receipt with different component identities", async () => {
+    const defaultRpc = mocks.rpc.getMockImplementation()!;
+    let persisted: PersistedPlanParameters | null = null;
+    mocks.rpc.mockImplementation(async (name: string, parameters) => {
+      if (name === "command_record_preflight_plan") {
+        persisted = parameters as PersistedPlanParameters;
+        return {
+          data: null,
+          error: { message: "upstream request timeout" },
+        };
+      }
+      if (name === "get_plan_preflight_resume" && persisted) {
+        return {
+          data: {
+            challenges: [],
+            componentIds: {
+              ...persisted.p_component_ids,
+              edd: id("999"),
+            },
+            consensus: null,
+            graphHash: persisted.p_graph_hash,
+            plan: persisted.p_plan,
+            planBundleId: persisted.p_plan_bundle_id,
+            planHash: persisted.p_plan_hash,
+            state: "candidate",
+          },
+          error: null,
+        };
+      }
+      return defaultRpc(name, parameters);
+    });
+
+    await expect(
+      executePlanPreflight({
+        authorityEpoch: 1,
+        capabilityGrantId: null,
+        fencingToken: 1,
+        inputManifestId: id("90"),
+        inputManifestSha256: hash("a"),
+        preflightRunId: id("6"),
+        schemaVersion: "genie.preflight-task.v1",
+        stageAttemptId: id("9"),
+        stageRunId: id("91"),
+        workspaceId: id("1"),
+      }),
+    ).rejects.toMatchObject({ code: "PLAN_LEDGER_CONFLICT" });
+  });
+
+  it("rotates researched photographs before repeating an available alternative", async () => {
+    const data = fixture();
+    mocks.agent
+      .mockReset()
+      .mockResolvedValueOnce({
+        output: semanticBoundaries(data),
+        requestHash: hash("4"),
+        responseId: "resp_boundaries",
+        responseRequestId: "request_boundaries",
+      })
+      .mockResolvedValueOnce({
+        output: {
+          ...data.director,
+          shots: data.director.shots.map((shot, index) => ({
+            ...shot,
+            realWorldReferenceAssetVersionId: index < 2 ? id("31") : id("32"),
+          })),
+        },
+        requestHash: hash("5"),
+        responseId: "resp_director",
+        responseRequestId: "request_director",
+      })
+      .mockResolvedValueOnce({
+        output: data.evaluator,
+        requestHash: hash("6"),
+        responseId: "resp_sol",
+        responseRequestId: "request_sol",
+      })
+      .mockResolvedValueOnce({
+        output: data.evaluator,
+        requestHash: hash("7"),
+        responseId: "resp_terra",
+        responseRequestId: "request_terra",
+      });
+
+    await executePlanPreflight({
+      authorityEpoch: 1,
+      capabilityGrantId: null,
+      fencingToken: 1,
+      inputManifestId: id("90"),
+      inputManifestSha256: hash("a"),
+      preflightRunId: id("6"),
+      schemaVersion: "genie.preflight-task.v1",
+      stageAttemptId: id("9"),
+      stageRunId: id("91"),
+      workspaceId: id("1"),
+    });
+    const planCall = mocks.rpc.mock.calls.find(
+      ([name]) => name === "command_record_preflight_plan",
+    );
+    expect(
+      planCall?.[1].p_plan.edd.shots
+        .slice(0, 4)
+        .map(
+          ({
+            realWorldReferenceAssetVersionId,
+          }: {
+            realWorldReferenceAssetVersionId: string;
+          }) => realWorldReferenceAssetVersionId,
+        ),
+    ).toEqual([id("31"), id("32"), id("31"), id("32")]);
   });
 
   it("repairs a blocked plan with exact feedback and fresh blind evaluation", async () => {
