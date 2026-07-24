@@ -584,6 +584,9 @@ describe("executable cinematic plan agent", () => {
     expect(mocks.agent.mock.calls[1]![1].instructions).toContain(
       "Never invent an anonymous devotee",
     );
+    expect(mocks.agent.mock.calls[1]![1].instructions).toContain(
+      "Never translate death into kneeling",
+    );
     const directorInput = JSON.parse(mocks.agent.mock.calls[1]![1].input as string);
     expect(directorInput.world.characters[0].identityBinding).toEqual({
       canonicalName: "Devi",
@@ -617,6 +620,10 @@ describe("executable cinematic plan agent", () => {
       rule: expect.stringContaining("never a required count"),
     });
     const evaluatorInput = JSON.parse(mocks.agent.mock.calls[2]![1].input as string);
+    expect(evaluatorInput.sourceEvidence.sources[0]).toMatchObject({
+      boundedProposition: "Source-bound story context.",
+      propositionTruncated: false,
+    });
     expect((mocks.agent.mock.calls[2]![1].input as string).length).toBeLessThan(
       100_000,
     );

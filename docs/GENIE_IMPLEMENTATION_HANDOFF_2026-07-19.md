@@ -1895,3 +1895,34 @@ The focused suite passes `16/16`, including both the original
 Goddess-ID-as-devotee rejection and the editorial-audience false-positive
 regression. Formatting, focused lint and route-aware TypeScript pass. A clean
 post-deploy Ekadashi successor remains the required production proof.
+
+## 39. 2026-07-24 Narrative-finality and evaluator source evidence
+
+Ekadashi run 28 proved the corrected recovery mechanics end to end through two
+repairs. Its final candidate passed the Terra blind evaluator at `75` but Sol
+blocked at `69`. The blocker was concrete: the immutable narration states that
+Devi Ekadashi kills Mura, while the plan showed Mura kneeling and bowing. The
+image therefore communicated surrender rather than the narrated non-graphic
+death. Repeated invented tithi seals, low-value symbolic inserts and a subtle
+1.478-second final action also reduced clarity, shot economy and feasibility.
+
+The Director contract now requires exact causal finality. Narrated death,
+slaying or vadh must use an unmistakably final but dignified, non-graphic
+consequence; kneeling, bowing, surrender, retreat or recoil are explicitly
+invalid substitutes. It also forbids invented authoritative ritual/tithi
+iconography, limits repeated symbolic motifs to two materially distinct uses,
+prioritizes a concrete dramatic first frame over a quiet calendar symbol, and
+requires a bold readable final action when the retained window is shorter than
+two seconds.
+
+The blind evaluator previously received only cultural evidence hashes, so it
+could not inspect the already-qualified claim bounds and repeatedly penalized
+their absence. Its bounded packet now includes at most twenty compact source
+records with title/class and up to 800 characters of each reviewed
+`boundedProposition`. The packet remains below the existing 100 KB structured
+agent input boundary, is explicitly untrusted, and does not change the
+immutable script or persisted source packet.
+
+Focused tests pass `16/16`; formatting, focused lint and route-aware TypeScript
+pass. The next clean successor must clear both blind evaluators and then prove
+quote, storyboard, clip, edit and playable-master production.
