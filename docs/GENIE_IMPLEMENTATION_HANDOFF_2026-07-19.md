@@ -1873,3 +1873,25 @@ The focused executable-plan suite passes `15/15`, including the exact
 incomplete beat-level reveal regression. Formatting, focused lint and
 route-aware TypeScript pass. The next live successor must demonstrate bounded
 automatic retry and then clear blind review before any media spend.
+
+## 38. 2026-07-24 Visible-character guard scope correction
+
+Production runs 26 and 27 repeatedly exercised the retryable locked-character
+guard. Each Shot Director and Cinematic Director call completed, but five
+candidates were rejected as depicting an unanchored person. The detector was
+scanning not only on-screen composition and action, but editorial metadata
+such as `narrativeFunction`, `emotionalRead`, score and SFX. A phrase such as
+"orient the audience" therefore matched the prohibited person token
+`audience`, even though no audience member was placed in the frame.
+
+The unanchored-person phrase guard now scans only fields that can actually
+place a visible subject on screen: camera motion, framing, lighting, subject
+action and storyboard visual intent. The stronger structural rule is
+unchanged: every attached immutable character ID must have the exact matching
+`characterIdentityKey`, and visible prose still rejects devotees, crowds,
+pilgrims, worshippers or other people absent from the accepted World.
+
+The focused suite passes `16/16`, including both the original
+Goddess-ID-as-devotee rejection and the editorial-audience false-positive
+regression. Formatting, focused lint and route-aware TypeScript pass. A clean
+post-deploy Ekadashi successor remains the required production proof.

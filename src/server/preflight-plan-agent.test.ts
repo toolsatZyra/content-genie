@@ -759,6 +759,65 @@ describe("executable cinematic plan agent", () => {
     });
   });
 
+  it("does not treat an editorial audience reference as a visible unanchored person", async () => {
+    const data = fixture();
+    mocks.agent
+      .mockReset()
+      .mockResolvedValueOnce({
+        output: semanticBoundaries(data),
+        requestHash: hash("4"),
+        responseId: "resp_boundaries",
+        responseRequestId: "request_boundaries",
+      })
+      .mockResolvedValueOnce({
+        output: {
+          ...data.director,
+          shots: data.director.shots.map((shot, index) =>
+            index === 0
+              ? {
+                  ...shot,
+                  emotionalRead: "The audience should feel immediate wonder.",
+                  narrativeFunction:
+                    "Orient the audience to the source-bound visual question.",
+                }
+              : shot,
+          ),
+        },
+        requestHash: hash("5"),
+        responseId: "resp_director",
+        responseRequestId: "request_director",
+      })
+      .mockResolvedValueOnce({
+        output: data.evaluator,
+        requestHash: hash("6"),
+        responseId: "resp_sol",
+        responseRequestId: "request_sol",
+      })
+      .mockResolvedValueOnce({
+        output: data.evaluator,
+        requestHash: hash("7"),
+        responseId: "resp_terra",
+        responseRequestId: "request_terra",
+      });
+
+    await expect(
+      executePlanPreflight({
+        authorityEpoch: 1,
+        capabilityGrantId: null,
+        fencingToken: 1,
+        inputManifestId: id("90"),
+        inputManifestSha256: hash("a"),
+        preflightRunId: id("6"),
+        schemaVersion: "genie.preflight-task.v1",
+        stageAttemptId: id("9"),
+        stageRunId: id("91"),
+        workspaceId: id("1"),
+      }),
+    ).resolves.toMatchObject({
+      schemaVersion: "genie.plan-preflight-output.v1",
+    });
+  });
+
   it("retries an incomplete storyboard sentence instead of persisting it", async () => {
     const data = fixture();
     mocks.agent

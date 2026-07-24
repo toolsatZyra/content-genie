@@ -1055,12 +1055,8 @@ function assertShotCharacterBindings(
   const directiveText = normalizedIdentityText(
     [
       shot.cameraMotion,
-      shot.emotionalRead,
       shot.framing,
       shot.lighting,
-      shot.narrativeFunction,
-      shot.scoreCue,
-      shot.sfxCue,
       shot.subjectAction,
       shot.visualIntent,
     ]
