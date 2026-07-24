@@ -2070,3 +2070,25 @@ inside its ownership fence while retaining five-way asynchronous provider
 submission. The current run may be resumed without new spend after confirming
 that every incomplete media dispatch is either ledger-reserved with no provider
 request or submitted with its exact external request ID.
+
+## 47. 2026-07-24 Clip ledger authority and Seedance dispatch
+
+Ekadashi completed all 24 provider storyboard frames for its 22-shot plan. The
+first clip provider request was then accepted, but insertion through
+`mvp_production_clip_worker` failed. The clip role-binding trigger queried the
+private storyboard table as `service_role`; that role intentionally has no
+private-schema access. The trigger now runs as its trusted owner with an empty
+search path, while `service_role` remains unable to use the private schema.
+The first two accepted provider receipts were reconciled into their exact clip
+rows without resubmission.
+
+The next pass durably submitted clips 3–5, then stopped on shot 6, the first
+Seedance shot. The media-dispatch command only admitted endpoint identifiers
+under `fal-ai/`, while fal.ai exposes Seedance under the exact
+`bytedance/seedance-2.0/image-to-video` identifier. Dispatch authority now uses
+an explicit five-endpoint production allowlist and retains the previously
+shipped owner-evidence-bound compatibility ceiling for legacy storyboard
+runs. The focused preview cinematic pgTAP suite passes `122/122`, including
+the narrow trigger-authority, Seedance allowlist, and legacy ceiling
+regressions. The production run is queued with five exact clip receipts and
+must continue from shot 6 without regenerating clips 1–5.

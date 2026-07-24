@@ -6,7 +6,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions,auth,storage,private,audit,pg_catalog;
 
-select plan(120);
+select plan(122);
 
 create temp table mvp_pipeline_fixture(
   key text primary key,
@@ -14,6 +14,36 @@ create temp table mvp_pipeline_fixture(
 ) on commit drop;
 grant select, insert, update, delete on mvp_pipeline_fixture
 to authenticated, service_role;
+
+select ok(
+  exists (
+    select 1
+    from pg_proc
+    join pg_namespace on pg_namespace.oid = pg_proc.pronamespace
+    where pg_namespace.nspname = 'private'
+      and pg_proc.proname = 'enforce_mvp_clip_storyboard_roles'
+      and pg_proc.prosecdef
+      and 'search_path=""' = any(coalesce(pg_proc.proconfig, '{}'::text[]))
+  )
+  and not has_schema_privilege('service_role', 'private', 'usage'),
+  'clip role binding uses a narrow trusted trigger without exposing the private schema'
+);
+
+select ok(
+  position(
+    '''bytedance/seedance-2.0/image-to-video'''
+    in pg_get_functiondef(
+      'public.command_reserve_mvp_media_dispatch(uuid,uuid,uuid,integer,integer,text,text,text,text,bigint,bigint)'::regprocedure
+    )
+  ) > 0
+  and position(
+    '''bytedance/seedance-2.0/reference-to-video'''
+    in pg_get_functiondef(
+      'public.command_reserve_mvp_media_dispatch(uuid,uuid,uuid,integer,integer,text,text,text,text,bigint,bigint)'::regprocedure
+    )
+  ) = 0,
+  'the dispatch authority admits only the production Seedance image-to-video endpoint'
+);
 
 select ok(
   exists (
@@ -2779,49 +2809,45 @@ select set_config(
 );
 select set_config('request.jwt.claim.role','authenticated',true);
 set local role authenticated;
-select lives_ok(
-  $sql$
-  with initial as materialized (
-    select public.command_authorize_world_build_intent(
-      'c1100000-0000-4000-8000-000000000001',
-      'd1400000-0000-4000-8000-000000000001',
-      'd1500000-0000-4000-8000-000000000001',
-      (
-        select aggregate_version
-        from public.episode_configuration_candidates
-        where id = 'd1500000-0000-4000-8000-000000000001'
-      ),
-      500,
-      'd2b00000-0000-4000-8000-000000000011',
-      'uploaded-world-intent-0001',
-      repeat('1', 64)
-    ) result
+insert into mvp_pipeline_fixture(key,value)
+select 'uploaded-world-initial',public.command_authorize_world_build_intent(
+  'c1100000-0000-4000-8000-000000000001',
+  'd1400000-0000-4000-8000-000000000001',
+  'd1500000-0000-4000-8000-000000000001',
+  (
+    select aggregate_version
+    from public.episode_configuration_candidates
+    where id = 'd1500000-0000-4000-8000-000000000001'
   ),
-  retried as materialized (
-    select public.command_authorize_world_build_intent(
-      'c1100000-0000-4000-8000-000000000001',
-      'd1400000-0000-4000-8000-000000000001',
-      'd1500000-0000-4000-8000-000000000001',
-      (
-        select aggregate_version
-        from public.episode_configuration_candidates
-        where id = 'd1500000-0000-4000-8000-000000000001'
-      ),
-      500,
-      'd2b00000-0000-4000-8000-000000000012',
-      'uploaded-world-intent-0002',
-      repeat('2', 64)
-    ) result
-    from initial
-  )
-  select case
-    when initial.result->>'intentId'=retried.result->>'intentId'
-      and retried.result->>'reusedActiveIntent'='true'
-    then 1
-    else 1/0
-  end
-  from initial,retried
-  $sql$,
+  500,
+  'd2b00000-0000-4000-8000-000000000011',
+  'uploaded-world-intent-0001',
+  repeat('1', 64)
+);
+insert into mvp_pipeline_fixture(key,value)
+select 'uploaded-world-retry',public.command_authorize_world_build_intent(
+  'c1100000-0000-4000-8000-000000000001',
+  'd1400000-0000-4000-8000-000000000001',
+  'd1500000-0000-4000-8000-000000000001',
+  (
+    select aggregate_version
+    from public.episode_configuration_candidates
+    where id = 'd1500000-0000-4000-8000-000000000001'
+  ),
+  500,
+  'd2b00000-0000-4000-8000-000000000012',
+  'uploaded-world-intent-0002',
+  repeat('2', 64)
+);
+select ok(
+  (
+    select initial.value->>'intentId'=retried.value->>'intentId'
+      and retried.value->>'reusedActiveIntent'='true'
+    from mvp_pipeline_fixture initial
+    cross join mvp_pipeline_fixture retried
+    where initial.key='uploaded-world-initial'
+      and retried.key='uploaded-world-retry'
+  ),
   'a confirmed uploaded source reaches World authority and retry reuses its exact active intent'
 );
 reset role;

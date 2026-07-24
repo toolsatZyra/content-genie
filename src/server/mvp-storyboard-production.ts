@@ -1515,9 +1515,8 @@ export async function advanceMvpStoryboardAndClipSubmission(
       });
     if (insertError) {
       throw new MvpStoryboardProductionError(
-        "A video job was accepted but could not be recorded.",
-        "PRODUCTION_LEDGER_FAILED",
-        false,
+        "The accepted video job is awaiting ledger reconciliation.",
+        "PROVIDER_RECEIPT_RECONCILIATION_PENDING",
       );
     }
     existingClips.add(shot.shot_number);

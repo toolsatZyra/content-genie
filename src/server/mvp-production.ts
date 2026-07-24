@@ -22,6 +22,7 @@ import {
 import {
   completeMvpMediaDispatchOutput,
   fetchMvpFalBilledResultForDispatch,
+  MvpMediaDispatchError,
 } from "@/server/mvp-media-dispatch";
 import { fetchMvpFalQueueJson } from "@/server/mvp-media-provider-broker";
 import {
@@ -173,6 +174,9 @@ async function submitJob(job: JobRow): Promise<void> {
     if (progress.readyForSound) await materializeMvpSfxCues(job);
   } catch (caught) {
     if (caught instanceof MvpStoryboardProductionError) {
+      throw new MvpProductionError(caught.message, caught.safeCode, caught.retryable);
+    }
+    if (caught instanceof MvpMediaDispatchError) {
       throw new MvpProductionError(caught.message, caught.safeCode, caught.retryable);
     }
     throw caught;
