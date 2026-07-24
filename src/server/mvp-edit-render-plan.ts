@@ -184,7 +184,7 @@ export function compileMvpEditRenderPlan(
     soundEffects.length > 0
       ? `;[narr]${sfxLabels}amix=inputs=${soundEffects.length + 1}:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.891251[mix]`
       : "";
-  const filterComplex = `${videoFilters.join(";")};${concatInputs}concat=n=${shots.length}:v=1:a=0[video];${audioFilters.join(";")}${mix}`;
+  const filterComplex = `${videoFilters.join(";")};${concatInputs}concat=n=${shots.length}:v=1:a=0[joined];[joined]trim=start=0:end=${seconds(narrationDurationMs)},setpts=PTS-STARTPTS[video];${audioFilters.join(";")}${mix}`;
   if (
     /stream_loop|\bloop\b|tpad|minterpolate|atempo|setpts\s*=\s*PTS\s*[*\/]/iu.test(
       filterComplex,
