@@ -578,7 +578,7 @@ describe("executable cinematic plan agent", () => {
     );
     expect(mocks.agent.mock.calls[1]![1].reasoningEffort).toBe("medium");
     expect(mocks.agent.mock.calls[1]![1]).toMatchObject({
-      maxOutputTokens: 10_000,
+      maxOutputTokens: 16_000,
       model: "gpt-5.6-terra",
     });
     expect(mocks.agent.mock.calls[1]![1].instructions).toContain(

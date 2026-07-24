@@ -1841,3 +1841,12 @@ including incomplete-composition and exact-count rejection. Formatting, lint,
 route-aware TypeScript and the production build pass. The next required live
 proof is a fresh Ekadashi plan run on this deployed contract, followed by the
 actual storyboard, clip, edit and playable-master path.
+
+The first post-deploy Director call then returned an exact provider receipt
+with incomplete reason `max_output_tokens`: the cadence-guided 22-shot
+structured plan plus the fuller composition contract exceeded the former
+10,000-token response ceiling. This was not a content or safety refusal. The
+Director alone now uses the structured-agent module's existing bounded maximum
+of 16,000 output tokens. Its 100 KB input, 128 KB response, 180-second request,
+single-agent fan-out, authority and no-spend-before-consensus limits are
+unchanged.
