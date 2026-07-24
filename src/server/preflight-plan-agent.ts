@@ -1053,15 +1053,7 @@ function assertShotCharacterBindings(
   characters: readonly CharacterReference[],
 ) {
   const directiveText = normalizedIdentityText(
-    [
-      shot.cameraMotion,
-      shot.framing,
-      shot.lighting,
-      shot.subjectAction,
-      shot.visualIntent,
-    ]
-      .map(String)
-      .join(" "),
+    [shot.framing, shot.subjectAction, shot.visualIntent].map(String).join(" "),
   );
   const worldIdentityText = normalizedIdentityText(
     characters

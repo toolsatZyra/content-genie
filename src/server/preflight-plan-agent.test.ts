@@ -783,7 +783,9 @@ describe("executable cinematic plan agent", () => {
             index === 0
               ? {
                   ...shot,
+                  cameraMotion: "A slow push draws the audience into the question.",
                   emotionalRead: "The audience should feel immediate wonder.",
+                  lighting: "A motivated edge light guides the audience toward Devi.",
                   narrativeFunction:
                     "Orient the audience to the source-bound visual question.",
                 }

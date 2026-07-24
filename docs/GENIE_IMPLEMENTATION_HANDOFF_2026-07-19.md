@@ -1926,3 +1926,21 @@ immutable script or persisted source packet.
 Focused tests pass `16/16`; formatting, focused lint and route-aware TypeScript
 pass. The next clean successor must clear both blind evaluators and then prove
 quote, storyboard, clip, edit and playable-master production.
+
+## 40. 2026-07-24 Visible-occupant guard final scope
+
+Run 29's post-deploy final repair was still rejected as an unanchored person
+before evaluation. The guard retained camera-motion and lighting prose in its
+text scan; those fields legitimately use editorial phrases such as "draw the
+audience" or "guide the viewer" without placing a person in the frame.
+
+The phrase guard is now limited to the three fields that define visible
+occupants: framing, subject action and storyboard visual intent. The exact
+character ID-to-key contract remains mandatory, and the existing regression
+continues to reject an anonymous devotee explicitly placed in those visual
+fields. The positive regression now also covers editorial audience references
+in camera motion, lighting, emotional read and narrative function.
+
+Focused tests remain `16/16`; formatting, focused lint and route-aware
+TypeScript pass. Run 30 or its first clean post-deploy successor is the required
+production proof.
