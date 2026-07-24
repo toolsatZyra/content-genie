@@ -19,25 +19,39 @@ const id = (suffix: string) => `10000000-0000-4000-8000-${suffix.padStart(12, "0
 const hash = (character: string) => character.repeat(64);
 
 const allowanceDefinitions = [
-  ["narration_master_reuse", "episode", 0, 1, 0],
-  ["qc_judges", "judge_call", 250_000, 4, 3_000_000],
-  ["render_export", "render_minute", 500_000, 1, 1_500_000],
-  ["repair_allowance", "episode", 500_000, 1, 1_000_000],
-  ["score_music", "episode", 1_250_000, 1, 2_500_000],
-  ["sfx_ambience", "credit", 100, 0, 1_000_000],
-  ["storyboard_generation", "billing_quantum", 80_000, 0, 50_000_000],
-  ["upscale", "minute", 1_200_000, 0, 5_000_000],
+  ["narration_master_reuse", "narration_master_reuse", "episode", 0, 1, 0],
+  ["qc_judges", "qc_judges", "judge_call", 250_000, 4, 3_000_000],
+  ["render_export", "render_export", "render_minute", 500_000, 1, 1_500_000],
+  ["repair_allowance", "repair_allowance", "episode", 500_000, 1, 1_000_000],
+  ["score_music", "score_music", "episode", 1_250_000, 1, 2_500_000],
+  ["sfx_ambience", "sfx_ambience", "credit", 100, 0, 1_000_000],
+  [
+    "storyboard_generation",
+    "provider_storyboard",
+    "billing_quantum",
+    80_000,
+    0,
+    50_000_000,
+  ],
+  ["upscale", "upscale", "minute", 1_200_000, 0, 5_000_000],
 ] as const;
 
 function quoteInput(providerUnitPriceMicrousd = 300_000) {
   const expiresAt = "2026-10-17T13:06:06.255Z";
   const allowanceRates = allowanceDefinitions.map(
     (
-      [rateKey, unitName, unitPriceMicrousd, minimumQuantity, maximumLineMicrousd],
+      [
+        rateKey,
+        lineKind,
+        unitName,
+        unitPriceMicrousd,
+        minimumQuantity,
+        maximumLineMicrousd,
+      ],
       index,
     ) => ({
       expiresAt,
-      lineKind: rateKey,
+      lineKind,
       maximumLineMicrousd,
       minimumQuantity,
       rateCardId: id(String(100 + index)),
@@ -87,7 +101,7 @@ describe("exact production quote compiler", () => {
 
   afterEach(() => vi.useRealTimers());
 
-  it("prices every immutable provider slot and all seven mandatory allowances", () => {
+  it("prices every immutable provider slot and all eight mandatory allowances", () => {
     const lines = compileProductionQuoteLines(quoteInput());
     expect(lines).toHaveLength(12);
     expect(

@@ -1976,3 +1976,25 @@ substantive blocker is recorded as a warning. Formatting, lint and route-aware
 TypeScript pass. The migration
 `owner_mvp_soft_plan_quality_gate` is live on preview and production. A fresh
 post-deploy Ekadashi run remains required to prove the complete media path.
+
+## 42. 2026-07-24 Storyboard allowance quote repair
+
+Ekadashi run 32 is the first fully post-deploy advisory-score run. The Shot
+Director and Cinematic Director completed, both independent evaluators
+completed, and Monica's consensus passed with 100% evidence density and a
+maximum parameter spread of one. The plan is `qc_passed`; its OVS, CVP and PFS
+shortfalls are retained under `MVP_PROVISIONAL_QUALITY`.
+
+The Production Accountant then stopped before spend with
+`PRODUCTION_QUOTE_INVALID`: the live storyboard allowance correctly uses the
+quote-line kind `provider_storyboard`, but the TypeScript parser incorrectly
+required every allowance's line kind to equal its rate key
+(`storyboard_generation`). The parser now validates each allowance against an
+explicit rate-key-to-line-kind contract, including
+`storyboard_generation -> provider_storyboard`. The production quote fixture
+now mirrors the live database shape and names all eight mandatory allowances.
+
+The quote and plan focused suites pass `20/20`; formatting, lint and
+route-aware TypeScript pass. No provider spend occurred on the failed quote.
+A fresh successor must reuse or reproduce the passed plan, compile the quote,
+and continue into storyboard generation.

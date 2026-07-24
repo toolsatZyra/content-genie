@@ -20,6 +20,16 @@ const allowanceRateKeys = [
   "upscale",
 ] as const;
 type AllowanceRateKey = (typeof allowanceRateKeys)[number];
+const allowanceLineKinds: Readonly<Record<AllowanceRateKey, string>> = Object.freeze({
+  narration_master_reuse: "narration_master_reuse",
+  qc_judges: "qc_judges",
+  render_export: "render_export",
+  repair_allowance: "repair_allowance",
+  score_music: "score_music",
+  sfx_ambience: "sfx_ambience",
+  storyboard_generation: "provider_storyboard",
+  upscale: "upscale",
+});
 type SlotKind = "alternate" | "candidate" | "primary" | "retry";
 
 type Rate = Readonly<{
@@ -252,7 +262,9 @@ function parseQuoteInput(value: unknown): QuoteInput {
     allowanceRateKeys.some(
       (rateKey) => !allowanceRates.some((rate) => rate.rateKey === rateKey),
     ) ||
-    allowanceRates.some((rate) => rate.lineKind !== rate.rateKey)
+    allowanceRates.some(
+      (rate) => rate.lineKind !== allowanceLineKinds[rate.rateKey as AllowanceRateKey],
+    )
   ) {
     throw new ProductionQuoteError("Production allowance rates are ambiguous.");
   }
