@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   limit: vi.fn(),
   order: vi.fn(),
   query: {} as Record<string, ReturnType<typeof vi.fn>>,
+  runLedgered: vi.fn(),
   select: vi.fn(),
   single: vi.fn(),
 }));
@@ -15,7 +16,12 @@ vi.mock("@/lib/supabase/admin", () => ({
   createAdminSupabaseClient: mocks.client,
 }));
 
+vi.mock("@/server/ledgered-openai-agent", () => ({
+  runLedgeredOpenAiStructuredAgent: mocks.runLedgered,
+}));
+
 import {
+  createNarrationDelivery,
   getApprovedNarrationSourceSetHash,
   NarrationDeliveryError,
 } from "./narration-delivery";
@@ -34,6 +40,7 @@ beforeEach(() => {
     mocks.from,
     mocks.limit,
     mocks.order,
+    mocks.runLedgered,
     mocks.select,
     mocks.single,
   ]) {
@@ -78,6 +85,58 @@ describe("approved narration context", () => {
 
     await expect(getApprovedNarrationSourceSetHash(input)).rejects.toBeInstanceOf(
       NarrationDeliveryError,
+    );
+  });
+
+  it("uses a bounded medium reasoning budget for delivery annotations", async () => {
+    mocks.single.mockResolvedValue({
+      data: { source_set_hash: "a".repeat(64) },
+      error: null,
+    });
+    mocks.runLedgered.mockResolvedValue({
+      inputTokens: 100,
+      output: {
+        annotations: [],
+        schemaVersion: "genie.elevenlabs-v3-delivery.v1",
+      },
+      outputTokens: 100,
+      requestHash: "b".repeat(64),
+      responseId: "resp_test",
+      responseRequestId: "req_test",
+      toolCallId: "10000000-0000-4000-8000-000000000007",
+    });
+
+    await expect(
+      createNarrationDelivery({
+        configurationCandidateId: input.configurationCandidateId,
+        envelope: {
+          authorityEpoch: 1,
+          capabilityGrantId: null,
+          fencingToken: 1,
+          inputManifestId: "10000000-0000-4000-8000-000000000009",
+          inputManifestSha256: "c".repeat(64),
+          preflightRunId: "10000000-0000-4000-8000-000000000005",
+          schemaVersion: "genie.preflight-task.v1",
+          stageAttemptId: "10000000-0000-4000-8000-000000000006",
+          stageRunId: "10000000-0000-4000-8000-00000000000a",
+          workspaceId: input.workspaceId,
+        },
+        episodeId: "10000000-0000-4000-8000-000000000008",
+        policyVersionId: input.policyVersionId,
+        scriptRevisionId: input.scriptRevisionId,
+        sourceText: "A faithful narration.",
+      }),
+    ).resolves.toMatchObject({
+      deliveryText: "A faithful narration.",
+      modelRequestHash: "b".repeat(64),
+    });
+    expect(mocks.runLedgered).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        maxOutputTokens: 8_000,
+        reasoningEffort: "medium",
+        schemaName: "genie_elevenlabs_v3_delivery",
+      }),
     );
   });
 });
