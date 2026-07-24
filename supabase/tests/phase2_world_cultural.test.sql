@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions,auth,storage,private,audit,pg_catalog;
-select plan(114);
+select plan(120);
 
 create temp table world_fixture(key text primary key,value text not null) on commit drop;
 grant select,insert,update,delete on world_fixture to authenticated,service_role;
@@ -944,9 +944,150 @@ select lives_ok(format(
  ),'the exact empty-location anchor is accepted');
 
 reset role;
+set local session_replication_role=replica;
+insert into public.preflight_runs(
+  id,workspace_id,episode_id,configuration_candidate_id,script_revision_id,
+  kind,run_number,authority_epoch,state,requires_micro_authority,trigger_run_id,
+  started_at,completed_at
+) values(
+  'b2460000-0000-4000-8000-000000000010',
+  'b1100000-0000-4000-8000-000000000001',
+  'b1400000-0000-4000-8000-000000000001',
+  'b1600000-0000-4000-8000-000000000001',
+  'b1500000-0000-4000-8000-000000000001',
+  'world_anchor',1,1,'succeeded',false,'world-selection-reconcile',
+  statement_timestamp(),statement_timestamp()
+);
+insert into public.world_build_progress_items(
+  id,workspace_id,configuration_candidate_id,preflight_run_id,item_key,
+  item_kind,world_entity_id,display_name,state,sort_order,safe_detail
+) values
+(
+  'b24c0000-0000-4000-8000-000000000010',
+  'b1100000-0000-4000-8000-000000000001',
+  'b1600000-0000-4000-8000-000000000001',
+  'b2460000-0000-4000-8000-000000000010',
+  'character.current-shiva','character',
+  'b1810000-0000-4000-8000-000000000001',
+  'Current Shiva','review_ready',1,'Secure image is ready for review'
+),
+(
+  'b24c0000-0000-4000-8000-000000000011',
+  'b1100000-0000-4000-8000-000000000001',
+  'b1600000-0000-4000-8000-000000000001',
+  'b2460000-0000-4000-8000-000000000010',
+  'location.current-kedarnath','location',
+  'b1840000-0000-4000-8000-000000000001',
+  'Current Kedarnath','review_ready',2,'Secure image is ready for review'
+);
+insert into public.character_selections(
+  id,workspace_id,configuration_candidate_id,character_form_id,
+  candidate_version_id,state,aggregate_version
+) values(
+  'b18c0000-0000-4000-8000-000000000010',
+  'b1100000-0000-4000-8000-000000000001',
+  'b1600000-0000-4000-8000-000000000001',
+  'b18d0000-0000-4000-8000-000000000010',
+  'b18e0000-0000-4000-8000-000000000010',
+  'review_required',1
+);
+insert into public.location_selections(
+  id,workspace_id,configuration_candidate_id,location_id,
+  candidate_version_id,state,aggregate_version
+) values(
+  'b18c0000-0000-4000-8000-000000000011',
+  'b1100000-0000-4000-8000-000000000001',
+  'b1600000-0000-4000-8000-000000000001',
+  'b18d0000-0000-4000-8000-000000000011',
+  'b18e0000-0000-4000-8000-000000000011',
+  'review_required',1
+);
+insert into public.preflight_runs(
+  id,workspace_id,episode_id,configuration_candidate_id,script_revision_id,
+  kind,run_number,authority_epoch,state,requires_micro_authority,trigger_run_id,
+  started_at,completed_at
+) values(
+  'b2460000-0000-4000-8000-000000000011',
+  'b1100000-0000-4000-8000-000000000001',
+  'b1400000-0000-4000-8000-000000000001',
+  'b1600000-0000-4000-8000-000000000001',
+  'b1500000-0000-4000-8000-000000000001',
+  'world_anchor',2,2,'failed',false,null,
+  statement_timestamp(),statement_timestamp()
+);
+set local session_replication_role=origin;
 select set_config('request.jwt.claims','{"role":"service_role"}',true);
 select set_config('request.jwt.claim.role','service_role',true);
 set local role service_role;
+select throws_ok(
+  $$select public.command_reconcile_current_world_selections(
+    'b1100000-0000-4000-8000-000000000001',
+    'b1600000-0000-4000-8000-000000000001'
+  )$$,
+  '40001',
+  'stale World selection retirement authority',
+  'a later failed World run cannot reactivate an older succeeded entity set'
+);
+reset role;
+set local session_replication_role=replica;
+delete from public.preflight_runs
+where id='b2460000-0000-4000-8000-000000000011';
+set local session_replication_role=origin;
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
+select set_config('request.jwt.claim.role','service_role',true);
+set local role service_role;
+select lives_ok(
+  $$select public.command_reconcile_current_world_selections(
+    'b1100000-0000-4000-8000-000000000001',
+    'b1600000-0000-4000-8000-000000000001'
+  )$$,
+  'a succeeded retry archives selections outside its authoritative entity set'
+);
+select is(
+  (
+    select count(*)::integer
+    from private.world_selection_history
+    where configuration_candidate_id='b1600000-0000-4000-8000-000000000001'
+  ),
+  2,
+  'both hidden retry selections remain immutable private audit evidence'
+);
+select ok(
+  not exists(
+    select 1 from public.character_selections
+    where id='b18c0000-0000-4000-8000-000000000010'
+  )
+  and not exists(
+    select 1 from public.location_selections
+    where id='b18c0000-0000-4000-8000-000000000011'
+  )
+  and exists(
+    select 1 from public.character_selections
+    where character_form_id='b1810000-0000-4000-8000-000000000001'
+      and state='accepted'
+  )
+  and exists(
+    select 1 from public.location_selections
+    where location_id='b1840000-0000-4000-8000-000000000001'
+      and state='accepted'
+  ),
+  'only the latest run selections remain active for reference-pack assembly'
+);
+select lives_ok(
+  $$select public.command_reconcile_current_world_selections(
+    'b1100000-0000-4000-8000-000000000001',
+    'b1600000-0000-4000-8000-000000000001'
+  )$$,
+  'current World selection reconciliation is idempotent'
+);
+select throws_ok(
+  $$update private.world_selection_history
+    set archived_reason='not_in_latest_succeeded_world_run'
+    where selection_id='b18c0000-0000-4000-8000-000000000010'$$,
+  '42501',
+  'permission denied for table world_selection_history',
+  'archived retry selections cannot be rewritten'
+);
 select throws_ok(format(
  'select public.command_record_world_reference_pack(%L,%L,%L,%L,%L::jsonb,%L,%L,%L)',
  'b1100000-0000-4000-8000-000000000001','b1600000-0000-4000-8000-000000000001',

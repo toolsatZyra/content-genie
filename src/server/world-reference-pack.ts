@@ -100,6 +100,10 @@ export async function ensureWorldReferencePack(input: {
   workspaceId: string;
 }): Promise<Readonly<{ packId: string | null; ready: boolean; replayed: boolean }>> {
   const client = createAdminSupabaseClient();
+  await rpc("command_reconcile_current_world_selections", {
+    p_configuration_candidate_id: input.configurationCandidateId,
+    p_workspace_id: input.workspaceId,
+  });
   const [characterSelectionsResult, locationSelectionsResult] = await Promise.all([
     client
       .from("character_selections")

@@ -73,7 +73,7 @@
     {
       "path": "scripts/phase2-candidate-migrations.v1.json",
       "role": "candidate-migration-inventory",
-      "sha256": "62de5a158350f612ba58052f92bb4d7c7b06a9edc3cfd867299c8fcfb20ceb51"
+      "sha256": "4bb02791e71402bf9152f38ec5dd7260d68ccafb64d42b112ab247675bbf3400"
     },
     {
       "path": "scripts/phase2-coordinate-upgrade-drill.mjs",
@@ -946,6 +946,21 @@
       "sha256": "2f8934923aa9bf742b52fe7befe8364e36fd086bdf12f4d9fdc79f561ae05840"
     },
     {
+      "path": "supabase/migrations/20260724033000_current_world_selection_reconciliation.sql",
+      "role": "phase2-migration",
+      "sha256": "842e675fb8825025b29e21ac5b648d0b5a3e1a69eb0ca05e5c86a33273f8687c"
+    },
+    {
+      "path": "supabase/migrations/20260724034500_latest_world_run_retirement_authority.sql",
+      "role": "phase2-migration",
+      "sha256": "fcf18b0aec37d33b05a93ff0f47dd700763ca2feea409fed7f06a62e6b2780b8"
+    },
+    {
+      "path": "supabase/migrations/20260724040000_world_selection_history_preflight_fk_index.sql",
+      "role": "phase2-migration",
+      "sha256": "7046591d7931227552eea812cc946146747bc7b08b80f4c0d60c28e6099c613e"
+    },
+    {
       "path": "supabase/tests/fixtures/phase2_coordinate_v1_verifiers.sql",
       "role": "predecessor-fixture",
       "sha256": "2df42a28cd04b193b0eaf97c882a17edfb13688cad7aca9bf8845408e9d7ec1c"
@@ -983,7 +998,7 @@
     {
       "path": "supabase/tests/phase2_world_cultural.test.sql",
       "role": "pgtap-source",
-      "sha256": "c7140b128740c8d3672197a3a94f8415b1f54b62709aeee136a74cb7733be28a"
+      "sha256": "9837548bc4b7727de7a545b35e1b6b5da53f7de343a677430a4f7d8fae7af024"
     },
     {
       "path": "supabase/tests/phase2_zero_spend_foundation.test.sql",
@@ -1055,9 +1070,9 @@
       "testFile": "phase2_preflight_provider_ingest.test.sql"
     },
     {
-      "hardenedQuerySha256": "c546bea3e72d03531996008ca5e92e120badf5d2e10882ad6b9e1c8aa00a0631",
-      "plannedAssertions": 114,
-      "sourceSha256": "c7140b128740c8d3672197a3a94f8415b1f54b62709aeee136a74cb7733be28a",
+      "hardenedQuerySha256": "c142cf2bf81d7ce4c901e8c03e324089fc3eb2603bd5609695e0188894f698ed",
+      "plannedAssertions": 120,
+      "sourceSha256": "9837548bc4b7727de7a545b35e1b6b5da53f7de343a677430a4f7d8fae7af024",
       "testFile": "phase2_world_cultural.test.sql"
     },
     {
@@ -1232,7 +1247,10 @@
     "supabase/migrations/20260723150500_terminal_world_progress_projection.sql",
     "supabase/migrations/20260723155000_world_quarantined_promotion_recovery.sql",
     "supabase/migrations/20260724023626_world_retry_identity_label_canonicalization.sql",
-    "supabase/migrations/20260724024217_world_retry_identity_manifest_canonicalization.sql"
+    "supabase/migrations/20260724024217_world_retry_identity_manifest_canonicalization.sql",
+    "supabase/migrations/20260724033000_current_world_selection_reconciliation.sql",
+    "supabase/migrations/20260724034500_latest_world_run_retirement_authority.sql",
+    "supabase/migrations/20260724040000_world_selection_history_preflight_fk_index.sql"
   ],
   "predecessorFixture": {
     "capturedAt": "2026-07-18",

@@ -159,6 +159,9 @@
     "supabase/migrations/20260723150500_terminal_world_progress_projection.sql",
     "supabase/migrations/20260723155000_world_quarantined_promotion_recovery.sql",
     "supabase/migrations/20260724023626_world_retry_identity_label_canonicalization.sql",
-    "supabase/migrations/20260724024217_world_retry_identity_manifest_canonicalization.sql"
+    "supabase/migrations/20260724024217_world_retry_identity_manifest_canonicalization.sql",
+    "supabase/migrations/20260724033000_current_world_selection_reconciliation.sql",
+    "supabase/migrations/20260724034500_latest_world_run_retirement_authority.sql",
+    "supabase/migrations/20260724040000_world_selection_history_preflight_fk_index.sql"
   ]
 }
