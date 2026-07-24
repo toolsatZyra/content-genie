@@ -1725,3 +1725,11 @@ Focused evidence passes formatting, TypeScript and all `10/10` executable-plan
 agent tests, including a production-shaped normalization regression. The next
 release proof is deployment followed by a fresh automatic `Ekadashi 1` plan
 run and the complete storyboard, clip, edit and playable-video path.
+
+The first post-deploy retry was claimed correctly but Vercel ended the
+four-agent plan/evaluator chain at the route's explicit 300-second duration,
+before it could publish a plan. The production project uses supported Node.js
+Fluid Compute; the documented Pro/Enterprise per-function maximum is 800
+seconds. Only `/api/cron/mvp-preflight` is raised to that bounded maximum.
+Fencing, the 15-minute lease, attempt limits, exact receipt reconciliation and
+all provider-spend authority remain unchanged.

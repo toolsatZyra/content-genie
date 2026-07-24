@@ -10,7 +10,7 @@ import {
 } from "@/server/mvp-preflight-runner";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 800;
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
