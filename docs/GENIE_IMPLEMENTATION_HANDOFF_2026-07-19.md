@@ -2086,9 +2086,10 @@ The next pass durably submitted clips 3–5, then stopped on shot 6, the first
 Seedance shot. The media-dispatch command only admitted endpoint identifiers
 under `fal-ai/`, while fal.ai exposes Seedance under the exact
 `bytedance/seedance-2.0/image-to-video` identifier. Dispatch authority now uses
-an explicit five-endpoint production allowlist and retains the previously
-shipped owner-evidence-bound compatibility ceiling for legacy storyboard
-runs. The focused preview cinematic pgTAP suite passes `122/122`, including
-the narrow trigger-authority, Seedance allowlist, and legacy ceiling
-regressions. The production run is queued with five exact clip receipts and
-must continue from shot 6 without regenerating clips 1–5.
+an explicit five-endpoint production allowlist at both the command and durable
+table-constraint layers, and retains the previously shipped
+owner-evidence-bound compatibility ceiling for legacy storyboard runs. The
+focused preview cinematic pgTAP suite passes `122/122`, including the narrow
+trigger-authority, Seedance allowlist, and legacy ceiling regressions. The
+production run is queued with five exact clip receipts and must continue from
+shot 6 without regenerating clips 1–5.

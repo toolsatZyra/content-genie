@@ -41,6 +41,26 @@ select ok(
     in pg_get_functiondef(
       'public.command_reserve_mvp_media_dispatch(uuid,uuid,uuid,integer,integer,text,text,text,text,bigint,bigint)'::regprocedure
     )
+  ) = 0
+  and position(
+    '''bytedance/seedance-2.0/image-to-video'''
+    in (
+      select pg_get_constraintdef(pg_constraint.oid, true)
+      from pg_constraint
+      where pg_constraint.conrelid =
+        'private.mvp_media_dispatches'::regclass
+        and pg_constraint.conname = 'mvp_media_dispatches_endpoint_check'
+    )
+  ) > 0
+  and position(
+    '''bytedance/seedance-2.0/reference-to-video'''
+    in (
+      select pg_get_constraintdef(pg_constraint.oid, true)
+      from pg_constraint
+      where pg_constraint.conrelid =
+        'private.mvp_media_dispatches'::regclass
+        and pg_constraint.conname = 'mvp_media_dispatches_endpoint_check'
+    )
   ) = 0,
   'the dispatch authority admits only the production Seedance image-to-video endpoint'
 );
