@@ -1614,3 +1614,53 @@ advisories remain). Three context-minimized adversarial reviews cleared the
 candidate after fixes with no remaining P0/P1. The next action is the explicit
 `main` push, automatic Vercel deployment verification, then one fresh live
 `Ekadashi 1` World run followed through secured anchor review readiness.
+
+## 32. 2026-07-24 Ekadashi 1 secured-promotion completion
+
+The fresh `Ekadashi 1` World run
+`bd811fc8-f577-40e9-b404-ac47e2a8045d` proved the Stage 3 -> World automatic
+start and completed one exact seven-anchor extraction, licensed Ekadashi
+research, seven FAL requests, seven scans and seven immutable storage uploads.
+Five anchors promoted during the bounded worker invocation. The final two
+reached clean attestation and immutable storage immediately before the
+serverless runtime exited, leaving their candidates quarantined even though no
+generation, download or scan work remained.
+
+Three service-only forward migrations close the complete recovery boundary:
+
+- `world_quarantined_promotion_recovery` returns only an active, fencing-current
+  World candidate whose clean attestation, exact storage object, SHA-256,
+  MIME, request, job, quote claim and authority all agree;
+- `world_retry_identity_label_canonicalization` preserves the existing stable
+  Series display label when a fresh retry's UUID, canonical key, ownership and
+  semantic identity agree but its punctuation differs;
+- `world_retry_identity_manifest_canonicalization` carries those stable
+  character/form labels into the additive v2 identity manifest and recomputes
+  its canonical hash. Key, topology, sacred-attribute, temple, real-place and
+  ownership conflicts still fail closed.
+
+The secure-ingest cron now attempts one such promotion before claiming another
+expensive remote image. It reconciles an exact committed receipt before a
+bounded replay and does not download or rescan the image. Preview and production
+contain all three migrations. Preview World/cultural pgTAP passes `114/114`;
+the trusted harness, RLS/policy composite, formatting, lint, route-aware type
+checking, 16 focused promotion/cron tests, repository security and canary
+production build pass. Post-DDL advisors report no new migration-specific
+error; the existing intentional authenticated command warnings and historical
+performance notices remain.
+
+Both retained production candidates then promoted without another FAL call or
+spend. Authoritative production state is: run `succeeded`, seven jobs
+`promoted`, seven provider requests `succeeded`, seven progress items
+`review_ready`, and no remaining eligible promotion recovery. Authenticated
+browser evidence on the canonical URL shows seven secure images, seven
+`Accept anchor` actions, zero `Retry World` actions, no stopped-generation
+message, and `0 of 7` accepted as expected before owner review.
+
+Commit `2e0b06b023ee962c6b6abe70e27f1cf9e6bf1cad` was pushed explicitly
+to GitHub `main`. Git-connected Vercel deployment
+`dpl_GN8cBxUFKvg5qhXekgsETkP2zm8H` reached READY for that exact commit. The
+canonical health route returns production HTTP 200 with `ok: true`, the
+errors-only build log is clean, and the post-deploy runtime-error query is
+empty. The owner may continue `Ekadashi 1` from World and start a second
+Episode for the fresh end-to-end test.
