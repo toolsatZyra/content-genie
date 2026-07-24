@@ -47,7 +47,7 @@ import {
   SandboxMediaScannerError,
 } from "@/server/sandbox-media-scanner";
 
-const MAXIMUM_POLLS_PER_PASS = 8;
+const MAXIMUM_POLLS_PER_PASS = 2;
 const MASTER_BUCKET = "workspace-media";
 
 type JobState =
@@ -940,7 +940,7 @@ export async function advanceNextMvpProductionJob(): Promise<
 > {
   const client = createAdminSupabaseClient();
   const { data, error } = await client.rpc("command_claim_next_mvp_production_job", {
-    p_lease_seconds: 300,
+    p_lease_seconds: 600,
   });
   if (error) {
     throw new MvpProductionError(

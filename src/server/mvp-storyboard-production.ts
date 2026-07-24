@@ -47,7 +47,7 @@ import { fetchMvpFalQueueJson } from "@/server/mvp-media-provider-broker";
 const MEDIA_BUCKET = "workspace-media";
 const MAXIMUM_SHOTS = 80;
 const MAXIMUM_SUBMISSIONS_PER_PASS = 5;
-const MAXIMUM_POLLS_PER_PASS = 8;
+const MAXIMUM_POLLS_PER_PASS = 2;
 
 export type MvpStoryboardCostAuthority = Readonly<{
   expectedCostMicrousd: number;

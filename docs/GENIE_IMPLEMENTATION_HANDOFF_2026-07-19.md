@@ -2054,3 +2054,19 @@ all scanner, re-encode, hash, duration and promotion checks. The focused
 storyboard suite passes `10/10`; lint and route-aware TypeScript pass. The live
 run remains queued with 22 storyboard and 22 clip slots and must be resumed
 after this repair deploys.
+
+## 46. 2026-07-24 Media polling bounded below the worker lease
+
+After the MIME repair deployed, Ekadashi safely generated and promoted fourteen
+storyboards. One five-frame validation pass then exceeded the worker's
+300-second lease while sandbox scanning was still active. The next claimant
+correctly failed closed with `PRODUCTION_OUTCOME_AMBIGUOUS`; all fourteen
+promoted frames and the one submitted provider receipt were preserved.
+
+Storyboard and clip polling are now bounded to two provider outputs per worker
+pass, and the production lease is 600 seconds. This keeps the expensive
+download, quarantine, sandbox scan, re-encode, upload and billing-evidence work
+inside its ownership fence while retaining five-way asynchronous provider
+submission. The current run may be resumed without new spend after confirming
+that every incomplete media dispatch is either ledger-reserved with no provider
+request or submitted with its exact external request ID.
