@@ -238,6 +238,7 @@ function fixture() {
     schemaVersion: "genie.cinematic-plan-director.v1",
     shots: timeline.shots.map(({ shotNumber }) => ({
       cameraMotion: "A controlled motivated move.",
+      characterIdentityKeys: ["devi"],
       characterVersionIds: [id("13")],
       emotionalRead: "Readable restraint and resolve.",
       framing:
@@ -588,6 +589,19 @@ describe("executable cinematic plan agent", () => {
       characterKey: "devi",
       formName: "Devi",
     });
+    expect(mocks.agent.mock.calls[1]![1].schema).toMatchObject({
+      properties: {
+        shots: {
+          items: {
+            properties: {
+              characterIdentityKeys: {
+                items: { enum: ["devi"] },
+              },
+            },
+          },
+        },
+      },
+    });
     const boundaryInput = JSON.parse(mocks.agent.mock.calls[0]![1].input as string);
     expect(boundaryInput.planningGuidance).toMatchObject({
       minimumShotCountGuidance: 20,
@@ -669,6 +683,53 @@ describe("executable cinematic plan agent", () => {
     expect(
       mocks.rpc.mock.calls.some(([name]) => name === "command_record_preflight_plan"),
     ).toBe(false);
+  });
+
+  it("rejects a character key that does not match its immutable World ID", async () => {
+    const data = fixture();
+    mocks.agent
+      .mockReset()
+      .mockResolvedValueOnce({
+        output: semanticBoundaries(data),
+        requestHash: hash("4"),
+        responseId: "resp_boundaries",
+        responseRequestId: "request_boundaries",
+      })
+      .mockResolvedValueOnce({
+        output: {
+          ...data.director,
+          shots: data.director.shots.map((shot, index) =>
+            index === 0
+              ? {
+                  ...shot,
+                  characterIdentityKeys: ["someone-else"],
+                }
+              : shot,
+          ),
+        },
+        requestHash: hash("5"),
+        responseId: "resp_director",
+        responseRequestId: "request_director",
+      });
+
+    await expect(
+      executePlanPreflight({
+        authorityEpoch: 1,
+        capabilityGrantId: null,
+        fencingToken: 1,
+        inputManifestId: id("90"),
+        inputManifestSha256: hash("a"),
+        preflightRunId: id("6"),
+        schemaVersion: "genie.preflight-task.v1",
+        stageAttemptId: id("9"),
+        stageRunId: id("91"),
+        workspaceId: id("1"),
+      }),
+    ).rejects.toMatchObject({
+      code: "PLAN_CHARACTER_BINDING_INVALID",
+      message: "Director shot identity keys do not match its immutable World IDs.",
+      retryable: true,
+    });
   });
 
   it("retries the exact materialized plan after an absent timeout receipt", async () => {

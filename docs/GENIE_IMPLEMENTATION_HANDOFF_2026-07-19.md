@@ -1786,7 +1786,14 @@ persisted or evaluated. This model-correctable Director defect is classified
 as retryable, so a fresh bounded attempt can correct it automatically instead
 of terminating the entire plan run.
 
-Focused executable-plan evidence passes `11/11`, including the exact
+The prose-name check is represented structurally rather than inferred from
+free text: every shot returns exact `characterIdentityKeys` in one-to-one
+correspondence with its immutable `characterVersionIds`. The parser proves
+that mapping and still rejects generic human roles absent from World. This
+avoids false failures when valid prose uses a shorter identity label while
+preserving the original collision protection.
+
+Focused executable-plan evidence passes `12/12`, including the exact
 Goddess-ID-as-devotee regression, and route-aware TypeScript passes. The live
 Ekadashi run claimed before this correction is allowed to finish under its
 existing authority; the next clean run must use the hardened Director before
