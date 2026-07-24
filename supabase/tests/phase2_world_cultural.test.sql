@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions,auth,storage,private,audit,pg_catalog;
-select plan(109);
+select plan(114);
 
 create temp table world_fixture(key text primary key,value text not null) on commit drop;
 grant select,insert,update,delete on world_fixture to authenticated,service_role;
@@ -390,6 +390,65 @@ select is(
   where id='b24c0000-0000-4000-8000-000000000002'),
  'review_ready',
  'terminal reconciliation preserves secure candidates already ready for review'
+);
+set local role authenticated;
+select throws_ok(
+ 'select public.get_next_world_promotion_recovery()',
+ '42501',
+ 'permission denied for function get_next_world_promotion_recovery',
+ 'World promotion recovery does not expose private receipts to members'
+);
+reset role;
+set local role service_role;
+select is(
+ (public.get_next_world_promotion_recovery()->>'empty')::boolean,
+ true,
+ 'World promotion recovery reports an exact empty result without eligible receipts'
+);
+select ok(
+ position(
+  'character.canonical_key = job.character_key'
+  in pg_get_functiondef(
+   'public.command_complete_world_anchor_job(uuid,uuid,uuid)'::regprocedure
+  )
+ ) > 0
+ and position(
+  'form.form_key = job.form_key'
+  in pg_get_functiondef(
+   'public.command_complete_world_anchor_job(uuid,uuid,uuid)'::regprocedure
+  )
+ ) > 0,
+ 'World completion preserves an existing stable character and form display label'
+);
+select ok(
+ position(
+  'location.canonical_key = job.location_key'
+  in pg_get_functiondef(
+   'public.command_complete_world_anchor_job(uuid,uuid,uuid)'::regprocedure
+  )
+ ) > 0
+ and position(
+  'location.real_place_name is not distinct from job.real_place_name'
+  in pg_get_functiondef(
+   'public.command_complete_world_anchor_job(uuid,uuid,uuid)'::regprocedure
+  )
+ ) > 0,
+ 'World completion preserves an existing stable location label only when its identity agrees'
+);
+select ok(
+ position(
+  'resolved_character_manifest := jsonb_set'
+  in pg_get_functiondef(
+   'public.command_complete_world_anchor_job(uuid,uuid,uuid)'::regprocedure
+  )
+ ) > 0
+ and position(
+  'private.character_identity_manifest_sha256(resolved_character_manifest)'
+  in pg_get_functiondef(
+   'public.command_complete_world_anchor_job(uuid,uuid,uuid)'::regprocedure
+  )
+ ) > 0,
+ 'World retry candidates bind their additive manifest and hash to the stable Series labels'
 );
 select lives_ok(format(
  'select public.command_record_character_candidate(%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L,%L::jsonb,%L,null)',

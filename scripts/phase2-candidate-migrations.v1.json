@@ -156,6 +156,9 @@
     "supabase/migrations/20260723102000_fal_credential_poll_claim_release.sql",
     "supabase/migrations/20260723134500_world_retry_review_candidate_replacement.sql",
     "supabase/migrations/20260723143000_world_extraction_cross_run_replay.sql",
-    "supabase/migrations/20260723150500_terminal_world_progress_projection.sql"
+    "supabase/migrations/20260723150500_terminal_world_progress_projection.sql",
+    "supabase/migrations/20260723155000_world_quarantined_promotion_recovery.sql",
+    "supabase/migrations/20260724023626_world_retry_identity_label_canonicalization.sql",
+    "supabase/migrations/20260724024217_world_retry_identity_manifest_canonicalization.sql"
   ]
 }

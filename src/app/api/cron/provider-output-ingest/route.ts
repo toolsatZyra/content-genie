@@ -19,6 +19,7 @@ import {
   getActiveRemoteFetchPolicy,
   ProviderBrokerLedgerError,
   quarantineProviderOutputBytes,
+  recoverNextQuarantinedWorldPromotion,
   reconcileTerminalWorldAnchorIngest,
   recordProviderRemoteFetch,
   promoteProviderWorldAnchor,
@@ -142,6 +143,17 @@ export async function GET(request: Request) {
     }
 
     const terminalWorldRunsReconciled = await reconcileTerminalWorldAnchorIngest();
+    try {
+      await recoverNextQuarantinedWorldPromotion();
+    } catch (error) {
+      console.error("Quarantined World promotion recovery failed safely", {
+        errorMessage:
+          error instanceof ProviderBrokerLedgerError
+            ? error.message
+            : "Unexpected World promotion recovery failure.",
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      });
+    }
     let completed = 0;
     let failed = 0;
     let claimed = 0;

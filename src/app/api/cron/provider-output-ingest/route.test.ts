@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   policy: vi.fn(),
   promote: vi.fn(),
   quarantine: vi.fn(),
+  recoverPromotion: vi.fn(),
   reconcileTerminalWorld: vi.fn(),
   recordFetch: vi.fn(),
   scan: vi.fn(),
@@ -38,6 +39,7 @@ vi.mock("@/server/provider-broker-ledger", async (importOriginal) => {
     getActiveRemoteFetchPolicy: mocks.policy,
     promoteProviderWorldAnchor: mocks.promote,
     quarantineProviderOutputBytes: mocks.quarantine,
+    recoverNextQuarantinedWorldPromotion: mocks.recoverPromotion,
     reconcileTerminalWorldAnchorIngest: mocks.reconcileTerminalWorld,
     recordProviderRemoteFetch: mocks.recordFetch,
   };
@@ -107,6 +109,11 @@ describe("provider output secure-ingest cron", () => {
       recovered: false,
     });
     mocks.reconcileTerminalWorld.mockResolvedValue(0);
+    mocks.recoverPromotion.mockResolvedValue({
+      checked: false,
+      promoted: false,
+      providerRequestId: null,
+    });
     mocks.plan.mockResolvedValue({
       configurationCandidateId: "30000000-0000-4000-8000-000000000014",
       preflightRunId: "30000000-0000-4000-8000-000000000015",
@@ -192,6 +199,7 @@ describe("provider output secure-ingest cron", () => {
     expect(mocks.scan.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.promote.mock.invocationCallOrder[0]!,
     );
+    expect(mocks.recoverPromotion).toHaveBeenCalledTimes(1);
   });
 
   it("keeps one expensive World scan inside each bounded invocation", async () => {

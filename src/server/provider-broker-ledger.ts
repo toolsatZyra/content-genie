@@ -819,6 +819,126 @@ export async function reconcileTerminalWorldAnchorIngest(limit = 20): Promise<nu
   return reconciled as number;
 }
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+export async function recoverNextQuarantinedWorldPromotion(): Promise<
+  Readonly<{
+    checked: boolean;
+    promoted: boolean;
+    providerRequestId: string | null;
+  }>
+> {
+  const value = await rpc("get_next_world_promotion_recovery", {});
+  const keys = [
+    "assetKind",
+    "assetVersionId",
+    "candidateId",
+    "empty",
+    "finalObjectName",
+    "ingestAttestationId",
+    "ok",
+    "providerRequestId",
+    "quarantineAssetVersionId",
+    "storageVersion",
+    "workspaceId",
+  ] as const;
+  if (
+    !exactObject(value, keys) ||
+    (value as Record<string, unknown>).ok !== true ||
+    typeof (value as Record<string, unknown>).empty !== "boolean"
+  ) {
+    throw new ProviderBrokerLedgerError(
+      "World promotion recovery context is malformed.",
+    );
+  }
+  const context = value as Record<string, unknown>;
+  if (context.empty === true) {
+    return Object.freeze({
+      checked: false,
+      promoted: false,
+      providerRequestId: null,
+    });
+  }
+  if (
+    ![
+      context.assetVersionId,
+      context.candidateId,
+      context.ingestAttestationId,
+      context.providerRequestId,
+      context.quarantineAssetVersionId,
+      context.workspaceId,
+    ].every(
+      (candidate) => typeof candidate === "string" && UUID_PATTERN.test(candidate),
+    ) ||
+    !["character_anchor", "location_anchor"].includes(String(context.assetKind)) ||
+    typeof context.finalObjectName !== "string" ||
+    typeof context.storageVersion !== "string" ||
+    context.storageVersion.length < 1
+  ) {
+    throw new ProviderBrokerLedgerError(
+      "World promotion recovery binding is malformed.",
+    );
+  }
+
+  const assetVersionId = context.assetVersionId as string;
+  const finalObjectName = context.finalObjectName as string;
+  const providerRequestId = context.providerRequestId as string;
+  const quarantineAssetVersionId = context.quarantineAssetVersionId as string;
+  const storageVersion = context.storageVersion as string;
+  const workspaceId = context.workspaceId as string;
+  const worldVersionId = randomUUID();
+  const client = createAdminSupabaseClient();
+  const promotion = await settleWorldPromotion({
+    attemptPromotion: () =>
+      rpc("command_promote_world_anchor_quarantine", {
+        p_asset_kind: context.assetKind,
+        p_asset_version_id: assetVersionId,
+        p_final_object_name: finalObjectName,
+        p_ingest_attestation_id: context.ingestAttestationId,
+        p_provider_request_id: providerRequestId,
+        p_quarantine_asset_version_id: quarantineAssetVersionId,
+        p_storage_version: storageVersion,
+        p_world_version_id: worldVersionId,
+        p_workspace_id: workspaceId,
+      }),
+    isCommitted: async () => {
+      const { data: committed, error } = await client
+        .from("asset_versions")
+        .select("id,object_name,source_quarantine_version_id,storage_version")
+        .eq("id", assetVersionId)
+        .maybeSingle();
+      return (
+        !error &&
+        committed !== null &&
+        committed.object_name === finalObjectName &&
+        committed.source_quarantine_version_id === quarantineAssetVersionId &&
+        committed.storage_version === storageVersion
+      );
+    },
+    shouldRetry: (error) =>
+      error instanceof ProviderBrokerLedgerError && !error.conflict,
+  });
+  const settledPromotion = promotion ?? { assetVersionId };
+  if (
+    !settledPromotion ||
+    typeof settledPromotion !== "object" ||
+    (settledPromotion as Record<string, unknown>).assetVersionId !== assetVersionId
+  ) {
+    throw new ProviderBrokerLedgerError("Recovered World promotion is malformed.");
+  }
+  await markWorldProgressByProviderRequest(
+    providerRequestId,
+    "review_ready",
+    "Secure image is ready for your review",
+  );
+  return Object.freeze({
+    checked: true,
+    promoted: true,
+    providerRequestId,
+  });
+}
+
 export async function quarantineImmediateProviderBytes(input: {
   alignment: SpeechAlignment;
   audioSha256: string;
