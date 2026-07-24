@@ -357,20 +357,39 @@ export async function completeMvpMediaDispatchOutput(input: {
   providerReportedBillableUnits: number;
   providerUsageEvidenceSha256: string;
 }): Promise<void> {
-  await rpc("command_complete_mvp_media_dispatch_output", {
-    p_dispatch_id: input.providerDispatchId,
-    p_billing_event_cost_nano_usd: input.billingEvent.costEstimateNanoUsd,
-    p_billing_event_endpoint_id: input.billingEvent.endpointId,
-    p_billing_event_evidence_sha256: input.billingEvent.evidenceSha256,
-    p_billing_event_output_units: input.billingEvent.outputUnits,
-    p_billing_event_percent_discount: input.billingEvent.percentDiscount,
-    p_billing_event_timestamp: input.billingEvent.timestamp,
-    p_billing_event_unit_price_usd: input.billingEvent.unitPriceUsd,
-    p_external_request_id: input.externalRequestId,
-    p_output_content_sha256: input.outputContentSha256,
-    p_provider_reported_billable_units: input.providerReportedBillableUnits,
-    p_provider_usage_evidence_sha256: input.providerUsageEvidenceSha256,
-  });
+  try {
+    await rpc("command_complete_mvp_media_dispatch_output", {
+      p_dispatch_id: input.providerDispatchId,
+      p_billing_event_cost_nano_usd: input.billingEvent.costEstimateNanoUsd,
+      p_billing_event_endpoint_id: input.billingEvent.endpointId,
+      p_billing_event_evidence_sha256: input.billingEvent.evidenceSha256,
+      p_billing_event_output_units: input.billingEvent.outputUnits,
+      p_billing_event_percent_discount: input.billingEvent.percentDiscount,
+      p_billing_event_timestamp: input.billingEvent.timestamp,
+      p_billing_event_unit_price_usd: input.billingEvent.unitPriceUsd,
+      p_external_request_id: input.externalRequestId,
+      p_output_content_sha256: input.outputContentSha256,
+      p_provider_reported_billable_units: input.providerReportedBillableUnits,
+      p_provider_usage_evidence_sha256: input.providerUsageEvidenceSha256,
+    });
+  } catch (caught) {
+    if (process.env.NODE_ENV !== "test") {
+      console.error("MVP media billing completion evidence rejected", {
+        billingCostNanoUsd: input.billingEvent.costEstimateNanoUsd,
+        billingEndpointId: input.billingEvent.endpointId,
+        billingOutputUnits: input.billingEvent.outputUnits,
+        billingPercentDiscount: input.billingEvent.percentDiscount,
+        billingTimestamp: input.billingEvent.timestamp,
+        billingUnitPriceUsd: input.billingEvent.unitPriceUsd,
+        evidenceHashesValid:
+          /^[a-f0-9]{64}$/u.test(input.billingEvent.evidenceSha256) &&
+          /^[a-f0-9]{64}$/u.test(input.providerUsageEvidenceSha256) &&
+          /^[a-f0-9]{64}$/u.test(input.outputContentSha256),
+        providerReportedBillableUnits: input.providerReportedBillableUnits,
+      });
+    }
+    throw caught;
+  }
 }
 
 export async function fetchMvpFalBilledResultForDispatch(input: {
