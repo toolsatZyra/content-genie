@@ -72,6 +72,13 @@ function row(value: unknown, label: string): DispatchRow {
 async function rpc(name: string, parameters: Record<string, unknown>) {
   const { data, error } = await createAdminSupabaseClient().rpc(name, parameters);
   if (error) {
+    if (process.env.NODE_ENV !== "test") {
+      console.error("MVP provider dispatch ledger rejected", {
+        errorCode: error.code,
+        errorMessage: error.message,
+        rpcName: name,
+      });
+    }
     throw new MvpMediaDispatchError(
       "The provider dispatch ledger rejected the operation.",
       "PRODUCTION_LEDGER_FAILED",
