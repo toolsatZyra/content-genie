@@ -419,8 +419,7 @@ export async function fetchMvpFalBilledResultForDispatch(input: {
         "PROVIDER_BILLING_UNRECONCILED",
       );
     }
-    const providerReportedBillableUnits =
-      result.providerReportedBillableUnits ?? billingEvent.outputUnits;
+    const providerReportedBillableUnits = billingEvent.outputUnits;
     const providerUsageEvidenceSha256 =
       result.providerUsageEvidenceSha256 ??
       createHash("sha256")

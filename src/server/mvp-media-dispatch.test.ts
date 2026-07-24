@@ -251,6 +251,29 @@ describe("durable MVP media dispatch", () => {
     });
   });
 
+  it("normalizes floating-point result units to the authoritative billing event", async () => {
+    mocks.result.mockResolvedValue({
+      data: { video: { url: "https://x.fal.media/clip.mp4" } },
+      providerReportedBillableUnits: 2.4000000000000004,
+      providerUsageEvidenceSha256: "b".repeat(64),
+    });
+    mocks.billingEvent.mockResolvedValue({ ...billingEvent, outputUnits: 2.4 });
+
+    await expect(
+      fetchMvpFalBilledResultForDispatch({
+        externalRequestId: control.externalRequestId,
+        providerDispatchId: ids.dispatch,
+        responseUrl: control.responseUrl,
+        timeoutMs: 5_000,
+      }),
+    ).resolves.toEqual({
+      billingEvent: { ...billingEvent, outputUnits: 2.4 },
+      data: { video: { url: "https://x.fal.media/clip.mp4" } },
+      providerReportedBillableUnits: 2.4,
+      providerUsageEvidenceSha256: "b".repeat(64),
+    });
+  });
+
   it("fails closed when the persisted dispatch timestamp is unavailable", async () => {
     mocks.maybeSingle.mockResolvedValue({ data: null, error: null });
 
