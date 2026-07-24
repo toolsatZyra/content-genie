@@ -2213,10 +2213,40 @@ async function evaluatePlan(
   const references = materialized.plan.references as readonly Readonly<
     Record<string, unknown>
   >[];
+  const edd = record(materialized.plan.edd, "Executable Director component");
+  if (!Array.isArray(edd.shots)) {
+    throw new PreflightPlanAgentError(
+      "Executable Director shot evidence is malformed.",
+    );
+  }
   const evaluationPlan = Object.freeze({
     beats: materialized.plan.beats,
     composition: materialized.plan.composition,
-    edd: materialized.plan.edd,
+    edd: {
+      immutableNarrationHash: edd.immutableNarrationHash,
+      schemaVersion: edd.schemaVersion,
+      shots: edd.shots.map((value) => {
+        const shot = record(value, "Executable Director evaluation shot");
+        return {
+          action: shot.action,
+          cameraAngleAndDistance: shot.cameraAngleAndDistance,
+          cameraMotion: shot.cameraMotion,
+          cutType: shot.cutType,
+          endMs: shot.endMs,
+          lighting: shot.lighting,
+          mood: shot.mood,
+          narrativeFunction: shot.narrativeFunction,
+          sceneComposition: shot.sceneComposition,
+          sfxCue: shot.sfxCue,
+          sfxDurationMs: shot.sfxDurationMs,
+          sfxGainDb: shot.sfxGainDb,
+          sfxStartOffsetMs: shot.sfxStartOffsetMs,
+          shotNumber: shot.shotNumber,
+          startMs: shot.startMs,
+          storyboardCompositionMode: shot.storyboardCompositionMode,
+        };
+      }),
+    },
     references: references.map((reference) => ({
       referenceKind: reference.referenceKind,
       referenceOrdinal: reference.referenceOrdinal,

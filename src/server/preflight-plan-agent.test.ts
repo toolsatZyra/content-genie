@@ -578,10 +578,28 @@ describe("executable cinematic plan agent", () => {
       rule: expect.stringContaining("never a required count"),
     });
     const evaluatorInput = JSON.parse(mocks.agent.mock.calls[2]![1].input as string);
+    expect((mocks.agent.mock.calls[2]![1].input as string).length).toBeLessThan(
+      100_000,
+    );
     expect(evaluatorInput.plan.requestSlots[0]).not.toHaveProperty(
       "capabilityVersionId",
     );
     expect(evaluatorInput.plan.references[0]).not.toHaveProperty("contentHash");
+    expect(evaluatorInput.plan.edd.shots[0]).toMatchObject({
+      action: expect.any(String),
+      cameraAngleAndDistance: expect.any(String),
+      cameraMotion: expect.any(String),
+      cutType: expect.any(String),
+      lighting: expect.any(String),
+      mood: expect.any(String),
+      narrativeFunction: expect.any(String),
+      sceneComposition: expect.any(String),
+      storyboardCompositionMode: expect.any(String),
+    });
+    expect(evaluatorInput.plan.edd.shots[0]).not.toHaveProperty("promptBlueprint");
+    expect(evaluatorInput.plan.edd.shots[0]).not.toHaveProperty(
+      "storyboardPromptBlueprint",
+    );
   });
 
   it("retries the exact materialized plan after an absent timeout receipt", async () => {

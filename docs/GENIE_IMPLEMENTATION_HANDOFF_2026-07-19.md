@@ -1754,3 +1754,13 @@ the prior shot end, and the final shot reaches the unchanged 63.060-second
 master clock. Spoken text, word order, alignment scalars and word timestamps
 remain unchanged. A focused regression covers the exact silence case and the
 complete plan-agent/timeline suite passes `17/17`.
+
+That fix committed the first production-scale Ekadashi candidate bundle. Blind
+evaluation then stopped before model dispatch because the QC request exceeded
+the structured-agent 100 KB input boundary: the 83 KB Director component
+repeated full Nano Banana start/end and motion prompt blueprints already
+preserved in the immutable plan. The blind evaluator packet now projects only
+the evidence needed for judgment—camera, lighting, mood, action, composition,
+timing, edit, SFX, storyboard mode, references and provider routing. It omits
+only duplicated generation prompt prose and provider-private identifiers. The
+persisted executable plan and all downstream media prompts are unchanged.
