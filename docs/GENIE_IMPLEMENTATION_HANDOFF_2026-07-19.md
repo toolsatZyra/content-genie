@@ -2093,3 +2093,46 @@ focused preview cinematic pgTAP suite passes `122/122`, including the narrow
 trigger-authority, Seedance allowlist, and legacy ceiling regressions. The
 production run is queued with five exact clip receipts and must continue from
 shot 6 without regenerating clips 1–5.
+
+## 48. 2026-07-24 Ekadashi 22-clip reconciliation checkpoint
+
+Ekadashi production run `13918e82-f896-54c6-86af-5e932569b77c` now has all
+22 clip requests durably submitted with exact fal.ai receipts. The deployed
+worker successfully submitted Seedance shot 6 and shots 7–22 without any
+manual browser action. Do not delete or resubmit those dispatches.
+
+Live reconciliation exposed and repaired three provider-contract mismatches:
+
+- media reconciliation errors now retain their exact safe code instead of
+  collapsing to `PRODUCTION_UNKNOWN` (`1e18465`);
+- a missing legacy result-unit header can fall back to the authoritative
+  request-level fal.ai billing event (`b54fb1a`);
+- fal.ai's valid floating representation `2.4000000000000004` is accepted,
+  hashed exactly, cross-checked, and normalized to the authoritative billing
+  event value before entering the bounded Postgres ledger (`85dbd05`,
+  `79cff18`).
+
+Focused provider and dispatch tests pass `45/45`; formatting, lint and
+route-aware TypeScript pass. The official fal.ai billing-event API is the
+request-level source of endpoint, units, price, discount and nano-USD cost.
+
+The current job is stopped at `failed`, version `100`, with
+`PRODUCTION_LEDGER_FAILED` while completing clip 1. Its provider request and
+generated media remain intact; no retry may resubmit any of the 22 provider
+requests. Commit `7d9fc5d` adds a server-only safe diagnostic containing the
+rejected RPC name plus Postgres error code/message. On resume:
+
+1. verify commit `7d9fc5d` is the READY production deployment;
+2. change only this exact job from failed/version 100 back to `generating`,
+   clear its job error and increment its version;
+3. let one production cron pass run, then inspect the newest Vercel runtime
+   log entry `MVP provider dispatch ledger rejected`;
+4. fix the reported completion-RPC contract, rerun focused tests, deploy, and
+   resume reconciliation two clips per cron pass through SFX, render, Monica
+   QC and a playable Edit-stage master;
+5. only after Ekadashi is proven playable, create and run the requested Ram
+   Episode 2 end to end.
+
+The worktree should contain only the user-owned untracked
+`docs/Provider and Infrastructure Inventory.xlsx`; preserve it and never stage
+it.
