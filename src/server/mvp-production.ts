@@ -379,7 +379,20 @@ async function pollJob(job: JobRow): Promise<void> {
   let polledThisPass = 0;
   for (const clip of data as ClipRow[]) {
     if (polledThisPass >= MAXIMUM_POLLS_PER_PASS) break;
-    if (clip.state === "submitted") await completeClip(clip);
+    if (clip.state === "submitted") {
+      try {
+        await completeClip(clip);
+      } catch (caught) {
+        if (caught instanceof MvpMediaDispatchError) {
+          throw new MvpProductionError(
+            caught.message,
+            caught.safeCode,
+            caught.retryable,
+          );
+        }
+        throw caught;
+      }
+    }
     if (clip.state === "submitted") polledThisPass += 1;
   }
   const { data: completed, error: countError } = await client
