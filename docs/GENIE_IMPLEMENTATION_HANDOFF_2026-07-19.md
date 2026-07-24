@@ -1798,3 +1798,46 @@ Goddess-ID-as-devotee regression, and route-aware TypeScript passes. The live
 Ekadashi run claimed before this correction is allowed to finish under its
 existing authority; the next clean run must use the hardened Director before
 media production can proceed.
+
+## 36. 2026-07-24 Cinematic-plan convergence hardening
+
+Production Ekadashi plan runs 20 and 21 completed every Shot Director,
+Cinematic Director and blind Sol/Terra evaluator call, including both bounded
+repair attempts, but stopped before provider spend because no candidate
+cleared the quality gate. The best intermediate candidate reached OVS
+`73.806`, CVP `75.400` and PFS `68.500`. This was not random evaluator drift:
+live plan evidence exposed four reproducible contract defects.
+
+The Director schema capped `visualIntent` at 360 characters. Run 21's central
+reveal used all 360 and ended mid-sentence, which was then copied verbatim into
+the storyboard composition. Reveal proof/reaction/consequence flags were also
+assigned mechanically from first/last shot position rather than visible shot
+content. Repairs could ask generated media for exactly eleven countable lunar
+markers, and continuity could point a Mura shot at an immediately prior
+Vishnu-only shot merely because both used the same location.
+
+The planning contract now:
+
+- accepts a complete visual composition up to 720 characters and rejects any
+  incomplete single-state sentence or START/END frame before persistence;
+- requires each shot to return explicit machine-readable
+  `revealContributions`, proves beat-level proof/reaction/consequence coverage,
+  and persists those content-true flags;
+- rejects exact repeated-object counts and overloaded three-identity
+  transformation/conflict shots as retryable generative-feasibility defects;
+- starts every short-form plan on a hard cut rather than black, instructs the
+  Director to protect chronological first manifestations, subtitle/UI safe
+  areas, stable multi-armed anatomy and executable reference load;
+- strengthens the non-binding `ceil(duration / 3 seconds)` shot-count guidance
+  so three-identity reveals receive separate word-aligned setup, reaction and
+  consequence windows when the narration permits; and
+- selects a continuity source only when the prior same-location shot shares at
+  least one locked character, while retaining the location master separately.
+
+An independent read-only review reproduced the exact 360-character truncation,
+positional reveal flags, count fragility, frozen repair timeline and
+same-location continuity defect. Focused executable-plan tests pass `14/14`,
+including incomplete-composition and exact-count rejection. Formatting, lint,
+route-aware TypeScript and the production build pass. The next required live
+proof is a fresh Ekadashi plan run on this deployed contract, followed by the
+actual storyboard, clip, edit and playable-master path.

@@ -236,7 +236,7 @@ function fixture() {
       revealLevel: beatNumber === 2 ? "minor" : "none",
     })),
     schemaVersion: "genie.cinematic-plan-director.v1",
-    shots: timeline.shots.map(({ shotNumber }) => ({
+    shots: timeline.shots.map(({ beatNumber, shotNumber }) => ({
       cameraMotion: "A controlled motivated move.",
       characterIdentityKeys: ["devi"],
       characterVersionIds: [id("13")],
@@ -250,6 +250,7 @@ function fixture() {
       ],
       narrativeFunction: "Advance cause, reaction, and consequence.",
       realWorldReferenceAssetVersionId: shotNumber % 2 === 1 ? id("31") : id("32"),
+      revealContributions: beatNumber === 2 ? ["proof", "reaction"] : [],
       scoreCue: "A restrained motif gains one layer.",
       sfxCue: "A restrained cloth movement with a short natural decay.",
       sfxDurationMs: Math.min(
@@ -597,6 +598,14 @@ describe("executable cinematic plan agent", () => {
               characterIdentityKeys: {
                 items: { enum: ["devi"] },
               },
+              revealContributions: {
+                items: {
+                  enum: ["proof", "reaction", "consequence"],
+                },
+              },
+              visualIntent: {
+                maxLength: 720,
+              },
             },
           },
         },
@@ -630,6 +639,24 @@ describe("executable cinematic plan agent", () => {
     expect(evaluatorInput.plan.edd.shots[0]).not.toHaveProperty(
       "storyboardPromptBlueprint",
     );
+    const revealShotNumbers = data.timeline.shots
+      .filter(({ beatNumber }) => beatNumber === 2)
+      .map(({ shotNumber }) => shotNumber);
+    expect(
+      plan.shots
+        .filter(({ shotNumber }: { shotNumber: number }) =>
+          revealShotNumbers.includes(shotNumber),
+        )
+        .every(
+          ({
+            suppliesProof,
+            suppliesReaction,
+          }: {
+            suppliesProof: boolean;
+            suppliesReaction: boolean;
+          }) => suppliesProof && suppliesReaction,
+        ),
+    ).toBe(true);
   });
 
   it("rejects a World ID reused for an invented devotee", async () => {
@@ -728,6 +755,99 @@ describe("executable cinematic plan agent", () => {
     ).rejects.toMatchObject({
       code: "PLAN_CHARACTER_BINDING_INVALID",
       message: "Director shot identity keys do not match its immutable World IDs.",
+      retryable: true,
+    });
+  });
+
+  it("retries an incomplete storyboard sentence instead of persisting it", async () => {
+    const data = fixture();
+    mocks.agent
+      .mockReset()
+      .mockResolvedValueOnce({
+        output: semanticBoundaries(data),
+        requestHash: hash("4"),
+        responseId: "resp_boundaries",
+        responseRequestId: "request_boundaries",
+      })
+      .mockResolvedValueOnce({
+        output: {
+          ...data.director,
+          shots: data.director.shots.map((shot, index) =>
+            index === 0
+              ? {
+                  ...shot,
+                  visualIntent: "Devi remains centered while the reveal",
+                }
+              : shot,
+          ),
+        },
+        requestHash: hash("5"),
+        responseId: "resp_director",
+        responseRequestId: "request_director",
+      });
+
+    await expect(
+      executePlanPreflight({
+        authorityEpoch: 1,
+        capabilityGrantId: null,
+        fencingToken: 1,
+        inputManifestId: id("90"),
+        inputManifestSha256: hash("a"),
+        preflightRunId: id("6"),
+        schemaVersion: "genie.preflight-task.v1",
+        stageAttemptId: id("9"),
+        stageRunId: id("91"),
+        workspaceId: id("1"),
+      }),
+    ).rejects.toMatchObject({
+      code: "PLAN_VISUAL_INTENT_INCOMPLETE",
+      retryable: true,
+    });
+  });
+
+  it("retries an exact repeated-object count that generative media cannot guarantee", async () => {
+    const data = fixture();
+    mocks.agent
+      .mockReset()
+      .mockResolvedValueOnce({
+        output: semanticBoundaries(data),
+        requestHash: hash("4"),
+        responseId: "resp_boundaries",
+        responseRequestId: "request_boundaries",
+      })
+      .mockResolvedValueOnce({
+        output: {
+          ...data.director,
+          shots: data.director.shots.map((shot, index) =>
+            index === 0
+              ? {
+                  ...shot,
+                  visualIntent:
+                    "Exactly eleven countable pearl markers fill the upper frame.",
+                }
+              : shot,
+          ),
+        },
+        requestHash: hash("5"),
+        responseId: "resp_director",
+        responseRequestId: "request_director",
+      });
+
+    await expect(
+      executePlanPreflight({
+        authorityEpoch: 1,
+        capabilityGrantId: null,
+        fencingToken: 1,
+        inputManifestId: id("90"),
+        inputManifestSha256: hash("a"),
+        preflightRunId: id("6"),
+        schemaVersion: "genie.preflight-task.v1",
+        stageAttemptId: id("9"),
+        stageRunId: id("91"),
+        workspaceId: id("1"),
+      }),
+    ).rejects.toMatchObject({
+      code: "PLAN_GENERATIVE_COUNT_INVALID",
       retryable: true,
     });
   });
