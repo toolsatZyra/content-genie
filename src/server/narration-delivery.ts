@@ -42,8 +42,37 @@ export class NarrationDeliveryError extends Error {
   override readonly name = "NarrationDeliveryError";
 }
 
+type ApprovedNarrationContextInput = Readonly<{
+  configurationCandidateId: string;
+  policyVersionId: string;
+  scriptRevisionId: string;
+  workspaceId: string;
+}>;
+
 const sha256 = (value: string) =>
   createHash("sha256").update(value, "utf8").digest("hex");
+
+export async function getApprovedNarrationSourceSetHash(
+  input: ApprovedNarrationContextInput,
+): Promise<string> {
+  const { data: review, error } = await createAdminSupabaseClient()
+    .from("source_review_packets")
+    .select(
+      "source_set_hash,source_review_statuses!source_review_statuses_source_review_packet_id_fkey!inner(status)",
+    )
+    .eq("workspace_id", input.workspaceId)
+    .eq("configuration_candidate_id", input.configurationCandidateId)
+    .eq("script_revision_id", input.scriptRevisionId)
+    .eq("policy_version_id", input.policyVersionId)
+    .eq("source_review_statuses.status", "approved")
+    .order("packet_version", { ascending: false })
+    .limit(1)
+    .single();
+  if (error || !review || !/^[a-f0-9]{64}$/u.test(review.source_set_hash)) {
+    throw new NarrationDeliveryError("Approved narration context is unavailable.");
+  }
+  return review.source_set_hash;
+}
 
 function record(value: unknown, label: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -241,21 +270,12 @@ export async function createNarrationDelivery(
     sourceText: string;
   }>,
 ): Promise<NarrationDelivery> {
-  const client = createAdminSupabaseClient();
-  const { data: review, error } = await client
-    .from("source_review_packets")
-    .select("source_set_hash,source_review_statuses!inner(status)")
-    .eq("workspace_id", input.envelope.workspaceId)
-    .eq("configuration_candidate_id", input.configurationCandidateId)
-    .eq("script_revision_id", input.scriptRevisionId)
-    .eq("policy_version_id", input.policyVersionId)
-    .eq("source_review_statuses.status", "approved")
-    .order("packet_version", { ascending: false })
-    .limit(1)
-    .single();
-  if (error || !review || !/^[a-f0-9]{64}$/u.test(review.source_set_hash)) {
-    throw new NarrationDeliveryError("Approved narration context is unavailable.");
-  }
+  const sourceSetHash = await getApprovedNarrationSourceSetHash({
+    configurationCandidateId: input.configurationCandidateId,
+    policyVersionId: input.policyVersionId,
+    scriptRevisionId: input.scriptRevisionId,
+    workspaceId: input.envelope.workspaceId,
+  });
   const result = await runLedgeredOpenAiStructuredAgent(
     {
       configurationCandidateId: input.configurationCandidateId,
@@ -264,7 +284,7 @@ export async function createNarrationDelivery(
       policyVersionId: input.policyVersionId,
       preflightRunId: input.envelope.preflightRunId,
       scriptRevisionId: input.scriptRevisionId,
-      sourceSetHash: review.source_set_hash,
+      sourceSetHash,
       stageAttemptId: input.envelope.stageAttemptId,
       toolName: "audio.delivery",
       trustedScopeHash: input.envelope.inputManifestSha256,

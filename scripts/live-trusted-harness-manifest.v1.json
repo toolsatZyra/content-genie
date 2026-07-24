@@ -73,7 +73,7 @@
     {
       "path": "scripts/phase2-candidate-migrations.v1.json",
       "role": "candidate-migration-inventory",
-      "sha256": "4bb02791e71402bf9152f38ec5dd7260d68ccafb64d42b112ab247675bbf3400"
+      "sha256": "025964079f987dbabf0c97ca09a17daec22b8318c4af72ae8378c0ecb117c520"
     },
     {
       "path": "scripts/phase2-coordinate-upgrade-drill.mjs",
@@ -961,6 +961,11 @@
       "sha256": "7046591d7931227552eea812cc946146747bc7b08b80f4c0d60c28e6099c613e"
     },
     {
+      "path": "supabase/migrations/20260724041500_p2_09_runtime_bundle_reconciliation.sql",
+      "role": "phase2-migration",
+      "sha256": "a4e67a8f543a734b2823d01d09655a6d23ce87b72a6e85ae1451ce6969b44431"
+    },
+    {
       "path": "supabase/tests/fixtures/phase2_coordinate_v1_verifiers.sql",
       "role": "predecessor-fixture",
       "sha256": "2df42a28cd04b193b0eaf97c882a17edfb13688cad7aca9bf8845408e9d7ec1c"
@@ -988,7 +993,7 @@
     {
       "path": "supabase/tests/phase2_p2_09_cultural_claim_contract.test.sql",
       "role": "pgtap-source",
-      "sha256": "c3164340d9dd4c21c64333c7b52495fdd9103f1e8c2d181fcb608b0228071a00"
+      "sha256": "90f10ad6398cb91f55357028cabc74aa84c5b7c5f63b586480ea3edb9974c609"
     },
     {
       "path": "supabase/tests/phase2_preflight_provider_ingest.test.sql",
@@ -1058,9 +1063,9 @@
       "testFile": "phase2_executable_plan.test.sql"
     },
     {
-      "hardenedQuerySha256": "0cb17966d2e267325b3ca99aad8bb195019132e4f7df8773e192d21f11a7e373",
-      "plannedAssertions": 59,
-      "sourceSha256": "c3164340d9dd4c21c64333c7b52495fdd9103f1e8c2d181fcb608b0228071a00",
+      "hardenedQuerySha256": "84c9e01ce692ce36dc35c3ffe42ceb008604b54d714e60031d6d3c54b009a51b",
+      "plannedAssertions": 61,
+      "sourceSha256": "90f10ad6398cb91f55357028cabc74aa84c5b7c5f63b586480ea3edb9974c609",
       "testFile": "phase2_p2_09_cultural_claim_contract.test.sql"
     },
     {
@@ -1250,7 +1255,8 @@
     "supabase/migrations/20260724024217_world_retry_identity_manifest_canonicalization.sql",
     "supabase/migrations/20260724033000_current_world_selection_reconciliation.sql",
     "supabase/migrations/20260724034500_latest_world_run_retirement_authority.sql",
-    "supabase/migrations/20260724040000_world_selection_history_preflight_fk_index.sql"
+    "supabase/migrations/20260724040000_world_selection_history_preflight_fk_index.sql",
+    "supabase/migrations/20260724041500_p2_09_runtime_bundle_reconciliation.sql"
   ],
   "predecessorFixture": {
     "capturedAt": "2026-07-18",

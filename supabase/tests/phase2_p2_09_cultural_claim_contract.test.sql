@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, auth, storage, private, audit, pg_catalog;
-select plan(59);
+select plan(61);
 
 create function pg_temp.p2_09_hash(p_value jsonb)
 returns text
@@ -137,6 +137,9 @@ select ok(to_regclass('public.p2_09_cultural_rule_assessments') is not null,
 select ok(to_regprocedure(
   'public.command_record_p2_09_cultural_claim_bundle(uuid,uuid,text,jsonb,jsonb,text,text,text)'
   ) is not null,'P2-09 exposes the exact service command');
+select ok(to_regprocedure(
+  'public.command_ensure_p2_09_cultural_claim_bundle(uuid,uuid)'
+  ) is not null,'P2-09 exposes runtime packet reconciliation');
 select has_trigger('public','source_review_statuses',
   'source_review_statuses_p2_09_approval_guard',
   'source-review approval has a P2-09 fail-closed guard');
@@ -234,6 +237,10 @@ select throws_ok(
   $$select public.command_record_p2_09_cultural_claim_bundle('d9100000-0000-4000-8000-000000000001','d9200000-0000-4000-8000-000000000001','genie.p2-09-cultural-claims.v1','[]'::jsonb,'[]'::jsonb,repeat('1',64),repeat('2',64),repeat('3',64))$$,
   '42501','permission denied for function command_record_p2_09_cultural_claim_bundle',
   'a non-service caller cannot create a P2-09 machine bundle');
+select throws_ok(
+  $$select public.command_ensure_p2_09_cultural_claim_bundle('d9100000-0000-4000-8000-000000000001','d9200000-0000-4000-8000-000000000001')$$,
+  '42501','permission denied for function command_ensure_p2_09_cultural_claim_bundle',
+  'a non-service caller cannot reconcile a P2-09 machine bundle');
 reset role;
 
 set local session_replication_role=replica;
@@ -334,8 +341,8 @@ select throws_ok(
   'missing claim evidence cannot be reported as machine eligible');
 
 select lives_ok(
-  $$select pg_temp.record_p2_09_bundle(pg_temp.p2_09_claims(),pg_temp.p2_09_rules())$$,
-  'an exact nine-category and twelve-rule bundle is accepted');
+  $$select public.command_ensure_p2_09_cultural_claim_bundle('d9100000-0000-4000-8000-000000000001','d9200000-0000-4000-8000-000000000001')$$,
+  'runtime reconciliation records an exact nine-category and twelve-rule bundle');
 reset role;
 
 select is((select count(*)::integer from public.p2_09_cultural_claim_bundles
@@ -363,8 +370,8 @@ select set_config('request.jwt.claims','{"role":"service_role"}',true);
 select set_config('request.jwt.claim.role','service_role',true);
 set local role service_role;
 select lives_ok(
-  $$select pg_temp.record_p2_09_bundle(pg_temp.p2_09_claims(),pg_temp.p2_09_rules())$$,
-  'exact replay is idempotent');
+  $$select public.command_ensure_p2_09_cultural_claim_bundle('d9100000-0000-4000-8000-000000000001','d9200000-0000-4000-8000-000000000001')$$,
+  'runtime reconciliation replay is idempotent');
 reset role;
 select is((select count(*)::integer from public.p2_09_cultural_claim_bundles
   where source_review_packet_id='d9200000-0000-4000-8000-000000000001'),1,

@@ -533,6 +533,25 @@ async function sourceInput(
   return parseInput(data);
 }
 
+export async function ensureP209CulturalClaimBundle(
+  workspaceId: string,
+  packetId: string,
+): Promise<void> {
+  const { error } = await createAdminSupabaseClient().rpc(
+    "command_ensure_p2_09_cultural_claim_bundle",
+    {
+      p_source_review_packet_id: packetId,
+      p_workspace_id: workspaceId,
+    },
+  );
+  if (error) {
+    throw new SourceCulturalPreflightError(
+      "The exact cultural-claim evidence could not be finalized.",
+      true,
+    );
+  }
+}
+
 export async function ensureSourceCulturalPacket(input: {
   configurationCandidateId: string;
   workspaceId: string;
@@ -552,6 +571,10 @@ export async function ensureSourceCulturalPacket(input: {
     workspaceId: input.workspaceId,
   });
   if (preparation.existingPacketId) {
+    await ensureP209CulturalClaimBundle(
+      input.workspaceId,
+      preparation.existingPacketId,
+    );
     return Object.freeze({
       packetId: preparation.existingPacketId,
       replayed: true,
@@ -712,6 +735,7 @@ export async function ensureSourceCulturalPacket(input: {
   if (error || typeof data !== "string") {
     throw new SourceCulturalPreflightError("The source-review packet was rejected.");
   }
+  await ensureP209CulturalClaimBundle(input.workspaceId, data);
   return Object.freeze({
     packetId: data,
     replayed: data !== packetId,

@@ -1,9 +1,26 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  client: vi.fn(),
+  rpc: vi.fn(),
+}));
+
+vi.mock("@/lib/supabase/admin", () => ({
+  createAdminSupabaseClient: mocks.client,
+}));
 
 import {
   buildQualifiedReviewFindings,
   chooseCulturalCatalogSource,
+  ensureP209CulturalClaimBundle,
+  SourceCulturalPreflightError,
 } from "./source-cultural-preflight";
+
+beforeEach(() => {
+  mocks.rpc.mockReset();
+  mocks.client.mockReset();
+  mocks.client.mockReturnValue({ rpc: mocks.rpc });
+});
 
 describe("qualified source and cultural preflight", () => {
   it.each([
@@ -53,5 +70,40 @@ describe("qualified source and cultural preflight", () => {
       verdict: "qualified_review_required",
     });
     expect(first[0]?.evidenceHash).toMatch(/^[a-f0-9]{64}$/u);
+  });
+
+  it("materializes the required P2-09 sidecar before qualified review", async () => {
+    mocks.rpc.mockResolvedValue({
+      data: { bundleId: "10000000-0000-4000-8000-000000000003", ok: true },
+      error: null,
+    });
+
+    await expect(
+      ensureP209CulturalClaimBundle(
+        "10000000-0000-4000-8000-000000000001",
+        "10000000-0000-4000-8000-000000000002",
+      ),
+    ).resolves.toBeUndefined();
+    expect(mocks.rpc).toHaveBeenCalledWith(
+      "command_ensure_p2_09_cultural_claim_bundle",
+      {
+        p_source_review_packet_id: "10000000-0000-4000-8000-000000000002",
+        p_workspace_id: "10000000-0000-4000-8000-000000000001",
+      },
+    );
+  });
+
+  it("keeps Preflight closed when the P2-09 sidecar cannot be finalized", async () => {
+    mocks.rpc.mockResolvedValue({
+      data: null,
+      error: { code: "40001" },
+    });
+
+    await expect(
+      ensureP209CulturalClaimBundle(
+        "10000000-0000-4000-8000-000000000001",
+        "10000000-0000-4000-8000-000000000002",
+      ),
+    ).rejects.toBeInstanceOf(SourceCulturalPreflightError);
   });
 });
