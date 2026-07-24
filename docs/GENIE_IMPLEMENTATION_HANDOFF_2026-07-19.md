@@ -2019,3 +2019,38 @@ The focused executable-plan suite remains `17/17`; formatting, lint and
 route-aware TypeScript pass. A clean post-deploy successor must prove that this
 removes metadata false positives without weakening visible-person rejection,
 then reach the repaired quote and media path.
+
+## 44. 2026-07-24 Latest successful plan quote binding
+
+Ekadashi run 34 completed the Shot Director, Cinematic Director, both blind
+evaluators and Monica consensus. Its plan passed with 100% evidence density and
+only advisory owner-MVP quality codes. Quote preparation nevertheless selected
+run 32's older passed plan because it ordered `plan_iteration` across
+independent runs, even though every run restarts that bounded counter at one.
+The creation projection displayed run 34 while World Lock correctly selected
+the newest plan by creation time, so the old quote was rejected as stale.
+
+`get_production_quote_input` now follows the same deterministic newest-plan
+ordering used by World Lock: `created_at desc,id desc`. The focused preview
+executable-plan pgTAP suite passes `76/76`, including a regression excluding
+the cross-run iteration ordering. The migration
+`latest_successful_plan_quote_binding` is live on preview and production.
+Ekadashi then received a new exact quote for the current plan, auto-confirmed
+it, sealed World Lock, and created production run
+`13918e82-f896-54c6-86af-5e932569b77c`.
+
+## 45. 2026-07-24 Provider quarantine MIME correction
+
+The first four Ekadashi storyboard provider outputs returned successfully but
+could not enter the quarantine prefix. `workspace-media` intentionally allows
+only explicit image, audio, video and ZIP MIME types; storyboard and clip
+quarantine uploads incorrectly declared `application/octet-stream`. The
+storage service therefore rejected valid provider bytes before the existing
+container inspection, dimension validation and sandbox re-encoding could run.
+
+Storyboard quarantine now uses the already-sniffed exact image MIME, and clip
+quarantine uses `video/mp4`. Quarantine remains non-public and still precedes
+all scanner, re-encode, hash, duration and promotion checks. The focused
+storyboard suite passes `10/10`; lint and route-aware TypeScript pass. The live
+run remains queued with 22 storyboard and 22 clip slots and must be resumed
+after this repair deploys.

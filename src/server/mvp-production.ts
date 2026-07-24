@@ -257,7 +257,7 @@ async function completeClip(clip: ClipRow): Promise<boolean> {
   const { error: quarantineError } = await client.storage
     .from(MASTER_BUCKET)
     .upload(quarantineObjectName, bytes, {
-      contentType: "application/octet-stream",
+      contentType: "video/mp4",
       upsert: false,
     });
   if (quarantineError && quarantineError.message !== "The resource already exists") {

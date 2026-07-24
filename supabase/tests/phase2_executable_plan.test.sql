@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions,auth,storage,private,audit,pg_catalog;
-select plan(75);
+select plan(76);
 grant usage on schema private to service_role;
 grant select on all tables in schema private to service_role;
 
@@ -1053,6 +1053,15 @@ select ok(
     in pg_get_functiondef(
       'public.get_production_quote_input(uuid,uuid,uuid[])'::regprocedure))>0,
   'quote input requires a passed plan and every mandatory allowance'
+);
+select ok(
+  position('order by created_at desc,id desc'
+    in lower(pg_get_functiondef(
+      'public.get_production_quote_input(uuid,uuid,uuid[])'::regprocedure)))>0
+  and position('order by plan_iteration desc'
+    in lower(pg_get_functiondef(
+      'public.get_production_quote_input(uuid,uuid,uuid[])'::regprocedure)))=0,
+  'quote preparation follows the newest successful plan across independent runs'
 );
 select has_trigger(
   'public','preflight_stage_attempts','surface_terminal_preflight_failure',

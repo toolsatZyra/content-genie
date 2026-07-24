@@ -549,7 +549,7 @@ async function pollStoryboardFrame(frame: StoryboardFrame): Promise<boolean> {
   const { error: quarantineError } = await client.storage
     .from(MEDIA_BUCKET)
     .upload(quarantineObjectName, bytes, {
-      contentType: "application/octet-stream",
+      contentType: mime as string,
       upsert: false,
     });
   if (quarantineError && quarantineError.message !== "The resource already exists") {
