@@ -834,6 +834,7 @@ describe("executable cinematic plan agent", () => {
                 characterVersionIds: [id("13"), id("13")],
                 sfxDurationMs: 5_000,
                 sfxStartOffsetMs: 14_999,
+                shotNumber: 1,
                 transition: "fade_from_black",
               }
             : shot,
@@ -890,6 +891,7 @@ describe("executable cinematic plan agent", () => {
     });
     expect(plan.shots[1]).toMatchObject({
       characterVersionIds: [id("13")],
+      shotNumber: 2,
     });
     expect(plan.composition.shots[1]).toMatchObject({
       transition: "hard_cut",

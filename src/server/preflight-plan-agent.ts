@@ -1020,7 +1020,6 @@ function parseDirectorOutput(
         ? "hard_cut"
         : String(shot.transition);
     if (
-      shot.shotNumber !== index + 1 ||
       !["simple_camera_subject", "camera_led", "complex_general"].includes(
         String(shot.motionClass),
       ) ||

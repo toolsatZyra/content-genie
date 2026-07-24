@@ -1713,9 +1713,10 @@ complete cinematic plan.
 The Director parser now preserves shot order, immutable narration windows,
 World identities and creative content while applying only deterministic
 contract normalization: duplicate references to the same character collapse
-to one, a later `fade_from_black` becomes `hard_cut`, a deliberate-silence cue
-has zero timing, and an audible SFX is clamped inside its exact shot window
-(or becomes deliberate silence when the window is shorter than 500 ms).
+to one, the display shot number is rebound to its server-owned array position,
+a later `fade_from_black` becomes `hard_cut`, a deliberate-silence cue has zero
+timing, and an audible SFX is clamped inside its exact shot window (or becomes
+deliberate silence when the window is shorter than 500 ms).
 Research references remain limited to the selected location's accepted,
 licensed set; an irrelevant model-supplied reference for a location without
 research is ignored instead of being attached.
