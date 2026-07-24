@@ -3588,16 +3588,6 @@ select has_trigger(
   'capture_owner_mvp_script_rubric_deferred_waiver',
   'locked owner-MVP configurations record an explicit deferred-advisory waiver'
 );
-select ok(
-  position(
-    'owner-mvp-advisory-rubric-deferred.v1'
-    in pg_get_functiondef(
-      'private.capture_owner_mvp_script_rubric_deferred_waiver()'::regprocedure
-    )
-  ) > 0,
-  'the owner-MVP waiver trigger records the exact auditable reason'
-);
-
 select set_config('request.jwt.claims','{"role":"service_role"}',true);
 select set_config('request.jwt.claim.role','service_role',true);
 set local role service_role;
@@ -3622,21 +3612,24 @@ select throws_ok(
 );
 
 reset role;
-insert into private.script_rubric_legacy_waivers (
-  workspace_id,
-  episode_id,
-  configuration_candidate_id,
-  script_revision_id,
-  waiver_reason
-)
-select
-  configuration.workspace_id,
-  configuration.episode_id,
-  configuration.id,
-  configuration.script_revision_id,
-  'captured-existing-world-lock-before-required-rubric.v1'
-from public.episode_configuration_candidates configuration
-where configuration.episode_id = '94000000-0000-4000-8000-000000000004';
+update public.episode_configuration_candidates
+set state = 'preflight'
+where episode_id = '94000000-0000-4000-8000-000000000004';
+select is(
+  (
+    select waiver.waiver_reason
+    from private.script_rubric_legacy_waivers waiver
+    where waiver.configuration_candidate_id = (
+      select configuration.id
+      from public.episode_configuration_candidates configuration
+      where configuration.episode_id = '94000000-0000-4000-8000-000000000004'
+      order by configuration.created_at desc
+      limit 1
+    )
+  ),
+  'owner-mvp-advisory-rubric-deferred.v1',
+  'the real preflight transition records the exact owner-MVP advisory waiver'
+);
 select set_config('request.jwt.claims','{"role":"service_role"}',true);
 select set_config('request.jwt.claim.role','service_role',true);
 set local role service_role;
@@ -3655,7 +3648,7 @@ select lives_ok(
       'rubric-plan-missing-0001',repeat('c',64)
     )
   $command$,
-  'only a migration-captured legacy configuration can resume without rubric evidence'
+  'a preflight-ready owner-MVP configuration can plan without fabricated rubric evidence'
 );
 select is(
   (
