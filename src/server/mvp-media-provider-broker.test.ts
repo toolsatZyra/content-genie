@@ -242,6 +242,38 @@ describe("MVP FAL provider broker", () => {
     );
   });
 
+  it("normalizes provider floating artifacts to the durable ledger scales", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse({
+        billing_events: [
+          {
+            cost_estimate_nano_usd: 288_000_000,
+            endpoint_id: endpoint,
+            output_units: 2.4000000000000004,
+            percent_discount: 9.999999999999998,
+            request_id: requestId,
+            timestamp: "2026-07-22T12:00:00Z",
+            unit_price: 0.11999999999999998,
+          },
+        ],
+        has_more: false,
+        next_cursor: null,
+      }),
+    );
+
+    await expect(
+      fetchMvpFalBillingEvent(requestId, "2026-07-20T12:05:00.000Z", 12_345),
+    ).resolves.toEqual({
+      costEstimateNanoUsd: 288_000_000,
+      endpointId: endpoint,
+      evidenceSha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      outputUnits: 2.4,
+      percentDiscount: 10,
+      timestamp: "2026-07-22T12:00:00.000Z",
+      unitPriceUsd: 0.12,
+    });
+  });
+
   it("keeps a missing request-level billing event retryable", async () => {
     vi.mocked(fetch).mockResolvedValue(
       jsonResponse({ billing_events: [], has_more: false, next_cursor: null }),

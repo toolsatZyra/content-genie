@@ -150,6 +150,10 @@ export type MvpFalBillingEvent = Readonly<{
   unitPriceUsd: number;
 }>;
 
+function normalizedDecimal(value: number, scale: number): number {
+  return Number(value.toFixed(scale));
+}
+
 function billableUnits(response: Response): Readonly<{
   canonical: string;
   value: number;
@@ -490,14 +494,33 @@ export async function fetchMvpFalBillingEvent(
       "PROVIDER_BILLING_UNRECONCILED",
     );
   }
+  const normalizedOutputUnits = normalizedDecimal(outputUnits, 4);
+  const normalizedUnitPriceUsd = normalizedDecimal(unitPriceUsd, 9);
+  const normalizedPercentDiscount =
+    percentDiscount === null ? null : normalizedDecimal(percentDiscount, 6);
+  if (
+    normalizedOutputUnits <= 0 ||
+    normalizedUnitPriceUsd < 0 ||
+    (normalizedPercentDiscount !== null &&
+      (normalizedPercentDiscount < 0 || normalizedPercentDiscount > 100))
+  ) {
+    throw new MvpMediaProviderBrokerError(
+      "The provider billing event is malformed.",
+      "terminal",
+      "PROVIDER_BILLING_UNRECONCILED",
+    );
+  }
   const normalized = Object.freeze({
     costEstimateNanoUsd,
     endpointId,
-    outputUnits,
-    percentDiscount,
+    outputUnits: normalizedOutputUnits,
+    percentDiscount: normalizedPercentDiscount,
+    providerRawOutputUnits: outputUnits,
+    providerRawPercentDiscount: percentDiscount,
+    providerRawUnitPriceUsd: unitPriceUsd,
     requestId,
     timestamp: new Date(timestamp).toISOString(),
-    unitPriceUsd,
+    unitPriceUsd: normalizedUnitPriceUsd,
   });
   return Object.freeze({
     costEstimateNanoUsd,
@@ -505,9 +528,9 @@ export async function fetchMvpFalBillingEvent(
     evidenceSha256: createHash("sha256")
       .update(JSON.stringify(normalized), "utf8")
       .digest("hex"),
-    outputUnits,
-    percentDiscount,
+    outputUnits: normalizedOutputUnits,
+    percentDiscount: normalizedPercentDiscount,
     timestamp: normalized.timestamp,
-    unitPriceUsd,
+    unitPriceUsd: normalizedUnitPriceUsd,
   });
 }
