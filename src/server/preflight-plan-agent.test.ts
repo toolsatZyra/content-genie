@@ -179,7 +179,13 @@ function fixture() {
           anchorContentSha256: hash("e"),
           characterFormId: id("12"),
           characterVersionId: id("13"),
-          identityManifest: { canonicalName: "देवी" },
+          identityManifest: {
+            identity: {
+              canonicalName: "Devi",
+              characterKey: "devi",
+              formName: "Devi",
+            },
+          },
           identityManifestHash: hash("f"),
           sheetAssetVersionId: id("14"),
           sheetContentSha256: hash("0"),
@@ -234,7 +240,8 @@ function fixture() {
       cameraMotion: "A controlled motivated move.",
       characterVersionIds: [id("13")],
       emotionalRead: "Readable restraint and resolve.",
-      framing: "Layered vertical composition with subtitle-safe negative space.",
+      framing:
+        "Devi holds a layered vertical composition with subtitle-safe negative space.",
       lighting: "Motivated warm key and cool separation.",
       locationVersionId: id("23"),
       motionClass: ["simple_camera_subject", "camera_led", "complex_general"][
@@ -251,9 +258,9 @@ function fixture() {
       sfxGainDb: -20,
       sfxStartOffsetMs: 0,
       shotNumber,
-      subjectAction: "The figure reacts with controlled physical detail.",
+      subjectAction: "Devi reacts with controlled physical detail.",
       transition: "hard_cut",
-      visualIntent: "Make the story legible without sound.",
+      visualIntent: "Devi makes the story legible without sound.",
     })),
     story: {
       devotionalIntent: "Awe with emotional intimacy.",
@@ -572,6 +579,15 @@ describe("executable cinematic plan agent", () => {
       maxOutputTokens: 10_000,
       model: "gpt-5.6-terra",
     });
+    expect(mocks.agent.mock.calls[1]![1].instructions).toContain(
+      "Never invent an anonymous devotee",
+    );
+    const directorInput = JSON.parse(mocks.agent.mock.calls[1]![1].input as string);
+    expect(directorInput.world.characters[0].identityBinding).toEqual({
+      canonicalName: "Devi",
+      characterKey: "devi",
+      formName: "Devi",
+    });
     const boundaryInput = JSON.parse(mocks.agent.mock.calls[0]![1].input as string);
     expect(boundaryInput.planningGuidance).toMatchObject({
       minimumShotCountGuidance: 20,
@@ -600,6 +616,58 @@ describe("executable cinematic plan agent", () => {
     expect(evaluatorInput.plan.edd.shots[0]).not.toHaveProperty(
       "storyboardPromptBlueprint",
     );
+  });
+
+  it("rejects a World ID reused for an invented devotee", async () => {
+    const data = fixture();
+    mocks.agent
+      .mockReset()
+      .mockResolvedValueOnce({
+        output: semanticBoundaries(data),
+        requestHash: hash("4"),
+        responseId: "resp_boundaries",
+        responseRequestId: "request_boundaries",
+      })
+      .mockResolvedValueOnce({
+        output: {
+          ...data.director,
+          shots: data.director.shots.map((shot, index) =>
+            index === 0
+              ? {
+                  ...shot,
+                  framing: "Devi watches an anonymous adult devotee in close-up.",
+                  subjectAction: "The devotee folds both hands in prayer.",
+                  visualIntent:
+                    "An unnamed worshipper stands alone in the devotional frame.",
+                }
+              : shot,
+          ),
+        },
+        requestHash: hash("5"),
+        responseId: "resp_director",
+        responseRequestId: "request_director",
+      });
+
+    await expect(
+      executePlanPreflight({
+        authorityEpoch: 1,
+        capabilityGrantId: null,
+        fencingToken: 1,
+        inputManifestId: id("90"),
+        inputManifestSha256: hash("a"),
+        preflightRunId: id("6"),
+        schemaVersion: "genie.preflight-task.v1",
+        stageAttemptId: id("9"),
+        stageRunId: id("91"),
+        workspaceId: id("1"),
+      }),
+    ).rejects.toMatchObject({
+      code: "PLAN_PREFLIGHT_INVALID",
+      message: "Director shot depicts a person who is not present in the locked World.",
+    });
+    expect(
+      mocks.rpc.mock.calls.some(([name]) => name === "command_record_preflight_plan"),
+    ).toBe(false);
   });
 
   it("retries the exact materialized plan after an absent timeout receipt", async () => {

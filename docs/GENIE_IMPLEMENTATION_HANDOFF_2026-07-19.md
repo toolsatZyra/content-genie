@@ -1764,3 +1764,28 @@ the evidence needed for judgment—camera, lighting, mood, action, composition,
 timing, edit, SFX, storyboard mode, references and provider routing. It omits
 only duplicated generation prompt prose and provider-private identifiers. The
 persisted executable plan and all downstream media prompts are unchanged.
+
+## 35. 2026-07-24 Locked character-role binding hardening
+
+The first complete three-attempt blind-review cycle exposed a real identity
+continuity defect. The accepted Ekadashi World contains exactly three locked
+characters: Vishnu, Mura and Goddess Ekadashi. The Director nevertheless used
+Goddess Ekadashi's immutable `characterVersionId` for an invented anonymous
+adult devotee in multiple shots. Both blind evaluators correctly blocked the
+plan because the generated film could render the goddess as that devotee.
+
+The Director input now carries an explicit identity binding beside every
+immutable character version: exact character key, canonical name and form
+name. The system contract forbids all unanchored people, including anonymous
+devotees, worshippers, pilgrims, observers, viewer avatars, crowds and extras.
+Every character ID attached to a shot must also be named in that shot's own
+visual or motion directives using its exact locked identity. A deterministic
+parser rejects a missing identity name, reuse of an ID for an unanchored role,
+or a generic human role absent from the accepted World before any plan is
+persisted or evaluated.
+
+Focused executable-plan evidence passes `11/11`, including the exact
+Goddess-ID-as-devotee regression, and route-aware TypeScript passes. The live
+Ekadashi run claimed before this correction is allowed to finish under its
+existing authority; the next clean run must use the hardened Director before
+media production can proceed.
