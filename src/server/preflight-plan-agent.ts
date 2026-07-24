@@ -2273,8 +2273,16 @@ Findings must be specific and evidence-bound. Emit blocker only for a defect tha
 async function rpc(name: string, parameters: Record<string, unknown>) {
   const { data, error } = await createAdminSupabaseClient().rpc(name, parameters);
   if (error) {
+    const diagnostic = [
+      error.code ?? "unknown",
+      error.message,
+      error.details,
+      error.hint,
+    ]
+      .filter((value): value is string => Boolean(value))
+      .join(" · ");
     throw new PreflightPlanAgentError(
-      `Plan ledger rejected ${name}.`,
+      `Plan ledger rejected ${name}: ${diagnostic}.`,
       true,
       "PLAN_LEDGER_REJECTED",
     );
