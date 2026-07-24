@@ -153,7 +153,10 @@ function preferredInitialChamber(
     projection.preflight.quote?.confirmed === true &&
     projection.preflight.quote.expired === false;
   const allowed: Readonly<Record<CreationChamber, boolean>> = {
-    create: Boolean(projection.preflight.productionRun) || preflightReady,
+    create:
+      Boolean(
+        projection.preflight.productionRun || projection.production.productionRunId,
+      ) || preflightReady,
     look: canResumeCreationInLook(projection),
     preflight: worldReady,
     script: true,

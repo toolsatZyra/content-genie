@@ -345,6 +345,7 @@ export async function loadCreationProjection(
     ? projectProductionJob(productionJobRow)
     : null;
   const productionRun = productionRunResult.data as ProductionRunRow | null;
+  const productionHasStarted = productionJobRow !== null || productionRun !== null;
   const productionMasterResult = productionJob
     ? await client
         .from("mvp_episode_masters")
@@ -471,7 +472,7 @@ export async function loadCreationProjection(
     : null;
   const configurationCandidateId = configuration?.id;
   const [readinessResult, sourceReviewResult, preflightRunsResult] =
-    configurationCandidateId
+    configurationCandidateId && !productionHasStarted
       ? await Promise.all([
           client
             .from("creation_readiness_projections")

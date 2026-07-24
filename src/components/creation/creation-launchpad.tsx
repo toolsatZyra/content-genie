@@ -23,9 +23,10 @@ export function CreationLaunchpad({
   stageHeadingRef,
   workspaceId,
 }: CreationLaunchpadProps) {
-  const run = preflight.productionRun;
+  const productionRunId =
+    production.productionRunId ?? preflight.productionRun?.id ?? null;
 
-  if (run) {
+  if (productionRunId) {
     return (
       <MvpProductionStudio
         episodeId={episodeId}
@@ -33,7 +34,7 @@ export function CreationLaunchpad({
         job={production.job}
         master={production.master}
         editPackage={production.package}
-        productionRunId={production.productionRunId ?? run.id}
+        productionRunId={productionRunId}
         repair={production.repair}
         signedMasterUrl={production.signedMasterUrl}
         stageHeadingRef={stageHeadingRef}

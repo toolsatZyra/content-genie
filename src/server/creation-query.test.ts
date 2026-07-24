@@ -521,7 +521,7 @@ describe("the creation projection query", () => {
       },
       error: null,
     };
-    const { client } = fakeClient(results);
+    const { client, from } = fakeClient(results);
 
     const projection = await loadCreationProjection(client, user, episodeId);
 
@@ -542,6 +542,13 @@ describe("the creation projection query", () => {
       },
     ]);
     expect(projection?.production.job).not.toHaveProperty("plan_bundle_id");
+    expect(projection?.production.productionRunId).toBe(
+      "10000000-0000-4000-8000-000000000021",
+    );
+    expect(from).not.toHaveBeenCalledWith("creation_readiness_projections");
+    expect(from).not.toHaveBeenCalledWith("source_review_readiness_projections");
+    expect(from).not.toHaveBeenCalledWith("preflight_runs");
+    expect(from).not.toHaveBeenCalledWith("world_build_progress_items");
   });
 
   it("suppresses a terminal failure superseded by a newer run of the same kind", async () => {
