@@ -1850,3 +1850,26 @@ Director alone now uses the structured-agent module's existing bounded maximum
 of 16,000 output tokens. Its 100 KB input, 128 KB response, 180-second request,
 single-agent fan-out, authority and no-spend-before-consensus limits are
 unchanged.
+
+## 37. 2026-07-24 Reveal-contract autonomous recovery
+
+The first clean production run on the 16,000-token Director ceiling proved
+both agent calls: the Shot Director completed and the Cinematic Director
+returned a complete 9,210-token structured plan. The deterministic validator
+then rejected that candidate because beat 5 was labelled as a reveal without
+the complete visible reveal contribution set required by its own level. This
+is a correct no-spend rejection, but it was incorrectly terminal and therefore
+stopped after one attempt.
+
+Beat-level reveal coverage failure is now classified as the model-correctable,
+retryable `PLAN_REVEAL_COVERAGE_INVALID`. The Director contract also requires
+an explicit pre-return checklist: every minor or major beat must visibly supply
+proof and reaction across its exact shots, and every major reveal must also
+supply consequence. Missing checklist items must be corrected in the shot
+compositions and machine-readable `revealContributions` before return. No
+contribution is inferred from narration or assigned by shot position.
+
+The focused executable-plan suite passes `15/15`, including the exact
+incomplete beat-level reveal regression. Formatting, focused lint and
+route-aware TypeScript pass. The next live successor must demonstrate bounded
+automatic retry and then clear blind review before any media spend.

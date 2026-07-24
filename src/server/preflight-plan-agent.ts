@@ -1337,6 +1337,8 @@ function parseDirectorOutput(
     if (required.some((contribution) => !supplied.has(contribution))) {
       throw new PreflightPlanAgentError(
         `Director reveal coverage is incomplete for beat ${beat.beatNumber}.`,
+        true,
+        "PLAN_REVEAL_COVERAGE_INVALID",
       );
     }
   }
@@ -1664,7 +1666,7 @@ Use Kling 2.5 motion class only for simple camera plus simple subject motion, Kl
 
 For every shot, use framing to state camera distance and angle explicitly; use visualIntent only for the static scene composition visible in the storyboard frame; use emotionalRead for mood; use lighting for motivated light; use subjectAction and cameraMotion only for motion that will animate that frame; use transition as the exact incoming cut type; and use sfxCue for one isolated, concise acoustic event or the exact phrase "deliberate silence". For an effect, set sfxStartOffsetMs inside the supplied shot window, set sfxDurationMs between 500 and 5000 without crossing that window, and set narration-safe sfxGainDb from -30 to -9. For deliberate silence, both timing fields must be 0. Choose transition only from hard_cut, match_cut, cut_on_action, smash_cut, jump_cut, or fade_from_black. fade_from_black is valid only for shot 1. A match or action match is designed through the adjacent shots' composition and action but rendered as an exact cut. Do not request a dissolve, wipe, morph, or other effect that requires unplanned media handles. Use two storyboard states only when a meaningful within-shot transformation cannot be communicated from one frame. In that case visualIntent must use exactly: "Two-state start/end composition: START FRAME: <one clean full-frame static composition>. END FRAME: <one clean full-frame static composition>." Never ask Nano Banana for a split screen, panel, diptych, contact sheet, collage, or combined image. Otherwise design one full-frame image.
 
-Return revealContributions as machine-readable truth for only what that exact shot visibly supplies. For each beat marked minor or major, the combined shots in that beat must visibly and explicitly supply proof and reaction; a major reveal must also supply consequence. A single shot may carry multiple contributions only when its complete visible composition/action actually makes each one readable. Never mark proof, reaction, or consequence merely because the narration states it.
+Return revealContributions as machine-readable truth for only what that exact shot visibly supplies. This is a hard output contract: before returning, build a checklist for every beat you mark minor or major and verify that the union of revealContributions across that beat's supplied shots contains proof and reaction, plus consequence for every major reveal. If any checklist item is absent, revise that beat's shot compositions and revealContributions before returning. A single shot may carry multiple contributions only when its complete visible composition/action actually makes each one readable. Never mark proof, reaction, or consequence merely because the narration states it.
 
 Write visualIntent as complete grammatical sentences within 720 characters. Finish both START FRAME and END FRAME descriptions when using two-state composition; never end a field mid-sentence. Keep every critical face, hand, prop, lunar marker, and thematic object inside the middle safe region, above the bottom 24% subtitle reserve and below the top 12% UI guard.
 
