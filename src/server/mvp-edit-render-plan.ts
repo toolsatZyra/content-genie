@@ -125,7 +125,7 @@ export function compileMvpEditRenderPlan(
     cuts.push(cut);
     const fade = cut.renderedAs === "fade_from_black" ? ",fade=t=in:st=0:d=0.250" : "";
     videoFilters.push(
-      `[${index}:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30,format=yuv420p,trim=start=0:end=${seconds(retainedDurationMs)},setpts=PTS-STARTPTS${fade}[v${index}]`,
+      `[${index}:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30,format=yuv420p,trim=start=0:end=${seconds(retainedDurationMs)},setpts=PTS-STARTPTS${fade}[v${index}]`,
     );
   }
   if (shots.at(-1)!.endMs !== narrationDurationMs) {

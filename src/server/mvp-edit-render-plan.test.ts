@@ -31,6 +31,9 @@ describe("MVP edit render plan", () => {
       "cut_on_action",
     ]);
     expect(plan.filterComplex).toContain("trim=start=0:end=3.000");
+    expect(plan.filterComplex).toContain(
+      "crop=1080:1920,setsar=1,fps=30,format=yuv420p",
+    );
     expect(plan.filterComplex).toContain("fade=t=in:st=0:d=0.250");
     expect(plan.filterComplex).toContain("atrim=start=0:end=6.100");
     expect(plan.filterComplex).not.toMatch(
