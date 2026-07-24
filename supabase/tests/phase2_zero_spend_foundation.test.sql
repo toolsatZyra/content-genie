@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, auth, storage, private, audit, pg_catalog;
 
-select plan(183);
+select plan(185);
 
 select is(
   private.estimate_hindi_narration_duration_v2(
@@ -3581,6 +3581,21 @@ select ok(
     'select'
   ),
   'application roles cannot read or extend the legacy waiver allowlist'
+);
+select has_trigger(
+  'public',
+  'episode_configuration_candidates',
+  'capture_owner_mvp_script_rubric_deferred_waiver',
+  'locked owner-MVP configurations record an explicit deferred-advisory waiver'
+);
+select ok(
+  position(
+    'owner-mvp-advisory-rubric-deferred.v1'
+    in pg_get_functiondef(
+      'private.capture_owner_mvp_script_rubric_deferred_waiver()'::regprocedure
+    )
+  ) > 0,
+  'the owner-MVP waiver trigger records the exact auditable reason'
 );
 
 select set_config('request.jwt.claims','{"role":"service_role"}',true);

@@ -163,6 +163,7 @@
     "supabase/migrations/20260724033000_current_world_selection_reconciliation.sql",
     "supabase/migrations/20260724034500_latest_world_run_retirement_authority.sql",
     "supabase/migrations/20260724040000_world_selection_history_preflight_fk_index.sql",
-    "supabase/migrations/20260724041500_p2_09_runtime_bundle_reconciliation.sql"
+    "supabase/migrations/20260724041500_p2_09_runtime_bundle_reconciliation.sql",
+    "supabase/migrations/20260724070000_owner_mvp_script_rubric_deferred_waiver.sql"
   ]
 }
