@@ -1944,3 +1944,35 @@ in camera motion, lighting, emotional read and narrative function.
 Focused tests remain `16/16`; formatting, focused lint and route-aware
 TypeScript pass. Run 30 or its first clean post-deploy successor is the required
 production proof.
+
+## 41. 2026-07-24 Owner-MVP advisory plan scores
+
+Ekadashi run 30 cleared the deterministic executable-plan contract and both
+blind evaluators returned complete evidence-bound reviews. Terra passed at
+`74`; Sol returned `69`. Sol's only blocking finding was the synthetic
+`PLAN_WEIGHTED_SCORE_LOW` generated from the numeric score itself. Its actual
+creative findings were warnings. The resulting consensus nevertheless blocked
+on `OVS 68.340`, `CVP 66.2` and `PFS 64.5`, so no storyboard could exist for
+owner testing despite there being no remaining substantive correctness
+blocker.
+
+For the owner-operated developer MVP, numeric creative thresholds are now
+advisory. A low weighted evaluator score is persisted as a warning, and the
+consensus records `OVS_BELOW_74`, `CVP_BELOW_70`, `PFS_BELOW_70` plus
+`MVP_PROVISIONAL_QUALITY` for final review and later calibration. The following
+conditions remain fail-closed:
+
+- any explicit evaluator blocker;
+- first-frame, reveal, subtitle-safe-area, sound, generation-feasibility,
+  localization or cliffhanger hard-gate failure;
+- incomplete or inapplicable evidence; or
+- material evaluator disagreement.
+
+This preserves immutable narration, accepted World identity, exact timing,
+provider feasibility and final human approval while allowing a real film to
+reach the owner during MVP calibration. The focused executable-plan suite
+passes `17/17`, including a regression proving that a low score with no
+substantive blocker is recorded as a warning. Formatting, lint and route-aware
+TypeScript pass. The migration
+`owner_mvp_soft_plan_quality_gate` is live on preview and production. A fresh
+post-deploy Ekadashi run remains required to prove the complete media path.

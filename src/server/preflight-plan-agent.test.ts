@@ -666,6 +666,67 @@ describe("executable cinematic plan agent", () => {
     ).toBe(true);
   });
 
+  it("records a low creative score as an owner-MVP warning when no substantive blocker exists", async () => {
+    const data = fixture();
+    const lowScoreEvaluator = {
+      ...data.evaluator,
+      scores: data.evaluator.scores.map((score) => ({ ...score, score: 6 })),
+    };
+    mocks.agent
+      .mockReset()
+      .mockResolvedValueOnce({
+        output: semanticBoundaries(data),
+        requestHash: hash("4"),
+        responseId: "resp_boundaries",
+        responseRequestId: "request_boundaries",
+      })
+      .mockResolvedValueOnce({
+        output: data.director,
+        requestHash: hash("5"),
+        responseId: "resp_director",
+        responseRequestId: "request_director",
+      })
+      .mockResolvedValueOnce({
+        output: lowScoreEvaluator,
+        requestHash: hash("6"),
+        responseId: "resp_sol",
+        responseRequestId: "request_sol",
+      })
+      .mockResolvedValueOnce({
+        output: lowScoreEvaluator,
+        requestHash: hash("7"),
+        responseId: "resp_terra",
+        responseRequestId: "request_terra",
+      });
+
+    await executePlanPreflight({
+      authorityEpoch: 1,
+      capabilityGrantId: null,
+      fencingToken: 1,
+      inputManifestId: id("90"),
+      inputManifestSha256: hash("a"),
+      preflightRunId: id("6"),
+      schemaVersion: "genie.preflight-task.v1",
+      stageAttemptId: id("9"),
+      stageRunId: id("91"),
+      workspaceId: id("1"),
+    });
+
+    const evaluatorCalls = mocks.rpc.mock.calls.filter(
+      ([name]) => name === "command_record_evaluator_record",
+    );
+    expect(evaluatorCalls).toHaveLength(2);
+    for (const [, parameters] of evaluatorCalls) {
+      expect(parameters).toMatchObject({ p_score: 60, p_verdict: "pass" });
+      expect(parameters.p_findings).toContainEqual(
+        expect.objectContaining({
+          code: "PLAN_WEIGHTED_SCORE_LOW",
+          severity: "warning",
+        }),
+      );
+    }
+  });
+
   it("rejects a World ID reused for an invented devotee", async () => {
     const data = fixture();
     mocks.agent

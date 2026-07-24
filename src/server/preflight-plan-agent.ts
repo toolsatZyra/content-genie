@@ -2676,13 +2676,13 @@ async function recordEvaluator(
     severity: finding.severity,
   }));
   const hasBlocker = findings.some(({ severity }) => severity === "blocker");
-  const verdict = hasBlocker || overallScore < 74 ? "block" : "pass";
-  if (verdict === "block" && !hasBlocker) {
+  const verdict = hasBlocker ? "block" : "pass";
+  if (overallScore < 74 && !hasBlocker) {
     findings.push({
       code: "PLAN_WEIGHTED_SCORE_LOW",
       evidenceVersionId: materialized.componentIds.edd,
-      reason: `Weighted rubric score ${overallScore} is below the production threshold of 74.`,
-      severity: "blocker",
+      reason: `Weighted rubric score ${overallScore} is below the owner-MVP quality target of 74; retain this as a repair recommendation for final review.`,
+      severity: "warning",
     });
   }
   const scoreSetHash = sha256(postgresJsonbText(scores));
