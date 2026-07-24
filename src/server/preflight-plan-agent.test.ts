@@ -816,6 +816,90 @@ describe("executable cinematic plan agent", () => {
     ).toEqual([id("31"), id("32"), id("31"), id("32")]);
   });
 
+  it("normalizes bounded director metadata without changing shot authority", async () => {
+    const data = fixture();
+    const normalizedDirector = {
+      ...data.director,
+      shots: data.director.shots.map((shot, index) =>
+        index === 0
+          ? {
+              ...shot,
+              sfxCue: "deliberate silence",
+              sfxDurationMs: 5_000,
+              sfxStartOffsetMs: 14_999,
+            }
+          : index === 1
+            ? {
+                ...shot,
+                characterVersionIds: [id("13"), id("13")],
+                sfxDurationMs: 5_000,
+                sfxStartOffsetMs: 14_999,
+                transition: "fade_from_black",
+              }
+            : shot,
+      ),
+    };
+    mocks.agent
+      .mockReset()
+      .mockResolvedValueOnce({
+        output: semanticBoundaries(data),
+        requestHash: hash("4"),
+        responseId: "resp_boundaries",
+        responseRequestId: "request_boundaries",
+      })
+      .mockResolvedValueOnce({
+        output: normalizedDirector,
+        requestHash: hash("5"),
+        responseId: "resp_director",
+        responseRequestId: "request_director",
+      })
+      .mockResolvedValueOnce({
+        output: data.evaluator,
+        requestHash: hash("6"),
+        responseId: "resp_sol",
+        responseRequestId: "request_sol",
+      })
+      .mockResolvedValueOnce({
+        output: data.evaluator,
+        requestHash: hash("7"),
+        responseId: "resp_terra",
+        responseRequestId: "request_terra",
+      });
+
+    await executePlanPreflight({
+      authorityEpoch: 1,
+      capabilityGrantId: null,
+      fencingToken: 1,
+      inputManifestId: id("90"),
+      inputManifestSha256: hash("a"),
+      preflightRunId: id("6"),
+      schemaVersion: "genie.preflight-task.v1",
+      stageAttemptId: id("9"),
+      stageRunId: id("91"),
+      workspaceId: id("1"),
+    });
+    const planCall = mocks.rpc.mock.calls.find(
+      ([name]) => name === "command_record_preflight_plan",
+    );
+    const plan = planCall?.[1].p_plan;
+    const [firstShot, secondShot] = plan.edd.shots;
+    expect(firstShot).toMatchObject({
+      sfxCue: "deliberate silence",
+      sfxDurationMs: 0,
+      sfxStartOffsetMs: 0,
+    });
+    expect(plan.shots[1]).toMatchObject({
+      characterVersionIds: [id("13")],
+    });
+    expect(plan.composition.shots[1]).toMatchObject({
+      transition: "hard_cut",
+    });
+    expect(secondShot.sfxDurationMs).toBeGreaterThanOrEqual(500);
+    expect(secondShot.sfxStartOffsetMs + secondShot.sfxDurationMs).toBeLessThanOrEqual(
+      data.timeline.shots[1]!.endMs - data.timeline.shots[1]!.startMs,
+    );
+  });
+
   it("repairs a blocked plan with exact feedback and fresh blind evaluation", async () => {
     const data = fixture();
     const plans: PersistedPlanParameters[] = [];

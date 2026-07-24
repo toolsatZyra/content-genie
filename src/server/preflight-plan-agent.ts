@@ -994,12 +994,17 @@ function parseDirectorOutput(
       location?.researchReferences.map(({ assetVersionId }) => assetVersionId) ?? [];
     const allowedResearch = new Set(availableResearch);
     const requestedResearch =
-      shot.realWorldReferenceAssetVersionId === null
+      allowedResearch.size === 0 || shot.realWorldReferenceAssetVersionId === null
         ? null
         : String(shot.realWorldReferenceAssetVersionId);
-    const sfxCue = text(shot.sfxCue, "SFX cue", 1_200);
-    const sfxDurationMs = integer(shot.sfxDurationMs, "SFX duration", 0, 5_000);
-    const sfxStartOffsetMs = integer(
+    const requestedSfxCue = text(shot.sfxCue, "SFX cue", 1_200);
+    const requestedSfxDurationMs = integer(
+      shot.sfxDurationMs,
+      "SFX duration",
+      0,
+      5_000,
+    );
+    const requestedSfxStartOffsetMs = integer(
       shot.sfxStartOffsetMs,
       "SFX start offset",
       0,
@@ -1007,29 +1012,38 @@ function parseDirectorOutput(
     );
     const sfxGainDb = Number(shot.sfxGainDb);
     const shotDurationMs = shotWindows[index]!.endMs - shotWindows[index]!.startMs;
+    const characterVersionIds = Array.isArray(shot.characterVersionIds)
+      ? [...new Set(shot.characterVersionIds.map((id) => String(id)))]
+      : [];
+    const transition =
+      index > 0 && shot.transition === "fade_from_black"
+        ? "hard_cut"
+        : String(shot.transition);
     if (
       shot.shotNumber !== index + 1 ||
       !["simple_camera_subject", "camera_led", "complex_general"].includes(
         String(shot.motionClass),
       ) ||
-      !directorCutTypes.includes(String(shot.transition) as DirectorCutType) ||
-      (index > 0 && shot.transition === "fade_from_black") ||
+      !directorCutTypes.includes(transition as DirectorCutType) ||
       !Number.isFinite(sfxGainDb) ||
       sfxGainDb < -30 ||
       sfxGainDb > -9 ||
-      (sfxCue === "deliberate silence"
-        ? sfxDurationMs !== 0 || sfxStartOffsetMs !== 0
-        : sfxDurationMs < 500 || sfxStartOffsetMs + sfxDurationMs > shotDurationMs) ||
       !allowedLocations.has(locationId) ||
-      !Array.isArray(shot.characterVersionIds) ||
-      shot.characterVersionIds.length < 1 ||
-      shot.characterVersionIds.length > 4 ||
-      new Set(shot.characterVersionIds).size !== shot.characterVersionIds.length ||
-      shot.characterVersionIds.some((id) => !allowedCharacters.has(String(id))) ||
-      (allowedResearch.size === 0 && requestedResearch !== null)
+      characterVersionIds.length < 1 ||
+      characterVersionIds.length > 4 ||
+      characterVersionIds.some((id) => !allowedCharacters.has(id))
     ) {
       throw new PreflightPlanAgentError("Director shot binding is invalid.");
     }
+    const hasUsableSfxWindow =
+      requestedSfxCue !== "deliberate silence" && shotDurationMs >= 500;
+    const sfxCue = hasUsableSfxWindow ? requestedSfxCue : "deliberate silence";
+    const sfxDurationMs = hasUsableSfxWindow
+      ? Math.min(Math.max(requestedSfxDurationMs, 500), shotDurationMs, 5_000)
+      : 0;
+    const sfxStartOffsetMs = hasUsableSfxWindow
+      ? Math.min(requestedSfxStartOffsetMs, shotDurationMs - sfxDurationMs, 14_999)
+      : 0;
     let selectedResearch =
       requestedResearch !== null && allowedResearch.has(requestedResearch)
         ? requestedResearch
@@ -1053,9 +1067,7 @@ function parseDirectorOutput(
     }
     return Object.freeze({
       cameraMotion: text(shot.cameraMotion, "Camera motion", 1_200),
-      characterVersionIds: Object.freeze(
-        shot.characterVersionIds.map((id) => String(id)),
-      ),
+      characterVersionIds: Object.freeze(characterVersionIds),
       emotionalRead: text(shot.emotionalRead, "Emotional read", 1_200),
       framing: text(shot.framing, "Framing", 1_200),
       lighting: text(shot.lighting, "Lighting", 1_200),
@@ -1070,7 +1082,7 @@ function parseDirectorOutput(
       sfxStartOffsetMs,
       shotNumber: index + 1,
       subjectAction: text(shot.subjectAction, "Subject action", 1_200),
-      transition: shot.transition as DirectorCutType,
+      transition: transition as DirectorCutType,
       visualIntent: text(shot.visualIntent, "Visual intent", 1_200),
     });
   });

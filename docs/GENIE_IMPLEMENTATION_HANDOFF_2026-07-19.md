@@ -1698,3 +1698,29 @@ context-minimized independent re-review with no remaining P0/P1/P2 finding.
 The remaining release proof is one production-scale Ekadashi plan commit under
 the 30-second function timeout, followed by autonomous storyboard, clips,
 edit and final playable-video verification.
+
+## 34. 2026-07-24 Director bounded-metadata recovery
+
+After the timeout fix reached production, the scheduler correctly created and
+claimed `Ekadashi 1` plan-evaluation run 5. The Director completed its
+structured response, but the run stopped before any media spend because
+bounded editorial metadata was internally inconsistent: a valid World-bound
+shot could still repeat one character identity, request a later
+`fade_from_black`, or place an otherwise valid SFX outside its exact narration
+window. These are recoverable metadata defects, not reasons to discard a
+complete cinematic plan.
+
+The Director parser now preserves shot order, immutable narration windows,
+World identities and creative content while applying only deterministic
+contract normalization: duplicate references to the same character collapse
+to one, a later `fade_from_black` becomes `hard_cut`, a deliberate-silence cue
+has zero timing, and an audible SFX is clamped inside its exact shot window
+(or becomes deliberate silence when the window is shorter than 500 ms).
+Research references remain limited to the selected location's accepted,
+licensed set; an irrelevant model-supplied reference for a location without
+research is ignored instead of being attached.
+
+Focused evidence passes formatting, TypeScript and all `10/10` executable-plan
+agent tests, including a production-shaped normalization regression. The next
+release proof is deployment followed by a fresh automatic `Ekadashi 1` plan
+run and the complete storyboard, clip, edit and playable-video path.
