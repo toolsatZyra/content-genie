@@ -1013,6 +1013,8 @@ function assertShotCharacterBindings(
     if (!aliases.some((alias) => containsNormalizedPhrase(directiveText, alias))) {
       throw new PreflightPlanAgentError(
         "Director shot does not explicitly bind every depicted World identity.",
+        true,
+        "PLAN_CHARACTER_BINDING_INVALID",
       );
     }
   }
@@ -1024,6 +1026,8 @@ function assertShotCharacterBindings(
     ) {
       throw new PreflightPlanAgentError(
         "Director shot depicts a person who is not present in the locked World.",
+        true,
+        "PLAN_CHARACTER_BINDING_INVALID",
       );
     }
   }

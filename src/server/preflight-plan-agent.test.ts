@@ -662,8 +662,9 @@ describe("executable cinematic plan agent", () => {
         workspaceId: id("1"),
       }),
     ).rejects.toMatchObject({
-      code: "PLAN_PREFLIGHT_INVALID",
+      code: "PLAN_CHARACTER_BINDING_INVALID",
       message: "Director shot depicts a person who is not present in the locked World.",
+      retryable: true,
     });
     expect(
       mocks.rpc.mock.calls.some(([name]) => name === "command_record_preflight_plan"),

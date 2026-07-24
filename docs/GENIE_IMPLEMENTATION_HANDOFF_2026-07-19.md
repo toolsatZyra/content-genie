@@ -1782,7 +1782,9 @@ Every character ID attached to a shot must also be named in that shot's own
 visual or motion directives using its exact locked identity. A deterministic
 parser rejects a missing identity name, reuse of an ID for an unanchored role,
 or a generic human role absent from the accepted World before any plan is
-persisted or evaluated.
+persisted or evaluated. This model-correctable Director defect is classified
+as retryable, so a fresh bounded attempt can correct it automatically instead
+of terminating the entire plan run.
 
 Focused executable-plan evidence passes `11/11`, including the exact
 Goddess-ID-as-devotee regression, and route-aware TypeScript passes. The live
