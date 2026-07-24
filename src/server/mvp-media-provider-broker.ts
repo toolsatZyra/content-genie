@@ -134,6 +134,12 @@ export type MvpFalBilledResult = Readonly<{
   providerUsageEvidenceSha256: string;
 }>;
 
+export type MvpFalQueueResult = Readonly<{
+  data: Record<string, unknown>;
+  providerReportedBillableUnits: number | null;
+  providerUsageEvidenceSha256: string | null;
+}>;
+
 export type MvpFalBillingEvent = Readonly<{
   costEstimateNanoUsd: number;
   endpointId: string;
@@ -147,8 +153,9 @@ export type MvpFalBillingEvent = Readonly<{
 function billableUnits(response: Response): Readonly<{
   canonical: string;
   value: number;
-}> {
+}> | null {
   const raw = response.headers.get("x-fal-billable-units")?.trim() ?? "";
+  if (!raw) return null;
   if (!/^(?:0|[1-9][0-9]*)(?:[.][0-9]{1,4})?$/u.test(raw)) {
     throw new MvpMediaProviderBrokerError(
       "The provider result is missing exact billing evidence.",
@@ -336,22 +343,24 @@ export async function fetchMvpFalQueueJson(
 export async function fetchMvpFalQueueResult(
   urlValue: string,
   timeoutMs: number,
-): Promise<MvpFalBilledResult> {
+): Promise<MvpFalQueueResult> {
   const result = await fetchMvpFalQueueResponse(urlValue, timeoutMs);
   const billing = billableUnits(result.response);
   return Object.freeze({
     data: result.data,
-    providerReportedBillableUnits: billing.value,
-    providerUsageEvidenceSha256: createHash("sha256")
-      .update(
-        JSON.stringify({
-          billableUnits: billing.canonical,
-          responseUrl: result.url.toString(),
-          sourceHeader: "x-fal-billable-units",
-        }),
-        "utf8",
-      )
-      .digest("hex"),
+    providerReportedBillableUnits: billing?.value ?? null,
+    providerUsageEvidenceSha256: billing
+      ? createHash("sha256")
+          .update(
+            JSON.stringify({
+              billableUnits: billing.canonical,
+              responseUrl: result.url.toString(),
+              sourceHeader: "x-fal-billable-units",
+            }),
+            "utf8",
+          )
+          .digest("hex")
+      : null,
   });
 }
 

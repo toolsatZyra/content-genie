@@ -229,6 +229,28 @@ describe("durable MVP media dispatch", () => {
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
+  it("uses the authoritative request billing event when the result omits legacy units", async () => {
+    mocks.result.mockResolvedValue({
+      data: { video: { url: "https://x.fal.media/clip.mp4" } },
+      providerReportedBillableUnits: null,
+      providerUsageEvidenceSha256: null,
+    });
+
+    await expect(
+      fetchMvpFalBilledResultForDispatch({
+        externalRequestId: control.externalRequestId,
+        providerDispatchId: ids.dispatch,
+        responseUrl: control.responseUrl,
+        timeoutMs: 5_000,
+      }),
+    ).resolves.toEqual({
+      billingEvent,
+      data: { video: { url: "https://x.fal.media/clip.mp4" } },
+      providerReportedBillableUnits: billingEvent.outputUnits,
+      providerUsageEvidenceSha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
+    });
+  });
+
   it("fails closed when the persisted dispatch timestamp is unavailable", async () => {
     mocks.maybeSingle.mockResolvedValue({ data: null, error: null });
 

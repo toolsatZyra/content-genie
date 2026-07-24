@@ -409,8 +409,9 @@ export async function fetchMvpFalBilledResultForDispatch(input: {
       );
     }
     if (
+      result.providerReportedBillableUnits !== null &&
       Math.abs(billingEvent.outputUnits - result.providerReportedBillableUnits) >
-      0.000_001
+        0.000_001
     ) {
       throw new MvpMediaProviderBrokerError(
         "The provider billing event conflicts with its result receipt.",
@@ -418,7 +419,27 @@ export async function fetchMvpFalBilledResultForDispatch(input: {
         "PROVIDER_BILLING_UNRECONCILED",
       );
     }
-    return Object.freeze({ ...result, billingEvent });
+    const providerReportedBillableUnits =
+      result.providerReportedBillableUnits ?? billingEvent.outputUnits;
+    const providerUsageEvidenceSha256 =
+      result.providerUsageEvidenceSha256 ??
+      createHash("sha256")
+        .update(
+          JSON.stringify({
+            billingEventEvidenceSha256: billingEvent.evidenceSha256,
+            outputUnits: providerReportedBillableUnits,
+            responseUrl: input.responseUrl,
+            source: "fal-request-billing-event",
+          }),
+          "utf8",
+        )
+        .digest("hex");
+    return Object.freeze({
+      billingEvent,
+      data: result.data,
+      providerReportedBillableUnits,
+      providerUsageEvidenceSha256,
+    });
   } catch (caught) {
     if (
       caught instanceof MvpMediaProviderBrokerError &&

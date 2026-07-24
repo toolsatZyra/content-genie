@@ -293,8 +293,20 @@ describe("MVP FAL provider broker", () => {
     });
   });
 
-  it.each([undefined, "", "-1", "NaN", "1.00001", "10001"])(
-    "rejects missing or invalid provider billing evidence: %s",
+  it.each([undefined, ""])(
+    "allows the authoritative request billing event to supply omitted result units: %s",
+    async (units) => {
+      vi.mocked(fetch).mockResolvedValue(billedJsonResponse({ images: [] }, units));
+      await expect(fetchMvpFalQueueResult(responseUrl, 5_000)).resolves.toEqual({
+        data: { images: [] },
+        providerReportedBillableUnits: null,
+        providerUsageEvidenceSha256: null,
+      });
+    },
+  );
+
+  it.each(["-1", "NaN", "1.00001", "10001"])(
+    "rejects invalid provider billing evidence: %s",
     async (units) => {
       vi.mocked(fetch).mockResolvedValue(billedJsonResponse({ images: [] }, units));
       await expect(fetchMvpFalQueueResult(responseUrl, 5_000)).rejects.toMatchObject({
