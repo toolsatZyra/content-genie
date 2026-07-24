@@ -156,7 +156,7 @@ function billableUnits(response: Response): Readonly<{
 }> | null {
   const raw = response.headers.get("x-fal-billable-units")?.trim() ?? "";
   if (!raw) return null;
-  if (!/^(?:0|[1-9][0-9]*)(?:[.][0-9]{1,4})?$/u.test(raw)) {
+  if (!/^(?:0|[1-9][0-9]*)(?:[.][0-9]{1,18})?$/u.test(raw)) {
     throw new MvpMediaProviderBrokerError(
       "The provider result is missing exact billing evidence.",
       "terminal",

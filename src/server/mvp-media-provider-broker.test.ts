@@ -180,6 +180,21 @@ describe("MVP FAL provider broker", () => {
     });
   });
 
+  it("accepts the provider's bounded floating-point unit representation", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      billedJsonResponse(
+        { video: { url: "https://x.fal.media/clip.mp4" } },
+        "2.4000000000000004",
+      ),
+    );
+
+    await expect(fetchMvpFalQueueResult(responseUrl, 12_345)).resolves.toEqual({
+      data: { video: { url: "https://x.fal.media/clip.mp4" } },
+      providerReportedBillableUnits: 2.4000000000000004,
+      providerUsageEvidenceSha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
+    });
+  });
+
   it("binds a request-level provider billing event with discounts", async () => {
     vi.mocked(fetch).mockResolvedValue(
       jsonResponse({
@@ -305,7 +320,7 @@ describe("MVP FAL provider broker", () => {
     },
   );
 
-  it.each(["-1", "NaN", "1.00001", "10001"])(
+  it.each(["-1", "NaN", "1e2", "1.0000000000000000001", "10001"])(
     "rejects invalid provider billing evidence: %s",
     async (units) => {
       vi.mocked(fetch).mockResolvedValue(billedJsonResponse({ images: [] }, units));
