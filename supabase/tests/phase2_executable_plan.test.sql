@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions,auth,storage,private,audit,pg_catalog;
-select plan(74);
+select plan(75);
 grant usage on schema private to service_role;
 grant select on all tables in schema private to service_role;
 
@@ -47,6 +47,15 @@ select is(
   ),
   '30s',
   'the bounded plan ledger has a function-local API timeout exemption'
+);
+select ok(
+  position(
+    'errcode = ''22023'''
+    in pg_get_functiondef(
+      'public.command_record_preflight_plan(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,text,numeric,numeric,numeric,numeric,numeric,jsonb,jsonb)'::regprocedure
+    )
+  ) > 0,
+  'deterministic plan validation failures are non-retryable through the Data API'
 );
 
 select lives_ok($sql$
@@ -169,12 +178,12 @@ select has_column('public','preflight_provider_request_slots','input_strategy',
   'request slots distinguish composed frames from direct provider references');
 select ok(
   position('mod((slot->>''durationMs'')::integer,capability.duration_quantum_ms)<>0'
-    in pg_get_functiondef('public.command_record_preflight_plan(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,text,numeric,numeric,numeric,numeric,numeric,jsonb,jsonb)'::regprocedure))>0,
+    in pg_get_functiondef('public.command_record_preflight_plan_retryable(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,text,numeric,numeric,numeric,numeric,numeric,jsonb,jsonb)'::regprocedure))>0,
   'the plan command rejects durations that do not obey provider quanta'
 );
 select ok(
   position('input_strategy=''composited_start_frame'''
-    in pg_get_functiondef('public.command_record_preflight_plan(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,text,numeric,numeric,numeric,numeric,numeric,jsonb,jsonb)'::regprocedure))>0,
+    in pg_get_functiondef('public.command_record_preflight_plan_retryable(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,text,numeric,numeric,numeric,numeric,numeric,jsonb,jsonb)'::regprocedure))>0,
   'the plan command validates composed versus direct reference expansion'
 );
 
@@ -494,37 +503,37 @@ set local role service_role;
 select throws_ok(
   format('select pg_temp.attempt_executable_plan(%L::jsonb)',
     jsonb_set(plan,'{references,1,sourceShotNumber}','2'::jsonb)),
-  '40001','reference graph is cyclic, stale, later-bound, or unsafe',
+  '22023','reference graph is cyclic, stale, later-bound, or unsafe',
   'a self-dependent shot cycle is rejected before plan publication'
 ) from executable_plan_fixture;
 select throws_ok(
   format('select pg_temp.attempt_executable_plan(%L::jsonb)',
     jsonb_set(plan,'{references,1,sourceShotNumber}','3'::jsonb)),
-  '40001','reference graph is cyclic, stale, later-bound, or unsafe',
+  '22023','reference graph is cyclic, stale, later-bound, or unsafe',
   'a later-shot dependency is rejected before plan publication'
 ) from executable_plan_fixture;
 select throws_ok(
   format('select pg_temp.attempt_executable_plan(%L::jsonb)',
     jsonb_set(plan,'{requestSlots,0,referenceCount}','2'::jsonb)),
-  '40001','provider request slot breaches its authenticated capability',
+  '22023','provider request slot breaches its authenticated capability',
   'a plan cannot exceed the authenticated provider reference cap'
 ) from executable_plan_fixture;
 select throws_ok(
   format('select pg_temp.attempt_executable_plan(%L::jsonb)',
     jsonb_set(plan,'{references,0,contentHash}',to_jsonb(repeat('f',64)))),
-  '40001','reference graph is cyclic, stale, later-bound, or unsafe',
+  '22023','reference graph is cyclic, stale, later-bound, or unsafe',
   'an external reference with a stale asset hash is rejected'
 ) from executable_plan_fixture;
 select throws_ok(
   format('select pg_temp.attempt_executable_plan(%L::jsonb)',
     jsonb_set(plan,'{references,1,contentHash}',to_jsonb(repeat('e',64)))),
-  '40001','reference graph is cyclic, stale, later-bound, or unsafe',
+  '22023','reference graph is cyclic, stale, later-bound, or unsafe',
   'a continuity edge with a stale upstream shot hash is rejected'
 ) from executable_plan_fixture;
 select throws_ok(
   format('select pg_temp.attempt_executable_plan(%L::jsonb)',
     jsonb_set(plan,'{references,1,requiresUpstreamSuccess}','false'::jsonb)),
-  '40001','reference graph is cyclic, stale, later-bound, or unsafe',
+  '22023','reference graph is cyclic, stale, later-bound, or unsafe',
   'a downstream reference cannot bypass explicit upstream-success gating'
 ) from executable_plan_fixture;
 select is(
@@ -612,7 +621,7 @@ select is(
 select throws_ok(
   format('select pg_temp.attempt_executable_plan(%L::jsonb)',
     jsonb_set(plan,'{beats,0,exactText}',to_jsonb('abcdeg'::text))),
-  '40001','beats do not cover the locked script/master clock',
+  '22023','beats do not cover the locked script/master clock',
   'one mutated script scalar invalidates executable-plan eligibility'
 ) from executable_plan_fixture;
 select throws_ok($sql$

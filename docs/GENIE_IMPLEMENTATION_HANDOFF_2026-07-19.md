@@ -1733,3 +1733,24 @@ Fluid Compute; the documented Pro/Enterprise per-function maximum is 800
 seconds. Only `/api/cron/mvp-preflight` is raised to that bounded maximum.
 Fencing, the 15-minute lease, attempt limits, exact receipt reconciliation and
 all provider-spend authority remain unchanged.
+
+The subsequent complete agent chain exposed two independent ledger-path
+defects. First, `command_record_preflight_plan` historically raised SQLSTATE
+`40001` for deterministic contract rejection. PostgREST treated that state as
+retryable transaction serialization and replayed the large request until an
+upstream timeout hid the useful validation message. Forward migration
+`20260724103500_preflight_plan_validation_no_retry.sql`, applied to preview and
+production, preserves the original implementation behind a non-public helper
+and exposes a one-shot wrapper which maps its deterministic rejection to
+`22023`. The exact rejection then surfaced immediately: the generated beats
+did not continuously cover the locked master clock.
+
+The accepted ElevenLabs alignment contains four legitimate inter-word silence
+gaps, the largest 247 ms. Shot text and scalar coverage were exact, but both
+timeline builders began each shot at its first word, leaving those silence
+intervals uncovered. The deterministic timeline now assigns every verified
+gap to the following shot: shot one begins at zero, every later shot begins at
+the prior shot end, and the final shot reaches the unchanged 63.060-second
+master clock. Spoken text, word order, alignment scalars and word timestamps
+remain unchanged. A focused regression covers the exact silence case and the
+complete plan-agent/timeline suite passes `17/17`.

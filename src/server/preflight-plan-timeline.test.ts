@@ -98,6 +98,44 @@ describe("deterministic cinematic timeline", () => {
     expect(timeline.beats).toHaveLength(3);
   });
 
+  it("assigns verified inter-word silence to the following semantic shot", () => {
+    const input = fixture();
+    const boundaries = Array.from({ length: 12 }, (_, index) => ({
+      endSegmentNumber:
+        index === 11 ? input.segments.length : Math.round(((index + 1) * 239) / 12),
+      sceneNumber: Math.floor(index / 4) + 1,
+      shotNumber: index + 1,
+      startSegmentNumber: index === 0 ? 1 : Math.round((index * 239) / 12) + 1,
+    }));
+    const boundaryStarts = new Set(
+      boundaries.slice(1).map(({ startSegmentNumber }) => startSegmentNumber),
+    );
+    const segments = input.segments.map((segment) =>
+      boundaryStarts.has(segment.segmentNumber)
+        ? { ...segment, startMs: segment.startMs + 100 }
+        : segment,
+    );
+    const timeline = buildCinematicTimelineFromShotPlan({
+      ...input,
+      boundaries,
+      segments,
+    });
+
+    expect(
+      segments.some(
+        (segment, index) => index > 0 && segment.startMs > segments[index - 1]!.endMs,
+      ),
+    ).toBe(true);
+    for (const [index, shot] of timeline.shots.entries()) {
+      expect(shot.startMs).toBe(index === 0 ? 0 : timeline.shots[index - 1]!.endMs);
+    }
+    expect(timeline.shots.map(({ exactText }) => exactText).join("")).toBe(
+      input.processingText,
+    );
+    expect(timeline.beats[0]!.startMs).toBe(0);
+    expect(timeline.beats.at(-1)!.endMs).toBe(input.durationMs);
+  });
+
   it("rejects semantic shot plans with gaps, overlaps, or shots longer than 15s", () => {
     const input = fixture();
     expect(() =>

@@ -166,6 +166,7 @@
     "supabase/migrations/20260724041500_p2_09_runtime_bundle_reconciliation.sql",
     "supabase/migrations/20260724070000_owner_mvp_script_rubric_deferred_waiver.sql",
     "supabase/migrations/20260724071000_owner_mvp_script_rubric_preflight_waiver.sql",
-    "supabase/migrations/20260724090000_preflight_plan_rpc_timeout_exemption.sql"
+    "supabase/migrations/20260724090000_preflight_plan_rpc_timeout_exemption.sql",
+    "supabase/migrations/20260724103500_preflight_plan_validation_no_retry.sql"
   ]
 }

@@ -177,7 +177,9 @@ export function buildCinematicTimeline(input: {
   const ungroupedShots = ranges.map((range, index) => {
     const first = input.segments[range.startIndex]!;
     const last = input.segments[range.endIndex]!;
-    const duration = last.endMs - first.startMs;
+    const startMs =
+      index === 0 ? 0 : input.segments[ranges[index - 1]!.endIndex]!.endMs;
+    const duration = last.endMs - startMs;
     if (duration < MINIMUM_SHOT_MS || duration > MAXIMUM_SHOT_MS) {
       throw new PreflightPlanTimelineError(
         `Shot window ${index + 1} falls outside the provider planning band.`,
@@ -188,7 +190,7 @@ export function buildCinematicTimeline(input: {
       endScalar: last.endScalar,
       exactText: exactSlice(input.processingText, first.startScalar, last.endScalar),
       shotNumber: index + 1,
-      startMs: first.startMs,
+      startMs,
       startScalar: first.startScalar,
     };
   });
@@ -265,7 +267,8 @@ export function buildCinematicTimelineFromShotPlan(input: {
         "The semantic shot plan does not cover the narration in order.",
       );
     }
-    const duration = last.endMs - first.startMs;
+    const startMs = index === 0 ? 0 : shots.at(-1)!.endMs;
+    const duration = last.endMs - startMs;
     if (duration < 1_000 || duration > 15_000) {
       throw new PreflightPlanTimelineError(
         `Semantic shot ${boundary.shotNumber} is outside the qualified provider duration envelope.`,
@@ -278,7 +281,7 @@ export function buildCinematicTimelineFromShotPlan(input: {
         endScalar: last.endScalar,
         exactText: exactSlice(input.processingText, first.startScalar, last.endScalar),
         shotNumber: boundary.shotNumber,
-        startMs: first.startMs,
+        startMs,
         startScalar: first.startScalar,
       }),
     );
