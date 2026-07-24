@@ -849,6 +849,8 @@ describe("executable cinematic plan agent", () => {
                   lighting: "A motivated edge light guides the audience toward Devi.",
                   narrativeFunction:
                     "Orient the audience to the source-bound visual question.",
+                  visualIntent:
+                    "The audience understands the exact source-bound turning point.",
                 }
               : shot,
           ),

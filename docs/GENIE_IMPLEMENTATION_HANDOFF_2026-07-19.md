@@ -1998,3 +1998,24 @@ The quote and plan focused suites pass `20/20`; formatting, lint and
 route-aware TypeScript pass. No provider spend occurred on the failed quote.
 A fresh successor must reuse or reproduce the passed plan, compile the quote,
 and continue into storyboard generation.
+
+## 43. 2026-07-24 Visible-occupant guard metadata exclusion
+
+Runs 33 and 34 showed a high rate of `PLAN_CHARACTER_BINDING_INVALID` after the
+guard's earlier scope reduction. Exact World ID-to-character-key binding was
+not the source of every rejection: `visualIntent` is editorial metadata and
+can correctly say that an image should guide or orient the audience without
+placing an audience in the image. Scanning it as visible composition therefore
+retained the same false-positive class already removed from camera motion,
+lighting, emotional read and narrative function.
+
+The phrase guard now scans only `framing` and `subjectAction`, the fields that
+literally specify who is in the image and what that subject does. Exact
+character IDs and keys remain mandatory, and the existing anonymous-devotee
+regression still fails when that person is placed in framing or action. The
+positive editorial-audience regression now covers `visualIntent` as well.
+
+The focused executable-plan suite remains `17/17`; formatting, lint and
+route-aware TypeScript pass. A clean post-deploy successor must prove that this
+removes metadata false positives without weakening visible-person rejection,
+then reach the repaired quote and media path.
